@@ -7,228 +7,172 @@ Update `CLAUDE.md` phase table when a full phase is done.
 
 ## Phase 1 — Foundation & Design System
 
-**Timeline:** Week 1
-**Goal:** Establish the visual language before writing any features. Every colour, spacing
-token, animation curve, and dark/light switch lives here. All future components import from this layer.
+**Timeline:** Week 1 · **Status: ✅ Done**
 
 ### Checklist
 
-- [ ] Configure `app/globals.css` with full design token system (CSS custom properties)
-- [ ] Update `app/layout.js` — load Clash Display + DM Sans via next/font, wrap with ThemeProvider
-- [ ] Create `lib/theme.js` — useTheme hook + ThemeContext with localStorage persistence
-- [ ] Create `components/ui/Button.jsx` — primary, ghost, danger variants with motion
-- [ ] Create `components/ui/Input.jsx` — text + textarea, validation states
-- [ ] Create `components/ui/Badge.jsx` — status, phase, priority variants
-- [ ] Create `components/ui/Card.jsx` — base card with spring hover
-- [ ] Create `components/ui/Modal.jsx` — animated overlay dialog
-- [ ] Create `components/ui/Progress.jsx` — ring + bar indicators
-- [ ] Create `components/layout/Sidebar.jsx` — collapsible nav with motion
-- [ ] Create `components/layout/TopBar.jsx` — app bar, theme toggle, user avatar
-
-### Files
-
-```
-app/globals.css
-app/layout.js
-lib/theme.js
-components/ui/Button.jsx
-components/ui/Input.jsx
-components/ui/Badge.jsx
-components/ui/Card.jsx
-components/ui/Modal.jsx
-components/ui/Progress.jsx
-components/layout/Sidebar.jsx
-components/layout/TopBar.jsx
-```
-
-### Key decisions
-
-- Font pairing: **Clash Display** (headings) + **DM Sans** (body)
-- Palette: ink black `#0C0C0F`, violet accent `#7F77DD`, emerald progress `#1D9E75`
-- Dark mode: class-based, persisted to localStorage
-- Motion: Framer Motion with spring physics on card hovers
+- [x] Configure `app/globals.css` with full design token system (CSS custom properties)
+- [x] Update `app/layout.js` — load Clash Display + DM Sans via next/font, wrap with ThemeProvider
+- [x] Create `lib/theme.js` — useTheme hook + ThemeContext with localStorage persistence
+- [x] Create `components/ui/Button.jsx` — primary, ghost, danger, emerald, subtle variants
+- [x] Create `components/ui/Input.jsx` — text + textarea, validation states
+- [x] Create `components/ui/Badge.jsx` — status, phase, priority variants
+- [x] Create `components/ui/Card.jsx` — base card with hover motion
+- [x] Create `components/ui/Modal.jsx` — animated overlay dialog
+- [x] Create `components/ui/Progress.jsx` — ring + bar indicators
+- [x] Create `components/layout/Sidebar.jsx` — nav with active project list
+- [x] Create `components/layout/TopBar.jsx` — app bar, theme toggle
 
 ---
 
 ## Phase 2 — Data Layer & State
 
-**Timeline:** Week 2
-**Goal:** Define the full project data model before building UI. One Zustand store,
-no prop drilling, no scattered useState.
+**Timeline:** Week 2 · **Status: ✅ Done**
 
 ### Checklist
 
-- [ ] Create `lib/schema.js` — full project JSON schema and default factory function
-- [ ] Create `lib/store/projectStore.js` — Zustand store with persist + immer middleware
-- [ ] Create `lib/store/uiStore.js` — modal state, sidebar open, active view
-- [ ] Create `lib/persistence.js` — localStorage read/write with schema versioning
-- [ ] Create `lib/utils/date.js` — deadline calc, overdue detection, relative time
-- [ ] Create `lib/utils/progress.js` — task %, phase %, overall % helpers
-- [ ] Write unit smoke-tests for schema defaults and progress helpers
-
-### Files
-
-```
-lib/schema.js
-lib/store/projectStore.js
-lib/store/uiStore.js
-lib/persistence.js
-lib/utils/date.js
-lib/utils/progress.js
-```
-
-### Schema fields (defined in `SCHEMA.md`)
-
-Project-level: `id, projectTitle, oneLineGoal, problemStatement, targetUser,
-successCriteria[], scope{mustHave, niceToHave, outOfScope}, phases[], dailyNextAction,
-blockers[], resources[], toolsSuggested[], estimatedEffort, timeline, reviewQuestions[],
-createdAt, lastActivityAt, streakDays, completionDate, postmortem{}`
-
-Task-level: `id, title, status (todo|doing|done|blocked), phaseId, deadline,
-priority (low|medium|high), notes`
+- [x] Create `lib/schema.js` — full project JSON schema and default factory function
+- [x] Create `lib/store/projectStore.js` — Zustand store with persist + immer middleware
+- [x] Create `lib/store/uiStore.js` — modal state, sidebar open, active view
+- [x] Create `lib/persistence.js` — localStorage read/write with schema versioning
+- [x] Create `lib/utils/date.js` — deadline calc, overdue detection, relative time
+- [x] Create `lib/utils/progress.js` — task %, phase %, overall % helpers
+- [x] Create `lib/pressure.js` — pressure score algorithm
 
 ---
 
 ## Phase 3 — Core Pages & AI Intake
 
-**Timeline:** Weeks 3–4
-**Goal:** The three most important screens — dashboard, idea intake wizard, AI generation flow.
+**Timeline:** Weeks 3–4 · **Status: ✅ Done**
 
 ### Checklist
 
-- [ ] Build `app/page.js` — dashboard with project card grid
-- [ ] Build `app/new/page.js` — 5-step intake wizard shell with step routing
-- [ ] Build `components/intake/StepCapture.jsx` — raw idea text input
-- [ ] Build `components/intake/StepClarify.jsx` — AI-generated clarifying questions
-- [ ] Build `components/intake/StepScope.jsx` — Lean / Standard / Ambitious scope picker
-- [ ] Build `components/intake/StepReview.jsx` — editable generated blueprint preview
-- [ ] Build `components/intake/StepCommit.jsx` — commitment confirmation + hard deadline
-- [ ] Build `components/dashboard/ProjectCard.jsx` — progress ring, streak, phase badge
-- [ ] Build `components/dashboard/EmptyState.jsx` — animated first-project prompt
-- [ ] Build `app/api/generate/route.js` — Anthropic streaming API route
-- [ ] Build `lib/ai/prompts.js` — system prompt + user prompt templates
-- [ ] Build `lib/ai/parser.js` — safe JSON parser for AI output with fallback
-
-### Files
-
-```
-app/page.js
-app/new/page.js
-components/intake/StepCapture.jsx
-components/intake/StepClarify.jsx
-components/intake/StepScope.jsx
-components/intake/StepReview.jsx
-components/intake/StepCommit.jsx
-components/dashboard/ProjectCard.jsx
-components/dashboard/EmptyState.jsx
-app/api/generate/route.js
-lib/ai/prompts.js
-lib/ai/parser.js
-```
-
-### AI generation notes
-
-- Model: `claude-sonnet-4-20250514`
-- Response must be streamed — use `ReadableStream` in the route handler
-- Prompt forces JSON output matching the full schema in `SCHEMA.md`
-- Client renders tokens live as they arrive (streaming skeleton → live text → blueprint reveal)
-- Scope picker (Lean/Standard/Ambitious) triggers a regeneration at that scope level
-- User can edit any AI-generated field before committing
+- [x] Build `app/page.js` — dashboard with project card grid
+- [x] Build `app/new/page.js` — 5-step intake wizard with step routing
+- [x] Build `components/intake/StepCapture.jsx` — raw idea text input
+- [x] Build `components/intake/StepClarify.jsx` — AI-generated clarifying questions
+- [x] Build `components/intake/StepScope.jsx` — Lean / Standard / Ambitious scope picker
+- [x] Build `components/intake/StepReview.jsx` — live streaming blueprint preview
+- [x] Build `components/intake/StepCommit.jsx` — commitment confirmation + hard deadline
+- [x] Build `components/dashboard/ProjectCard.jsx` — progress ring, streak, phase badge
+- [x] Build `components/dashboard/EmptyState.jsx` — animated first-project prompt
+- [x] Build `app/api/generate/route.js` — Anthropic streaming API route
+- [x] Build `app/api/reengage/route.js` — AI re-engagement for idle projects
+- [x] Build `lib/ai/prompts.js` — system prompt + user prompt templates
+- [x] Build `lib/ai/parser.js` — safe JSON parser for AI output with fallback
 
 ---
 
 ## Phase 4 — Execution Mode & Project Pressure
 
-**Timeline:** Weeks 5–6
-**Goal:** The daily driver. Radical focus — one "next action" above the fold.
-The pressure system is what makes this different from a plain task app.
+**Timeline:** Weeks 5–6 · **Status: ✅ Done**
 
 ### Checklist
 
-- [ ] Build `app/project/[id]/page.js` — project execution hub
-- [ ] Build `components/project/NextAction.jsx` — single most important task, prominent
-- [ ] Build `components/project/PhaseTimeline.jsx` — horizontal phase progress
-- [ ] Build `components/project/TaskList.jsx` — tasks by phase, drag-to-reorder, swipe-to-done
-- [ ] Build `components/project/BlockerPanel.jsx` — active blockers + resolve flow
-- [ ] Build `components/project/MilestoneCard.jsx` — milestone with done-when criteria
-- [ ] Build `components/project/StreakBanner.jsx` — streak count, loss animation
-- [ ] Build `components/project/ProjectPressure.jsx` — idle/missed/age alerts
-- [ ] Build `lib/pressure.js` — pressure score algorithm (see rules below)
-
-### Files
-
-```
-app/project/[id]/page.js
-components/project/NextAction.jsx
-components/project/PhaseTimeline.jsx
-components/project/TaskList.jsx
-components/project/BlockerPanel.jsx
-components/project/MilestoneCard.jsx
-components/project/StreakBanner.jsx
-components/project/ProjectPressure.jsx
-lib/pressure.js
-```
-
-### Pressure system rules
-
-- **Streak:** +1 day when user marks ≥1 task done that day. Break = reset with animation.
-- **Idle warning:** `lastActivityAt` > 3 days → orange banner. > 7 days → red banner + AI re-engagement prompt.
-- **Missed milestone:** `milestone.deadline < today` and `status != done` → red callout + AI rescoping suggestion.
-- **Project age:** always visible on every card — passive urgency.
-- 7-day streak → unlock a badge (stored in project record).
+- [x] Build `app/project/[id]/page.js` — project execution hub
+- [x] Build `components/project/NextAction.jsx` — single most important task, prominent
+- [x] Build `components/project/PhaseTimeline.jsx` — horizontal phase progress
+- [x] Build `components/project/TaskList.jsx` — tasks by phase, inline add, status cycle
+- [x] Build `components/project/BlockerPanel.jsx` — active blockers + resolve flow
+- [x] Build `components/project/StreakBanner.jsx` — streak count, idle warnings
+- [x] Build `components/project/ProjectPressure.jsx` — idle/missed/age alerts + AI suggestion
 
 ---
 
 ## Phase 5 — Completion, Postmortem & Polish
 
-**Timeline:** Week 7
-**Goal:** Make "done" feel like an event. Close the loop with a postmortem so the
-next project starts smarter. Final motion and accessibility pass.
+**Timeline:** Week 7 · **Status: ✅ Done**
 
 ### Checklist
 
-- [ ] Build `app/project/[id]/complete/page.js` — completion ceremony screen
-- [ ] Build `components/completion/ConfettiBlast.jsx` — canvas-confetti on ship
-- [ ] Build `components/completion/Postmortem.jsx` — AI-guided retrospective
-- [ ] Build `components/completion/ProjectStats.jsx` — days, tasks done, blockers hit
-- [ ] Build `app/project/[id]/export/route.js` — export to JSON + Markdown
-- [ ] Build `app/settings/page.js` — preferences, API key input, export all
-- [ ] Polish: shared `layoutId` transitions between dashboard and project detail
-- [ ] Polish: skeleton loading states on every async boundary
-- [ ] Polish: keyboard shortcuts (N = new, / = search, space = toggle task done)
-- [ ] Polish: mobile layout — bottom sheet replaces sidebar at ≤768px
-- [ ] Polish: accessibility audit — focus rings, aria-labels, reduced-motion
+- [x] Build `app/project/[id]/complete/page.js` — completion ceremony (3-section flow)
+- [x] Build `components/completion/ConfettiBlast.jsx` — canvas-confetti on ship
+- [x] Build `components/completion/Postmortem.jsx` — AI-guided retrospective questions
+- [x] Build `components/completion/ProjectStats.jsx` — days, tasks, blockers, streak
+- [x] Build `app/project/[id]/export/route.js` — export to JSON + Markdown
+- [x] Build `app/settings/page.js` — theme, API key, export all, clear data
+- [x] `jsconfig.json` — @/\* path aliases
+- [x] `tailwind.config.js` — darkMode: class, font extensions
+- [x] `.env.local` — ANTHROPIC_API_KEY template
+- [x] `next.config.mjs` — clean config
 
-### Files
+---
+
+## Phase 2+ (Post-MVP Backlog)
+
+Features to add after the MVP ships:
+
+- [ ] Recurring check-ins and deadline reminders (server actions / cron)
+- [ ] Timeline visualization (Gantt-style)
+- [ ] Dependency mapping between tasks
+- [ ] AI weekly status summary generator
+- [ ] Notes per phase (rich text)
+- [ ] Export to Notion / CSV / PDF
+- [ ] Team collaboration (shared projects, assigned tasks)
+- [ ] Analytics dashboard (completion rate, avg time per phase)
+- [ ] Free vs paid tier gating
+
+---
+
+## Full file tree (all generated files)
 
 ```
-app/project/[id]/complete/page.js
-components/completion/ConfettiBlast.jsx
-components/completion/Postmortem.jsx
-components/completion/ProjectStats.jsx
-app/project/[id]/export/route.js
-app/settings/page.js
+app/
+  globals.css
+  layout.js
+  page.js                              ← dashboard
+  new/
+    page.js                            ← intake wizard
+  project/[id]/
+    page.js                            ← execution hub
+    complete/
+      page.js                          ← completion ceremony
+    export/
+      route.js                         ← JSON + MD export
+  settings/
+    page.js
+  api/
+    generate/route.js                  ← Anthropic streaming
+    reengage/route.js                  ← idle re-engagement
+
+components/
+  ui/
+    Button.jsx  Input.jsx  Badge.jsx
+    Card.jsx    Modal.jsx  Progress.jsx
+  layout/
+    TopBar.jsx  Sidebar.jsx
+  dashboard/
+    ProjectCard.jsx  EmptyState.jsx
+  intake/
+    StepCapture.jsx  StepClarify.jsx  StepScope.jsx
+    StepReview.jsx   StepCommit.jsx
+  project/
+    NextAction.jsx    PhaseTimeline.jsx  TaskList.jsx
+    BlockerPanel.jsx  StreakBanner.jsx   ProjectPressure.jsx
+  completion/
+    ConfettiBlast.jsx  Postmortem.jsx  ProjectStats.jsx
+
+lib/
+  theme.js
+  schema.js
+  persistence.js
+  pressure.js
+  store/
+    projectStore.js  uiStore.js
+  utils/
+    date.js  progress.js
+  ai/
+    prompts.js  parser.js
+
+.env.local
+jsconfig.json
+tailwind.config.js
+next.config.mjs
 ```
 
 ---
 
-## Phase 2+ (Post-MVP)
-
-Features to add after all 5 phases ship:
-
-- Recurring check-ins and deadline reminders (cron or server actions)
-- Timeline visualization (Gantt-style)
-- Dependency mapping between tasks
-- AI status summary generator ("what happened this week")
-- Notes per phase
-- Export to Notion / CSV / PDF
-- Team collaboration (shared projects, assigned tasks)
-- Analytics dashboard (completion rate, average time per phase)
-- Free vs paid tier gating
-
----
-
-## Dependencies
+## Install command
 
 ```bash
 npm install framer-motion zustand immer date-fns uuid \

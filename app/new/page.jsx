@@ -1,0 +1,137 @@
+"use client";
+
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { StepCapture } from "@/components/intake/StepCapture";
+import { StepClarify } from "@/components/intake/StepClarify";
+import { StepScope } from "@/components/intake/StepScope";
+import { StepReview } from "@/components/intake/StepReview";
+import { StepCommit } from "@/components/intake/StepCommit";
+import { useProjectStore } from "@/lib/store/projectStore";
+
+const STEPS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
+
+export default function NewProjectPage() {
+  const router = useRouter();
+  const addProject = useProjectStore((s) => s.addProject);
+
+  const [step, setStep] = useState(0);
+  const [idea, setIdea] = useState("");
+  const [clarifyAnswers, setClarifyAnswers] = useState({});
+  const [scopeLevel, setScopeLevel] = useState("standard");
+  const [blueprint, setBlueprint] = useState(null);
+
+  const clarifications = Object.entries(clarifyAnswers)
+    .map(([i, answer]) => ({ question: `Q${parseInt(i) + 1}`, answer }))
+    .filter((c) => c.answer.trim());
+
+  const handleCommit = ({ deadline }) => {
+    const id = addProject({
+      ...blueprint,
+      scopeLevel,
+      completionDate: null,
+      ...(deadline ? { timeline: deadline } : {}),
+    });
+    router.push(`/project/${id}`);
+  };
+
+  const handleClarifyChange = (index, value) => {
+    setClarifyAnswers((prev) => ({ ...prev, [index]: value }));
+  };
+
+  return (
+    <div className="min-h-screen bg-[var(--bg-surface)] flex flex-col">
+      {/* Progress header */}
+      <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-6 py-4">
+        <div className="max-w-2xl mx-auto">
+          {/* Step indicators */}
+          <div className="flex items-center gap-2">
+            {STEPS.map((label, i) => (
+              <div key={i} className="flex items-center gap-2">
+                <div className="flex items-center gap-2">
+                  <div
+                    className={[
+                      "w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300",
+                      i < step
+                        ? "bg-[var(--emerald)] text-white"
+                        : i === step
+                        ? "bg-[var(--violet)] text-white"
+                        : "bg-[var(--bg-muted)] text-[var(--text-tertiary)]",
+                    ].join(" ")}
+                  >
+                    {i < step ? "✓" : i + 1}
+                  </div>
+                  <span
+                    className={`text-xs font-medium hidden sm:block ${
+                      i === step
+                        ? "text-[var(--text-primary)]"
+                        : "text-[var(--text-tertiary)]"
+                    }`}
+                  >
+                    {label}
+                  </span>
+                </div>
+                {i < STEPS.length - 1 && (
+                  <div
+                    className={`h-px w-8 transition-colors duration-300 ${
+                      i < step ? "bg-[var(--emerald)]" : "bg-[var(--border)]"
+                    }`}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Step content */}
+      <div className="flex-1 flex items-start justify-center px-6 py-12">
+        <div className="w-full max-w-2xl">
+          {step === 0 && (
+            <StepCapture
+              value={idea}
+              onChange={setIdea}
+              onNext={() => setStep(1)}
+            />
+          )}
+          {step === 1 && (
+            <StepClarify
+              idea={idea}
+              answers={clarifyAnswers}
+              onChange={handleClarifyChange}
+              onNext={() => setStep(2)}
+              onBack={() => setStep(0)}
+            />
+          )}
+          {step === 2 && (
+            <StepScope
+              value={scopeLevel}
+              onChange={setScopeLevel}
+              onNext={() => setStep(3)}
+              onBack={() => setStep(1)}
+            />
+          )}
+          {step === 3 && (
+            <StepReview
+              idea={idea}
+              clarifications={clarifications}
+              scopeLevel={scopeLevel}
+              onBack={() => setStep(2)}
+              onCommit={(bp) => {
+                setBlueprint(bp);
+                setStep(4);
+              }}
+            />
+          )}
+          {step === 4 && blueprint && (
+            <StepCommit
+              blueprint={blueprint}
+              onBack={() => setStep(3)}
+              onConfirm={handleCommit}
+            />
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

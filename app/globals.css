@@ -1,3 +1,227 @@
+@import url("https://api.fontshare.com/v2/css?f[]=clash-display@400,500,600,700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap");
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* ─── Design Tokens ──────────────────────────────────────────────────── */
+:root {
+  /* Fonts */
+  --font-display: "Clash Display", sans-serif;
+  --font-body: "DM Sans", sans-serif;
+
+  /* Palette — Light */
+  --ink: #0c0c0f;
+  --ink-2: #1c1c22;
+  --ink-3: #2e2e38;
+  --slate-1: #f5f5f7;
+  --slate-2: #eeeef2;
+  --slate-3: #e0e0e8;
+  --slate-4: #c8c8d4;
+  --slate-5: #9898a8;
+  --slate-6: #6b6b7e;
+
+  --violet: #7f77dd;
+  --violet-dim: #534ab7;
+  --violet-bg: #eeedfe;
+
+  --emerald: #1d9e75;
+  --emerald-dim: #0f6e56;
+  --emerald-bg: #e1f5ee;
+
+  --amber: #ba7517;
+  --amber-bg: #faeeda;
+
+  --coral: #d85a30;
+  --coral-bg: #faece7;
+
+  --rose: #993556;
+  --rose-bg: #fbeaf0;
+
+  /* Semantic — Light */
+  --bg-base: #ffffff;
+  --bg-surface: var(--slate-1);
+  --bg-elevated: #ffffff;
+  --bg-subtle: var(--slate-2);
+  --bg-muted: var(--slate-3);
+
+  --text-primary: var(--ink);
+  --text-secondary: var(--slate-6);
+  --text-tertiary: var(--slate-5);
+  --text-inverse: #ffffff;
+
+  --border: var(--slate-3);
+  --border-focus: var(--violet);
+  --border-subtle: var(--slate-2);
+
+  /* Radius */
+  --r-sm: 6px;
+  --r-md: 10px;
+  --r-lg: 16px;
+  --r-xl: 24px;
+  --r-full: 9999px;
+
+  /* Shadow */
+  --shadow-sm: 0 1px 3px rgba(12, 12, 15, 0.06),
+    0 1px 2px rgba(12, 12, 15, 0.04);
+  --shadow-md: 0 4px 12px rgba(12, 12, 15, 0.08),
+    0 2px 4px rgba(12, 12, 15, 0.04);
+  --shadow-lg: 0 12px 32px rgba(12, 12, 15, 0.1),
+    0 4px 8px rgba(12, 12, 15, 0.06);
+
+  /* Motion */
+  --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --dur-fast: 120ms;
+  --dur-base: 200ms;
+  --dur-slow: 350ms;
+
+  /* Spacing scale */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+  --space-12: 48px;
+  --space-16: 64px;
+}
+
+/* ─── Dark Mode ──────────────────────────────────────────────────────── */
+.dark {
+  --bg-base: #0c0c0f;
+  --bg-surface: #141418;
+  --bg-elevated: #1c1c22;
+  --bg-subtle: #1c1c22;
+  --bg-muted: #2e2e38;
+
+  --text-primary: #f0f0f5;
+  --text-secondary: #9898a8;
+  --text-tertiary: #6b6b7e;
+  --text-inverse: #0c0c0f;
+
+  --border: #2e2e38;
+  --border-focus: var(--violet);
+  --border-subtle: #1c1c22;
+
+  --violet-bg: rgba(127, 119, 221, 0.15);
+  --emerald-bg: rgba(29, 158, 117, 0.15);
+  --amber-bg: rgba(186, 117, 23, 0.15);
+  --coral-bg: rgba(216, 90, 48, 0.15);
+  --rose-bg: rgba(153, 53, 86, 0.15);
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Base Reset ─────────────────────────────────────────────────────── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  font-family: var(--font-body);
+  background-color: var(--bg-surface);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  min-height: 100%;
+  transition: background-color var(--dur-slow) var(--ease-smooth),
+    color var(--dur-slow) var(--ease-smooth);
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-display);
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────────── */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: var(--r-full);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--slate-5);
+}
+
+/* ─── Selection ──────────────────────────────────────────────────────── */
+::selection {
+  background: var(--violet-bg);
+  color: var(--violet-dim);
+}
+
+/* ─── Focus ring ─────────────────────────────────────────────────────── */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ─── Utility classes ────────────────────────────────────────────────── */
+.font-display {
+  font-family: var(--font-display);
+}
+.font-body {
+  font-family: var(--font-body);
+}
+
+.text-primary {
+  color: var(--text-primary);
+}
+.text-secondary {
+  color: var(--text-secondary);
+}
+.text-tertiary {
+  color: var(--text-tertiary);
+}
+
+.bg-base {
+  background: var(--bg-base);
+}
+.bg-surface {
+  background: var(--bg-surface);
+}
+.bg-elevated {
+  background: var(--bg-elevated);
+}
+.bg-subtle {
+  background: var(--bg-subtle);
+}
+
+.border-default {
+  border-color: var(--border);
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
