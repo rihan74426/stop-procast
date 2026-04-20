@@ -2,14 +2,14 @@
 
 import Link from "next/link";
 import { useProjectStore } from "@/lib/store/projectStore";
-
 import { ProjectCard } from "@/components/dashboard/ProjectCard";
 import { EmptyState } from "@/components/dashboard/EmptyState";
 import { TopBar } from "@/components/layout/TopBar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/Button";
+import { DataProvider } from "@/components/providers/DataProvider";
 
-export default function DashboardPage() {
+function DashboardContent() {
   const projects = useProjectStore((s) => s.projects);
 
   const active = projects.filter((p) => !p.completionDate);
@@ -87,5 +87,13 @@ export default function DashboardPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <DataProvider>
+      <DashboardContent />
+    </DataProvider>
   );
 }

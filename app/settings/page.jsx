@@ -1,26 +1,29 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { useTheme } from "@/lib/theme";
 import { TopBar } from "@/components/layout/TopBar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/Button";
-import { clearAll } from "@/lib/persistence";
+import { clearLocal } from "@/lib/persistence";
+import { DataProvider } from "@/components/providers/DataProvider";
 
-export default function SettingsPage() {
+function SettingsContent() {
   const { theme, toggle } = useTheme();
   const projects = useProjectStore((s) => s.projects);
-  const [apiKey, setApiKey] = useState(() =>
-    typeof window !== "undefined"
-      ? localStorage.getItem("sp_api_key") ?? ""
-      : ""
-  );
+
+  // Never read localStorage during render — always use useEffect
+  const [openrouterKey, setOpenrouterKey] = useState("");
   const [saved, setSaved] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
 
-  const handleSaveApiKey = () => {
-    localStorage.setItem("sp_api_key", apiKey);
+  useEffect(() => {
+    setOpenrouterKey(localStorage.getItem("sp_openrouter_key") ?? "");
+  }, []);
+
+  const handleSaveKey = () => {
+    localStorage.setItem("sp_openrouter_key", openrouterKey);
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };
@@ -45,7 +48,7 @@ export default function SettingsPage() {
       setConfirmClear(true);
       return;
     }
-    clearAll();
+    clearLocal();
     window.location.href = "/";
   };
 
@@ -73,23 +76,30 @@ export default function SettingsPage() {
                 </Row>
               </Section>
 
-              {/* API key */}
+              {/* AI */}
               <Section title="AI Integration">
                 <p className="text-sm text-[var(--text-secondary)] mb-4">
-                  StopProcast uses the Anthropic API to generate project plans.
-                  Add your API key below. It`s stored locally in your browser
-                  and never sent to any server other than Anthropic.
+                  StopProcast uses OpenRouter to generate project plans. Your
+                  key is stored in your browser only. Get a free key at{" "}
+                  <a
+                    href="https://openrouter.ai/keys"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[var(--violet)] hover:underline"
+                  >
+                    openrouter.ai/keys
+                  </a>
                 </p>
                 <div className="flex gap-2">
                   <input
                     type="password"
-                    value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
-                    placeholder="sk-ant-api03-..."
+                    value={openrouterKey}
+                    onChange={(e) => setOpenrouterKey(e.target.value)}
+                    placeholder="sk-or-v1-..."
                     className="flex-1 h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] font-mono focus:outline-none focus:ring-2 focus:ring-[var(--violet)]"
                   />
                   <Button
-                    onClick={handleSaveApiKey}
+                    onClick={handleSaveKey}
                     variant={saved ? "subtle" : "primary"}
                     size="md"
                   >
@@ -97,15 +107,10 @@ export default function SettingsPage() {
                   </Button>
                 </div>
                 <p className="text-xs text-[var(--text-tertiary)] mt-2">
-                  Get your key at{" "}
-                  <a
-                    href="https://console.anthropic.com"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[var(--violet)] hover:underline"
-                  >
-                    console.anthropic.com
-                  </a>
+                  Model is set via{" "}
+                  <code className="font-mono">OPENROUTER_MODEL</code> in{" "}
+                  <code className="font-mono">.env.local</code>. Default: Gemini
+                  2.0 Flash (free).
                 </p>
               </Section>
 
@@ -115,18 +120,18 @@ export default function SettingsPage() {
                   label="Export all projects"
                   description={`${projects.length} project${
                     projects.length !== 1 ? "s" : ""
-                  } stored locally`}
+                  } saved`}
                 >
                   <Button variant="ghost" size="sm" onClick={handleExportAll}>
                     Export JSON
                   </Button>
                 </Row>
                 <Row
-                  label="Clear all data"
-                  description="Permanently delete all projects. Cannot be undone."
+                  label="Clear local cache"
+                  description="Removes local cache only. Your data in MongoDB is preserved."
                 >
                   <Button variant="danger" size="sm" onClick={handleClearAll}>
-                    {confirmClear ? "Click again to confirm" : "Clear all"}
+                    {confirmClear ? "Click again to confirm" : "Clear cache"}
                   </Button>
                 </Row>
               </Section>
@@ -139,7 +144,8 @@ export default function SettingsPage() {
                   moving until it ships.
                 </p>
                 <p className="text-xs text-[var(--text-tertiary)] mt-3">
-                  Version 0.1.0 · All data stored locally in your browser
+                  Version 0.1.0 · AI by OpenRouter · Auth by Clerk · DB by
+                  MongoDB
                 </p>
               </Section>
             </div>
@@ -147,6 +153,14 @@ export default function SettingsPage() {
         </main>
       </div>
     </div>
+  );
+}
+
+export default function SettingsPage() {
+  return (
+    <DataProvider>
+      <SettingsContent />
+    </DataProvider>
   );
 }
 

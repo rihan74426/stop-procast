@@ -4,6 +4,7 @@ import { use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useProjectStore } from "@/lib/store/projectStore";
+import { DataProvider } from "@/components/providers/DataProvider";
 import { TopBar } from "@/components/layout/TopBar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { NextAction } from "@/components/project/NextAction";
