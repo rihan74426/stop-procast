@@ -3,8 +3,9 @@
 
 # StopProcast — Project Intelligence File
 
-This file is the single source of truth for Claude (and any agent) working on this codebase.
-Read it before writing any code. Update it after completing any phase or major decision.
+Single source of truth for all development. Read before writing any code.
+
+---
 
 ## What this app is
 
@@ -15,7 +16,9 @@ then keeps dragging it forward until it ships. The core differentiator is
 **anti-procrastination pressure**: streaks, idle warnings, missed milestone alerts, and a
 "next irreversible action" focus mode.
 
-## Current status
+---
+
+## Current phase status
 
 | Phase | Name                           | Status  |
 | ----- | ------------------------------ | ------- |
@@ -24,67 +27,112 @@ then keeps dragging it forward until it ships. The core differentiator is
 | 3     | Core Pages & AI Intake         | ✅ Done |
 | 4     | Execution Mode & Pressure      | ✅ Done |
 | 5     | Completion, Postmortem, Polish | ✅ Done |
+| 6     | Auth, DB, OpenRouter           | ✅ Done |
 
-**MVP is complete.** All source files are generated and ready to run.
+**Status key:** ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
 
-## Quick start
-
-```bash
-# 1. Install dependencies
-npm install framer-motion zustand immer date-fns uuid \
-  @dnd-kit/core @dnd-kit/sortable canvas-confetti @anthropic-ai/sdk
-
-# 2. Set your Anthropic API key in .env.local
-# ANTHROPIC_API_KEY=sk-ant-api03-...
-
-# 3. Run
-npm run dev
-```
+---
 
 ## Tech stack
 
-- **Framework:** Next.js App Router (v16)
-- **Styling:** Tailwind CSS v4 + CSS custom properties for design tokens
-- **State:** Zustand + Immer + localStorage persistence
-- **Motion:** Framer Motion (page transitions, micro-interactions)
-- **AI:** Anthropic SDK — `claude-sonnet-4-20250514` via `/api/generate` and `/api/reengage`
-- **Utilities:** date-fns, uuid, canvas-confetti
+| Layer       | Technology                                      | Notes                            |
+| ----------- | ----------------------------------------------- | -------------------------------- |
+| Framework   | Next.js 15 (App Router)                         |                                  |
+| Styling     | Tailwind CSS v4 + CSS custom properties         | All tokens in `app/globals.css`  |
+| State       | Zustand + Immer                                 | Dual-layer persistence           |
+| Auth        | Clerk                                           | Free tier, handles all auth UI   |
+| Database    | MongoDB via Mongoose                            | Free M0 cluster on Atlas         |
+| AI (active) | OpenRouter — `google/gemini-2.0-flash-exp:free` | Free, swap model in `.env.local` |
+| AI (future) | Anthropic Claude (kept in codebase)             | Activate when monetising         |
+| Motion      | Framer Motion                                   |                                  |
+| Drag & drop | @dnd-kit/core + @dnd-kit/sortable               |                                  |
+| Confetti    | canvas-confetti                                 | Completion ceremony              |
 
-## Design language
+### Install command (full)
 
-- **Fonts:** Clash Display (headings) + DM Sans (body)
-- **Colors:** Ink black `#0C0C0F`, Violet accent `#7F77DD`, Emerald progress `#1D9E75`
-- **Dark mode:** Class-based via ThemeContext, persisted to localStorage
-- **All tokens:** defined in `app/globals.css` as CSS custom properties
+```bash
+npm install @clerk/nextjs mongoose framer-motion zustand immer \
+  date-fns uuid @dnd-kit/core @dnd-kit/sortable canvas-confetti \
+  @anthropic-ai/sdk
+```
+
+> No extra AI SDK needed for OpenRouter — it uses plain `fetch`.
+
+---
+
+## AI provider system
+
+The AI layer is **provider-switchable** via a single env var:
+
+```
+AI_PROVIDER=openrouter   # default — free via OpenRouter
+AI_PROVIDER=anthropic    # paid — direct Anthropic API
+```
+
+To change the model used through OpenRouter, update `.env.local`:
+
+```
+OPENROUTER_MODEL=google/gemini-2.0-flash-exp:free   # free
+OPENROUTER_MODEL=anthropic/claude-sonnet-4-5         # paid
+OPENROUTER_MODEL=openai/gpt-4o                       # paid
+```
+
+Free models on OpenRouter (no credits needed):
+
+- `google/gemini-2.0-flash-exp:free`
+- `meta-llama/llama-3.3-70b-instruct:free`
+- `mistralai/mistral-7b-instruct:free`
+- `deepseek/deepseek-r1:free`
+
+---
+
+## Data persistence
+
+All project data is stored in **two layers**:
+
+1. **localStorage** — instant reads/writes, offline capable, used as a cache
+2. **MongoDB** — source of truth, survives across devices and browsers
+
+Flow:
+
+- On app load → read from localStorage instantly (no flash)
+- After Clerk auth confirms → fetch from MongoDB and hydrate the store
+- On every write → update localStorage immediately + async sync to MongoDB
+
+---
 
 ## Architecture rules
 
-1. All project state lives in `lib/store/projectStore.js`. No ad hoc useState for data.
-2. The full project schema is in `lib/schema.js`. Add fields there first.
-3. AI calls only in `app/api/` route handlers — never from client components.
-4. All design tokens in `app/globals.css`. No hardcoded colors.
-5. Every async boundary gets a skeleton — never a blank flash.
-6. Path alias: `@/` maps to project root (configured in `jsconfig.json`).
+1. All project state lives in `lib/store/projectStore.js`. No ad hoc `useState` for data.
+2. The full project JSON schema is in `lib/schema.js`. Add fields there first, then `lib/models/Project.js`.
+3. AI calls only in `app/api/generate/route.js`. Never call OpenRouter or Anthropic from client components.
+4. All design tokens in `app/globals.css`. No hardcoded colors anywhere.
+5. Every async boundary gets a skeleton loader — never a blank flash.
+6. Path alias: `@/` maps to project root (`jsconfig.json`).
+7. Never hardcode `userId` — always read from Clerk `auth()` in API routes.
+
+---
 
 ## Key files at a glance
 
-| File                                | Purpose                                |
-| ----------------------------------- | -------------------------------------- |
-| `app/globals.css`                   | All design tokens, dark mode, fonts    |
-| `lib/schema.js`                     | Project data model + factory functions |
-| `lib/store/projectStore.js`         | All project CRUD + streak logic        |
-| `lib/pressure.js`                   | Pressure score algorithm               |
-| `lib/ai/prompts.js`                 | All AI prompt templates                |
-| `app/api/generate/route.js`         | Streaming blueprint generation         |
-| `app/new/page.js`                   | 5-step intake wizard                   |
-| `app/project/[id]/page.js`          | Execution hub                          |
-| `app/project/[id]/complete/page.js` | Completion ceremony                    |
+| File                                    | Purpose                                       |
+| --------------------------------------- | --------------------------------------------- |
+| `.env.local`                            | All secrets — AI key, Clerk keys, MongoDB URI |
+| `middleware.js`                         | Clerk route protection                        |
+| `app/globals.css`                       | Design tokens, dark mode, fonts               |
+| `lib/schema.js`                         | Project data model + factory functions        |
+| `lib/models/Project.js`                 | Mongoose schema (MongoDB)                     |
+| `lib/db/mongoose.js`                    | MongoDB connection with caching               |
+| `lib/ai/openrouter.js`                  | OpenRouter client (streaming + non-streaming) |
+| `lib/store/projectStore.js`             | All project CRUD + dual-layer persistence     |
+| `lib/persistence.js`                    | localStorage + MongoDB API helpers            |
+| `app/api/generate/route.js`             | AI generation — OpenRouter or Anthropic       |
+| `app/api/projects/route.js`             | REST: GET all, POST create                    |
+| `app/api/projects/[id]/route.js`        | REST: GET, PATCH, DELETE one                  |
+| `components/providers/DataProvider.jsx` | Hydrates store from MongoDB post-auth         |
 
-## Next steps (Post-MVP)
+---
 
-See `PLAN.md` Phase 2+ backlog for the full list. Suggested first additions:
+## Next steps (Post-MVP backlog)
 
-1. Recurring deadline reminders (Next.js server actions + cron)
-2. Timeline / Gantt visualization
-3. Notes per phase (rich text with Tiptap or similar)
-4. Team collaboration (Supabase or Convex for real-time sync)
+See `PLAN.md` Phase 7+ for the full list.
