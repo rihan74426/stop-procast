@@ -6,13 +6,4 @@ module.exports = {
     "./components/**/*.{js,ts,jsx,tsx,mdx}",
     "./lib/**/*.{js,ts,jsx,tsx}",
   ],
-  theme: {
-    extend: {
-      fontFamily: {
-        display: ["Clash Display", "sans-serif"],
-        body: ["DM Sans", "sans-serif"],
-      },
-    },
-  },
-  plugins: [],
 };

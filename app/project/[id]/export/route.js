@@ -1,11 +1,14 @@
 import { auth } from "@clerk/nextjs/server";
 import { connectDB } from "@/lib/db/mongoose";
 import Project from "@/lib/models/Project";
+import { redirect } from "next/navigation";
 
 export async function GET(request, { params }) {
   try {
     const { userId } = await auth();
-    if (!userId) return new Response("Unauthorized", { status: 401 });
+    if (!userId) {
+      return new Response("Unauthorized", { status: 401 });
+    }
 
     await connectDB();
     const { id } = await params;

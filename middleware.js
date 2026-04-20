@@ -5,6 +5,12 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhook(.*)",
+  "/",
+  "/new(.*)",
+  "/project/(.*)",
+  "/settings(.*)",
+  "/export",
+  // Allow public access to project pages (adjust as needed)
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
