@@ -35,28 +35,18 @@ then keeps dragging it forward until it ships. The core differentiator is
 
 ## Tech stack
 
-| Layer       | Technology                                      | Notes                            |
-| ----------- | ----------------------------------------------- | -------------------------------- |
-| Framework   | Next.js 15 (App Router)                         |                                  |
-| Styling     | Tailwind CSS v4 + CSS custom properties         | All tokens in `app/globals.css`  |
-| State       | Zustand + Immer                                 | Dual-layer persistence           |
-| Auth        | Clerk                                           | Free tier, handles all auth UI   |
-| Database    | MongoDB via Mongoose                            | Free M0 cluster on Atlas         |
-| AI (active) | OpenRouter — `google/gemini-2.0-flash-exp:free` | Free, swap model in `.env.local` |
-| AI (future) | Anthropic Claude (kept in codebase)             | Activate when monetising         |
-| Motion      | Framer Motion                                   |                                  |
-| Drag & drop | @dnd-kit/core + @dnd-kit/sortable               |                                  |
-| Confetti    | canvas-confetti                                 | Completion ceremony              |
-
-### Install command (full)
-
-```bash
-npm install @clerk/nextjs mongoose framer-motion zustand immer \
-  date-fns uuid @dnd-kit/core @dnd-kit/sortable canvas-confetti \
-  @anthropic-ai/sdk
-```
-
-> No extra AI SDK needed for OpenRouter — it uses plain `fetch`.
+| Layer       | Technology                                         | Notes                            |
+| ----------- | -------------------------------------------------- | -------------------------------- |
+| Framework   | Next.js 15 (App Router)                            |                                  |
+| Styling     | Tailwind CSS v4 + CSS custom properties            | All tokens in `app/globals.css`  |
+| State       | Zustand + Immer                                    | Dual-layer persistence           |
+| Auth        | Clerk                                              | Free tier, handles all auth UI   |
+| Database    | MongoDB via Mongoose                               | Free M0 cluster on Atlas         |
+| AI (active) | OpenRouter — `deepseek/deepseek-chat-v3-0324:free` | Free, swap model in `.env.local` |
+| AI (future) | Anthropic Claude (kept in codebase)                | Activate when monetising         |
+| Motion      | Framer Motion                                      |                                  |
+| Drag & drop | @dnd-kit/core + @dnd-kit/sortable                  |                                  |
+| Confetti    | canvas-confetti                                    | Completion ceremony              |
 
 ---
 
@@ -72,17 +62,15 @@ AI_PROVIDER=anthropic    # paid — direct Anthropic API
 To change the model used through OpenRouter, update `.env.local`:
 
 ```
-OPENROUTER_MODEL=google/gemini-2.0-flash-exp:free   # free
-OPENROUTER_MODEL=anthropic/claude-sonnet-4-5         # paid
-OPENROUTER_MODEL=openai/gpt-4o                       # paid
+OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324:free   # free (default) — best JSON output
+OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free  # free alternative
+OPENROUTER_MODEL=google/gemini-2.5-pro-exp-03-25:free    # free, Google
+OPENROUTER_MODEL=openrouter/free                          # auto-select any free model
+OPENROUTER_MODEL=anthropic/claude-sonnet-4-5              # paid
+OPENROUTER_MODEL=openai/gpt-4o                            # paid
 ```
 
-Free models on OpenRouter (no credits needed):
-
-- `google/gemini-2.0-flash-exp:free`
-- `meta-llama/llama-3.3-70b-instruct:free`
-- `mistralai/mistral-7b-instruct:free`
-- `deepseek/deepseek-r1:free`
+> ⚠️ `google/gemini-2.0-flash-exp:free` was removed from OpenRouter in early 2025.
 
 ---
 
@@ -92,12 +80,6 @@ All project data is stored in **two layers**:
 
 1. **localStorage** — instant reads/writes, offline capable, used as a cache
 2. **MongoDB** — source of truth, survives across devices and browsers
-
-Flow:
-
-- On app load → read from localStorage instantly (no flash)
-- After Clerk auth confirms → fetch from MongoDB and hydrate the store
-- On every write → update localStorage immediately + async sync to MongoDB
 
 ---
 
@@ -110,6 +92,7 @@ Flow:
 5. Every async boundary gets a skeleton loader — never a blank flash.
 6. Path alias: `@/` maps to project root (`jsconfig.json`).
 7. Never hardcode `userId` — always read from Clerk `auth()` in API routes.
+8. **File naming**: component files must be PascalCase (`TopBar.jsx` not `Topbar.jsx`) to avoid import failures on case-sensitive filesystems (Linux/Docker).
 
 ---
 
@@ -130,9 +113,4 @@ Flow:
 | `app/api/projects/route.js`             | REST: GET all, POST create                    |
 | `app/api/projects/[id]/route.js`        | REST: GET, PATCH, DELETE one                  |
 | `components/providers/DataProvider.jsx` | Hydrates store from MongoDB post-auth         |
-
----
-
-## Next steps (Post-MVP backlog)
-
-See `PLAN.md` Phase 7+ for the full list.
+| `components/layout/TopBar.jsx`          | Top navigation bar (PascalCase — important!)  |

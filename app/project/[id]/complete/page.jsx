@@ -6,7 +6,7 @@ import { useProjectStore } from "@/lib/store/projectStore";
 import { ConfettiBlast } from "@/components/completion/ConfettiBlast";
 import { ProjectStats } from "@/components/completion/ProjectStats";
 import { Postmortem } from "@/components/completion/Postmortem";
-import { TopBar } from "@/components/layout/TopBar";
+import { TopBar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";
 
 export default function CompletePage({ params }) {

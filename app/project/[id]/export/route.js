@@ -1,38 +1,47 @@
-import { loadProjects } from "@/lib/persistence";
+import { auth } from "@clerk/nextjs/server";
+import { connectDB } from "@/lib/db/mongoose";
+import Project from "@/lib/models/Project";
 
 export async function GET(request, { params }) {
-  const { id } = await params;
-  const projects = loadProjects();
-  const project = projects.find((p) => p.id === id);
+  try {
+    const { userId } = await auth();
+    if (!userId) return new Response("Unauthorized", { status: 401 });
 
-  if (!project) {
-    return new Response("Project not found", { status: 404 });
-  }
+    await connectDB();
+    const { id } = await params;
+    const project = await Project.findOne({ id, userId }).lean();
 
-  const { searchParams } = new URL(request.url);
-  const format = searchParams.get("format") ?? "json";
+    if (!project) return new Response("Project not found", { status: 404 });
 
-  if (format === "markdown") {
-    const md = toMarkdown(project);
-    return new Response(md, {
+    const { searchParams } = new URL(request.url);
+    const format = searchParams.get("format") ?? "json";
+
+    if (format === "markdown") {
+      const md = toMarkdown(project);
+      return new Response(md, {
+        headers: {
+          "Content-Type": "text/markdown; charset=utf-8",
+          "Content-Disposition": `attachment; filename="${slug(
+            project.projectTitle
+          )}.md"`,
+        },
+      });
+    }
+
+    // Strip MongoDB internals
+    const { _id, __v, ...clean } = project;
+    return new Response(JSON.stringify(clean, null, 2), {
       headers: {
-        "Content-Type": "text/markdown; charset=utf-8",
+        "Content-Type": "application/json",
         "Content-Disposition": `attachment; filename="${slug(
           project.projectTitle
-        )}.md"`,
+        )}.json"`,
       },
     });
+  } catch (err) {
+    console.error("Export error:", err);
+    return new Response("Export failed", { status: 500 });
   }
-
-  // Default: JSON
-  return new Response(JSON.stringify(project, null, 2), {
-    headers: {
-      "Content-Type": "application/json",
-      "Content-Disposition": `attachment; filename="${slug(
-        project.projectTitle
-      )}.json"`,
-    },
-  });
 }
 
 function slug(title) {
@@ -44,7 +53,6 @@ function slug(title) {
 
 function toMarkdown(p) {
   const lines = [];
-
   lines.push(`# ${p.projectTitle}`);
   lines.push("");
   lines.push(`> ${p.oneLineGoal}`);
@@ -55,18 +63,15 @@ function toMarkdown(p) {
     lines.push(p.problemStatement);
     lines.push("");
   }
-
   if (p.targetUser) {
     lines.push(`**Target user:** ${p.targetUser}`);
     lines.push("");
   }
-
   if (p.successCriteria?.length) {
     lines.push("## Success criteria");
     p.successCriteria.forEach((c) => lines.push(`- ${c}`));
     lines.push("");
   }
-
   if (p.scope) {
     lines.push("## Scope");
     if (p.scope.mustHave?.length) {
@@ -84,42 +89,33 @@ function toMarkdown(p) {
     lines.push("");
   }
 
-  p.phases.forEach((phase, i) => {
+  (p.phases ?? []).forEach((phase, i) => {
     lines.push(`## Phase ${i + 1}: ${phase.name}`);
     lines.push(phase.objective);
     lines.push("");
-
-    phase.milestones.forEach((m) => {
+    (phase.milestones ?? []).forEach((m) => {
       lines.push(`### ${m.name}`);
       if (m.deadline) lines.push(`**Deadline:** ${m.deadline}`);
       if (m.doneWhen) lines.push(`**Done when:** ${m.doneWhen}`);
       if (m.risk) lines.push(`**Risk:** ${m.risk}`);
       lines.push("");
-
-      // Tasks for this milestone
-      const tasks = p.tasks.filter((t) => t.milestoneId === m.id);
-      if (tasks.length) {
-        tasks.forEach((t) => {
-          const check = t.status === "done" ? "x" : " ";
-          lines.push(`- [${check}] ${t.title}`);
-        });
-        lines.push("");
-      }
+      const tasks = (p.tasks ?? []).filter((t) => t.milestoneId === m.id);
+      tasks.forEach((t) => {
+        lines.push(`- [${t.status === "done" ? "x" : " "}] ${t.title}`);
+      });
+      if (tasks.length) lines.push("");
     });
   });
 
   if (p.blockers?.length) {
     lines.push("## Blockers");
     p.blockers.forEach((b) => {
-      const status = b.status === "resolved" ? "~~resolved~~" : "**active**";
-      lines.push(`- ${b.description} (${status})`);
+      lines.push(
+        `- ${b.description} (${
+          b.status === "resolved" ? "resolved" : "active"
+        })`
+      );
     });
-    lines.push("");
-  }
-
-  if (p.toolsSuggested?.length) {
-    lines.push("## Suggested tools");
-    p.toolsSuggested.forEach((t) => lines.push(`- ${t}`));
     lines.push("");
   }
 
@@ -136,6 +132,5 @@ function toMarkdown(p) {
   lines.push(
     `*Exported from StopProcast on ${new Date().toLocaleDateString()}*`
   );
-
   return lines.join("\n");
 }

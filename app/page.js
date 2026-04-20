@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { ProjectCard } from "@/components/dashboard/ProjectCard";
 import { EmptyState } from "@/components/dashboard/EmptyState";
-import { TopBar } from "@/components/layout/TopBar";
+import { TopBar } from "@/components/layout/Topbar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/Button";
 import { DataProvider } from "@/components/providers/DataProvider";
