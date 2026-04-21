@@ -4,6 +4,8 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
+import { useUIStore } from "@/lib/store/uiStore";
+import { useState, useEffect } from "react";
 
 const navItems = [
   { href: "/", label: "Dashboard", icon: GridIcon },
@@ -11,14 +13,36 @@ const navItems = [
   { href: "/settings", label: "Settings", icon: CogIcon },
 ];
 
-export function Sidebar() {
+function SidebarContent({ onClose }) {
   const pathname = usePathname();
   const { isSignedIn, isLoaded } = useUser();
   const projects = useProjectStore((s) => s.projects);
   const activeProjects = projects.filter((p) => !p.completionDate);
 
   return (
-    <aside className="w-56 shrink-0 border-r border-[var(--border)] bg-[var(--bg-elevated)] flex flex-col h-full">
+    <div className="flex flex-col h-full w-56">
+      {/* Mobile close button */}
+      {onClose && (
+        <div className="flex items-center justify-between px-3 py-3 border-b border-[var(--border)] lg:hidden">
+          <span className="font-display font-semibold text-sm text-[var(--text-primary)]">
+            StopProcast
+          </span>
+          <button
+            onClick={onClose}
+            className="h-8 w-8 flex items-center justify-center rounded-[var(--r-md)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]"
+          >
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+              <path
+                d="M11 3L3 11M3 3l8 8"
+                stroke="currentColor"
+                strokeWidth="1.5"
+                strokeLinecap="round"
+              />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {/* Nav */}
       <nav className="p-3 flex flex-col gap-1">
         {navItems.map(({ href, label, icon: Icon }) => {
@@ -27,6 +51,7 @@ export function Sidebar() {
             <Link
               key={href}
               href={href}
+              onClick={onClose}
               className={[
                 "flex items-center gap-2.5 px-3 py-2 rounded-[var(--r-md)] text-sm",
                 "transition-colors duration-[var(--dur-fast)]",
@@ -53,6 +78,7 @@ export function Sidebar() {
               <Link
                 key={p.id}
                 href={`/project/${p.id}`}
+                onClick={onClose}
                 className={[
                   "flex items-center gap-2 px-3 py-1.5 rounded-[var(--r-md)] text-sm",
                   "transition-colors duration-[var(--dur-fast)]",
@@ -71,7 +97,7 @@ export function Sidebar() {
 
       <div className="flex-1" />
 
-      {/* Footer — sign-in nudge for guests, project count for members */}
+      {/* Footer */}
       <div className="p-3 border-t border-[var(--border)]">
         {isLoaded && !isSignedIn ? (
           <SignInButton mode="modal">
@@ -91,7 +117,74 @@ export function Sidebar() {
           </p>
         )}
       </div>
-    </aside>
+    </div>
+  );
+}
+
+export function Sidebar() {
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Close on route change
+  const pathname = usePathname();
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  return (
+    <>
+      {/* Desktop sidebar */}
+      <aside className="hidden lg:flex w-56 shrink-0 border-r border-[var(--border)] bg-[var(--bg-elevated)] flex-col h-full">
+        <SidebarContent />
+      </aside>
+
+      {/* Mobile hamburger button — rendered in TopBar slot via portal-like button */}
+      {/* We expose a trigger via the MobileSidebarTrigger component below */}
+
+      {/* Mobile drawer overlay */}
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 lg:hidden"
+          style={{
+            background: "rgba(12,12,15,0.6)",
+            backdropFilter: "blur(4px)",
+          }}
+          onClick={() => setMobileOpen(false)}
+        />
+      )}
+
+      {/* Mobile drawer */}
+      <aside
+        className={[
+          "fixed inset-y-0 left-0 z-50 w-56 bg-[var(--bg-elevated)] border-r border-[var(--border)] flex flex-col",
+          "transition-transform duration-300 ease-[var(--ease-smooth)] lg:hidden",
+          mobileOpen ? "translate-x-0" : "-translate-x-full",
+        ].join(" ")}
+      >
+        <SidebarContent onClose={() => setMobileOpen(false)} />
+      </aside>
+
+      {/* Mobile trigger button — floating hamburger */}
+      <button
+        onClick={() => setMobileOpen(true)}
+        className={[
+          "fixed bottom-4 left-4 z-30 lg:hidden",
+          "h-11 w-11 rounded-full bg-[var(--violet)] text-white shadow-[var(--shadow-lg)]",
+          "flex items-center justify-center",
+          "transition-all duration-200 hover:bg-[var(--violet-dim)] active:scale-95",
+          mobileOpen ? "opacity-0 pointer-events-none" : "opacity-100",
+        ].join(" ")}
+        aria-label="Open menu"
+      >
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+          <path
+            d="M2 4h12M2 8h12M2 12h12"
+            stroke="currentColor"
+            strokeWidth="1.5"
+            strokeLinecap="round"
+          />
+        </svg>
+      </button>
+    </>
   );
 }
 

@@ -5,10 +5,14 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhook(.*)",
+  "/api/generate",
+  "/api/projects(.*)",
+  "/api/reengage(.*)",
   "/",
   "/new(.*)",
   "/project/(.*)",
   "/settings(.*)",
+
   // Allow public access to project pages (adjust as needed)
 ]);
 

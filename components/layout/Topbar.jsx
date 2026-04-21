@@ -10,9 +10,9 @@ export function TopBar() {
   const { isSignedIn, isLoaded } = useUser();
 
   return (
-    <header className="h-14 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex items-center px-4 gap-3 sticky top-0 z-30">
+    <header className="h-14 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex items-center px-3 sm:px-4 gap-2 sm:gap-3 sticky top-0 z-30">
       {/* Logo */}
-      <Link href="/" className="flex items-center gap-2 mr-2">
+      <Link href="/" className="flex items-center gap-2 mr-2 shrink-0">
         <div className="h-7 w-7 rounded-[var(--r-md)] bg-[var(--violet)] flex items-center justify-center">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
             <path
@@ -24,7 +24,7 @@ export function TopBar() {
             />
           </svg>
         </div>
-        <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)]">
+        <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)] hidden sm:block">
           StopProcast
         </span>
       </Link>
@@ -47,8 +47,9 @@ export function TopBar() {
           <UserButton afterSignOutUrl="/" />
         ) : (
           <SignInButton mode="modal">
-            <button className="h-8 px-3 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all">
-              Sign in to save
+            <button className="h-8 px-2 sm:px-3 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all whitespace-nowrap">
+              <span className="hidden sm:inline">Sign in to save</span>
+              <span className="sm:hidden">Sign in</span>
             </button>
           </SignInButton>
         ))}

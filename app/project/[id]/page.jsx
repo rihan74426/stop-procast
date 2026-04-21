@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { SavePromptModal } from "@/components/ui/SavePromptModal";
-import { TopBar } from "@/components/layout/TopBar";
+import { TopBar } from "@/components/layout/Topbar"; // Fixed casing (was Topbar)
 import { Sidebar } from "@/components/layout/Sidebar";
 import { NextAction } from "@/components/project/NextAction";
 import { PhaseTimeline } from "@/components/project/PhaseTimeline";
@@ -28,7 +28,7 @@ function ProjectContent({ id }) {
 
   if (!project) {
     return (
-      <div className="flex h-screen items-center justify-center">
+      <div className="flex h-screen items-center justify-center px-4">
         <div className="text-center">
           <p className="text-[var(--text-secondary)] mb-4">
             Project not found.
@@ -58,7 +58,6 @@ function ProjectContent({ id }) {
     }
   };
 
-  // Export: encode project for guest users who have no MongoDB record
   const handleExport = (format = "json") => {
     const encoded = btoa(JSON.stringify(project));
     window.location.href = `/project/${id}/export?format=${format}&data=${encoded}`;
@@ -68,16 +67,16 @@ function ProjectContent({ id }) {
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
 
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopBar />
 
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto px-6 py-8">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
             {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-sm text-[var(--text-tertiary)] mb-6">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-[var(--text-tertiary)] mb-5 sm:mb-6">
               <Link
                 href="/"
-                className="hover:text-[var(--text-primary)] transition-colors"
+                className="hover:text-[var(--text-primary)] transition-colors shrink-0"
               >
                 Dashboard
               </Link>
@@ -87,24 +86,31 @@ function ProjectContent({ id }) {
               </span>
             </div>
 
-            <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_300px]">
+            <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-[1fr_280px] xl:grid-cols-[1fr_300px]">
               {/* ── Left column ───────────────────────────────────── */}
-              <div className="flex flex-col gap-6 min-w-0">
+              <div className="flex flex-col gap-5 sm:gap-6 min-w-0">
                 {/* Header */}
                 <div>
-                  <div className="flex items-start justify-between gap-4 mb-2">
-                    <h1 className="font-display font-semibold text-3xl text-[var(--text-primary)] leading-tight">
+                  <div className="flex items-start justify-between gap-3 mb-2">
+                    <h1 className="font-display font-semibold text-2xl sm:text-3xl text-[var(--text-primary)] leading-tight">
                       {project.projectTitle}
                     </h1>
+                    <ProgressRing
+                      value={progress}
+                      size={48}
+                      strokeWidth={4}
+                      label={`${progress}%`}
+                      className="shrink-0 sm:hidden"
+                    />
                     <ProgressRing
                       value={progress}
                       size={56}
                       strokeWidth={5}
                       label={`${progress}%`}
-                      className="shrink-0"
+                      className="shrink-0 hidden sm:flex"
                     />
                   </div>
-                  <p className="text-[var(--text-secondary)] leading-relaxed">
+                  <p className="text-sm sm:text-base text-[var(--text-secondary)] leading-relaxed">
                     {project.oneLineGoal}
                   </p>
                   <div className="flex flex-wrap gap-2 mt-3">
@@ -124,13 +130,13 @@ function ProjectContent({ id }) {
                 <ProjectPressure project={project} />
                 <StreakBanner project={project} />
 
-                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
+                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                   <PhaseTimeline project={project} />
                 </div>
 
                 {!isCompleted && <NextAction project={project} />}
 
-                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
+                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                   <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-4">
                     All tasks
                   </p>
@@ -139,13 +145,13 @@ function ProjectContent({ id }) {
               </div>
 
               {/* ── Right column ──────────────────────────────────── */}
-              <div className="flex flex-col gap-5">
+              <div className="flex flex-col gap-4 sm:gap-5 pb-16 lg:pb-0">
                 {/* Stats */}
-                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
-                  <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-4">
+                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
+                  <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3 sm:mb-4">
                     Stats
                   </p>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-3">
                     {[
                       {
                         label: "Done",
@@ -167,12 +173,12 @@ function ProjectContent({ id }) {
                     ].map(({ label, value }) => (
                       <div
                         key={label}
-                        className="rounded-[var(--r-md)] bg-[var(--bg-surface)] p-3"
+                        className="rounded-[var(--r-md)] bg-[var(--bg-surface)] p-2 sm:p-3 text-center sm:text-left"
                       >
-                        <p className="text-xs text-[var(--text-tertiary)] mb-1">
+                        <p className="text-xs text-[var(--text-tertiary)] mb-0.5 sm:mb-1">
                           {label}
                         </p>
-                        <p className="text-lg font-display font-semibold text-[var(--text-primary)]">
+                        <p className="text-base sm:text-lg font-display font-semibold text-[var(--text-primary)]">
                           {value}
                         </p>
                       </div>
@@ -182,7 +188,7 @@ function ProjectContent({ id }) {
 
                 {/* Success criteria */}
                 {project.successCriteria?.length > 0 && (
-                  <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
+                  <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                     <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
                       Success criteria
                     </p>
@@ -203,13 +209,13 @@ function ProjectContent({ id }) {
                 )}
 
                 {/* Blockers */}
-                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
+                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                   <BlockerPanel project={project} />
                 </div>
 
                 {/* Suggested tools */}
                 {project.toolsSuggested?.length > 0 && (
-                  <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
+                  <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                     <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
                       Suggested tools
                     </p>
@@ -224,7 +230,7 @@ function ProjectContent({ id }) {
                 )}
 
                 {/* Actions */}
-                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5 flex flex-col gap-2">
+                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5 flex flex-col gap-2">
                   <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-2">
                     Actions
                   </p>
@@ -265,7 +271,6 @@ function ProjectContent({ id }) {
         </main>
       </div>
 
-      {/* Save nudge for guests */}
       <SavePromptModal />
     </div>
   );

@@ -14,6 +14,10 @@ export async function POST(request) {
     const body = await request.json();
     const { type, idea, clarifications, scopeLevel, project } = body;
 
+    if (!type) {
+      return Response.json({ error: "Missing 'type' field" }, { status: 400 });
+    }
+
     if (PROVIDER === "anthropic") {
       return handleAnthropic(type, {
         idea,
@@ -44,6 +48,13 @@ async function handleOpenRouter(
   type,
   { idea, clarifications, scopeLevel, project }
 ) {
+  if (!process.env.OPENROUTER_API_KEY) {
+    return Response.json(
+      { error: "OPENROUTER_API_KEY is not set in .env.local" },
+      { status: 500 }
+    );
+  }
+
   // 1. Clarify — returns JSON array of 3 questions
   if (type === "clarify") {
     const text = await openrouterGenerate(null, buildClarifyPrompt(idea));
@@ -57,14 +68,18 @@ async function handleOpenRouter(
   }
 
   // 3. Generate — streams the full project blueprint JSON
-  const stream = await openrouterStream(
-    SYSTEM_PROMPT,
-    buildUserPrompt({ idea, clarifications, scopeLevel })
-  );
+  if (type === "generate") {
+    const stream = await openrouterStream(
+      SYSTEM_PROMPT,
+      buildUserPrompt({ idea, clarifications, scopeLevel })
+    );
 
-  return new Response(stream, {
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
-  });
+    return new Response(stream, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+
+  return Response.json({ error: `Unknown type: ${type}` }, { status: 400 });
 }
 
 // ─── Anthropic handler (kept for commercial tier) ─────────────────────────────
@@ -96,34 +111,38 @@ async function handleAnthropic(
     return Response.json({ suggestion: text });
   }
 
-  const stream = await client.messages.stream({
-    model: "claude-sonnet-4-20250514",
-    max_tokens: 4000,
-    system: SYSTEM_PROMPT,
-    messages: [
-      {
-        role: "user",
-        content: buildUserPrompt({ idea, clarifications, scopeLevel }),
-      },
-    ],
-  });
+  if (type === "generate") {
+    const stream = await client.messages.stream({
+      model: "claude-sonnet-4-20250514",
+      max_tokens: 4000,
+      system: SYSTEM_PROMPT,
+      messages: [
+        {
+          role: "user",
+          content: buildUserPrompt({ idea, clarifications, scopeLevel }),
+        },
+      ],
+    });
 
-  const encoder = new TextEncoder();
-  const readable = new ReadableStream({
-    async start(controller) {
-      for await (const chunk of stream) {
-        if (
-          chunk.type === "content_block_delta" &&
-          chunk.delta.type === "text_delta"
-        ) {
-          controller.enqueue(encoder.encode(chunk.delta.text));
+    const encoder = new TextEncoder();
+    const readable = new ReadableStream({
+      async start(controller) {
+        for await (const chunk of stream) {
+          if (
+            chunk.type === "content_block_delta" &&
+            chunk.delta.type === "text_delta"
+          ) {
+            controller.enqueue(encoder.encode(chunk.delta.text));
+          }
         }
-      }
-      controller.close();
-    },
-  });
+        controller.close();
+      },
+    });
 
-  return new Response(readable, {
-    headers: { "Content-Type": "text/plain; charset=utf-8" },
-  });
+    return new Response(readable, {
+      headers: { "Content-Type": "text/plain; charset=utf-8" },
+    });
+  }
+
+  return Response.json({ error: `Unknown type: ${type}` }, { status: 400 });
 }

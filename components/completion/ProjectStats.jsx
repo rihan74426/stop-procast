@@ -2,7 +2,6 @@
 
 export function ProjectStats({ project }) {
   const stats = project.postmortem?.stats ?? {};
-  const milestones = project.phases.flatMap((p) => p.milestones);
 
   const items = [
     {
@@ -12,7 +11,7 @@ export function ProjectStats({ project }) {
       color: "var(--violet)",
     },
     {
-      label: "Tasks completed",
+      label: "Tasks done",
       value: stats.tasksCompleted ?? 0,
       color: "var(--emerald)",
     },
@@ -22,12 +21,12 @@ export function ProjectStats({ project }) {
       color: "var(--coral)",
     },
     {
-      label: "Milestones on time",
+      label: "On-time",
       value: stats.milestonesOnTime ?? 0,
       color: "var(--emerald)",
     },
     {
-      label: "Milestones missed",
+      label: "Missed",
       value: stats.milestonesMissed ?? 0,
       color: "var(--amber)",
     },
@@ -40,14 +39,19 @@ export function ProjectStats({ project }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+    <div className="grid grid-cols-3 sm:grid-cols-3 gap-2 sm:gap-4">
       {items.map(({ label, value, suffix = "", color }) => (
         <div
           key={label}
-          className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] px-5 py-4"
+          className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] px-3 sm:px-5 py-3 sm:py-4"
         >
-          <p className="text-xs text-[var(--text-tertiary)] mb-2">{label}</p>
-          <p className="font-display font-semibold text-2xl" style={{ color }}>
+          <p className="text-xs text-[var(--text-tertiary)] mb-1 sm:mb-2 leading-tight">
+            {label}
+          </p>
+          <p
+            className="font-display font-semibold text-xl sm:text-2xl"
+            style={{ color }}
+          >
             {value}
             {suffix}
           </p>

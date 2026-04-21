@@ -114,3 +114,11 @@ All project data is stored in **two layers**:
 | `app/api/projects/[id]/route.js`        | REST: GET, PATCH, DELETE one                  |
 | `components/providers/DataProvider.jsx` | Hydrates store from MongoDB post-auth         |
 | `components/layout/TopBar.jsx`          | Top navigation bar (PascalCase — important!)  |
+
+// need to show login modal before start project. say it's free. after login then redirect to the project page and save everything.
+// we also need to use it in multiple languages.
+// a good fonts will be used
+
+J:\WD Works\stop-pro…ct\[id]\page.jsx:62 Uncaught InvalidCharacterError: Failed to execute 'btoa' on 'Window': The string to be encoded contains characters outside of the Latin1 range.
+at handleExport (J:\WD Works\stop-pro…[id]\page.jsx:62:21)
+at onClick (J:\WD Works\stop-pro…id]\page.jsx:248:36)

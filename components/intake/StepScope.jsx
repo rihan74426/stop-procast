@@ -38,18 +38,18 @@ const SCOPES = [
 
 export function StepScope({ value, onChange, onBack, onNext }) {
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6 sm:gap-8">
       <div>
-        <h1 className="text-3xl font-display font-semibold text-[var(--text-primary)] mb-2">
+        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)] mb-2">
           Choose your scope
         </h1>
-        <p className="text-[var(--text-secondary)]">
+        <p className="text-sm sm:text-base text-[var(--text-secondary)]">
           This shapes how the AI plans your project. You can always adjust
           later.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-3">
         {SCOPES.map((scope) => {
           const selected = value === scope.id;
           return (
@@ -57,7 +57,7 @@ export function StepScope({ value, onChange, onBack, onNext }) {
               key={scope.id}
               onClick={() => onChange(scope.id)}
               className={[
-                "relative text-left rounded-[var(--r-lg)] border-2 p-5 transition-all duration-200",
+                "relative text-left rounded-[var(--r-lg)] border-2 p-4 sm:p-5 transition-all duration-200",
                 selected
                   ? "border-[var(--violet)] shadow-[var(--shadow-md)]"
                   : "border-[var(--border)] hover:border-[var(--slate-4)]",
@@ -74,22 +74,22 @@ export function StepScope({ value, onChange, onBack, onNext }) {
 
               {/* Color dot */}
               <div
-                className="w-8 h-8 rounded-[var(--r-md)] flex items-center justify-center mb-4"
+                className="w-7 h-7 sm:w-8 sm:h-8 rounded-[var(--r-md)] flex items-center justify-center mb-3 sm:mb-4"
                 style={{ background: scope.bg }}
               >
                 <div
-                  className="w-3 h-3 rounded-full"
+                  className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full"
                   style={{ background: scope.color }}
                 />
               </div>
 
-              <p className="font-display font-semibold text-lg text-[var(--text-primary)] mb-0.5">
+              <p className="font-display font-semibold text-base sm:text-lg text-[var(--text-primary)] mb-0.5">
                 {scope.label}
               </p>
-              <p className="text-xs text-[var(--text-secondary)] mb-3">
+              <p className="text-xs text-[var(--text-secondary)] mb-2 sm:mb-3">
                 {scope.subtitle}
               </p>
-              <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-4">
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed mb-3 sm:mb-4">
                 {scope.description}
               </p>
               <p className="text-xs font-medium" style={{ color: scope.color }}>
@@ -98,7 +98,7 @@ export function StepScope({ value, onChange, onBack, onNext }) {
 
               {selected && (
                 <div
-                  className="absolute top-4 right-4 w-5 h-5 rounded-full flex items-center justify-center"
+                  className="absolute top-3 sm:top-4 right-3 sm:right-4 w-5 h-5 rounded-full flex items-center justify-center"
                   style={{ background: "var(--violet)" }}
                 >
                   <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
@@ -117,11 +117,16 @@ export function StepScope({ value, onChange, onBack, onNext }) {
         })}
       </div>
 
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-3">
         <Button variant="ghost" onClick={onBack}>
           ← Back
         </Button>
-        <Button onClick={onNext} disabled={!value} size="lg">
+        <Button
+          onClick={onNext}
+          disabled={!value}
+          size="lg"
+          className="flex-1 sm:flex-none justify-center"
+        >
           Generate plan →
         </Button>
       </div>

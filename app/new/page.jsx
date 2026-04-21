@@ -28,7 +28,6 @@ function NewProjectContent() {
     .filter((c) => c.answer.trim());
 
   const handleCommit = async ({ deadline }) => {
-    // addProject is async — must await so we get the id back reliably
     const id = await addProject({
       ...blueprint,
       scopeLevel,
@@ -45,15 +44,15 @@ function NewProjectContent() {
   return (
     <div className="min-h-screen bg-[var(--bg-surface)] flex flex-col">
       {/* Progress header */}
-      <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-6 py-4">
+      <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-4 sm:px-6 py-3 sm:py-4 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
             {STEPS.map((label, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <div className="flex items-center gap-2">
+              <div key={i} className="flex items-center gap-1.5 sm:gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <div
                     className={[
-                      "w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300",
+                      "w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300",
                       i < step
                         ? "bg-[var(--emerald)] text-white"
                         : i === step
@@ -75,7 +74,7 @@ function NewProjectContent() {
                 </div>
                 {i < STEPS.length - 1 && (
                   <div
-                    className={`h-px w-8 transition-colors duration-300 ${
+                    className={`h-px w-4 sm:w-8 transition-colors duration-300 ${
                       i < step ? "bg-[var(--emerald)]" : "bg-[var(--border)]"
                     }`}
                   />
@@ -87,7 +86,7 @@ function NewProjectContent() {
       </div>
 
       {/* Step content */}
-      <div className="flex-1 flex items-start justify-center px-6 py-12">
+      <div className="flex-1 flex items-start justify-center px-4 sm:px-6 py-8 sm:py-12">
         <div className="w-full max-w-2xl">
           {step === 0 && (
             <StepCapture
@@ -135,7 +134,6 @@ function NewProjectContent() {
         </div>
       </div>
 
-      {/* Save nudge for guests */}
       <SavePromptModal />
     </div>
   );

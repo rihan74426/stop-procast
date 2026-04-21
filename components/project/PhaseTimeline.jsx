@@ -1,3 +1,5 @@
+// needs responsiveness
+
 "use client";
 
 import { phaseProgress } from "@/lib/utils/progress";

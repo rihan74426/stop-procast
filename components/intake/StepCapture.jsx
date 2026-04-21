@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { Textarea } from "@/components/ui/Input";
 import { Button } from "@/components/ui/Button";
 
 const EXAMPLES = [
@@ -16,13 +15,13 @@ export function StepCapture({ value, onChange, onNext }) {
   const canProceed = value.trim().length >= 20;
 
   return (
-    <div className="flex flex-col gap-8">
+    <div className="flex flex-col gap-6 sm:gap-8">
       {/* Heading */}
       <div>
-        <h1 className="text-3xl font-display font-semibold text-[var(--text-primary)] mb-2">
+        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)] mb-2">
           What do you want to build?
         </h1>
-        <p className="text-[var(--text-secondary)]">
+        <p className="text-sm sm:text-base text-[var(--text-secondary)]">
           Describe your idea in plain language. Messy is fine — the more honest,
           the better the plan.
         </p>
@@ -41,11 +40,11 @@ export function StepCapture({ value, onChange, onNext }) {
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder="e.g. I want to build a tool that helps indie makers track their projects without getting overwhelmed by complex PM software..."
-          rows={6}
-          className="w-full bg-transparent px-5 py-4 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none focus:outline-none text-base leading-relaxed"
+          rows={5}
+          className="w-full bg-transparent px-4 sm:px-5 py-3 sm:py-4 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none focus:outline-none text-sm sm:text-base leading-relaxed"
           autoFocus
         />
-        <div className="px-5 py-3 border-t border-[var(--border)] flex items-center justify-between">
+        <div className="px-4 sm:px-5 py-2.5 sm:py-3 border-t border-[var(--border)] flex items-center justify-between">
           <span
             className={`text-xs ${
               value.length < 20
@@ -54,8 +53,8 @@ export function StepCapture({ value, onChange, onNext }) {
             }`}
           >
             {value.length < 20
-              ? `${20 - value.length} more characters to continue`
-              : "✓ Good — the more detail the better"}
+              ? `${20 - value.length} more chars`
+              : "✓ Good — more detail = better plan"}
           </span>
           <span className="text-xs text-[var(--text-tertiary)]">
             {value.length} chars
@@ -65,7 +64,7 @@ export function StepCapture({ value, onChange, onNext }) {
 
       {/* Examples */}
       <div>
-        <p className="text-xs text-[var(--text-tertiary)] mb-3 uppercase tracking-wider font-medium">
+        <p className="text-xs text-[var(--text-tertiary)] mb-2 sm:mb-3 uppercase tracking-wider font-medium">
           Need inspiration?
         </p>
         <div className="flex flex-col gap-2">
@@ -73,9 +72,9 @@ export function StepCapture({ value, onChange, onNext }) {
             <button
               key={i}
               onClick={() => onChange(ex)}
-              className="text-left text-sm text-[var(--text-secondary)] px-4 py-3 rounded-[var(--r-md)] border border-[var(--border)] hover:border-[var(--violet)] hover:text-[var(--text-primary)] hover:bg-[var(--violet-bg)] transition-all duration-150"
+              className="text-left text-sm text-[var(--text-secondary)] px-3 sm:px-4 py-2.5 sm:py-3 rounded-[var(--r-md)] border border-[var(--border)] hover:border-[var(--violet)] hover:text-[var(--text-primary)] hover:bg-[var(--violet-bg)] transition-all duration-150"
             >
-              `{ex}`
+              {ex}
             </button>
           ))}
         </div>
@@ -87,7 +86,7 @@ export function StepCapture({ value, onChange, onNext }) {
           onClick={onNext}
           disabled={!canProceed}
           size="lg"
-          className="gap-3"
+          className="gap-2 sm:gap-3 w-full sm:w-auto justify-center"
         >
           Continue
           <ArrowRight />
