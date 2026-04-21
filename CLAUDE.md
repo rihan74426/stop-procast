@@ -118,6 +118,9 @@ All project data is stored in **two layers**:
 // need to show login modal before start project. say it's free. after login then redirect to the project page and save everything.
 // we also need to use it in multiple languages.
 // a good fonts will be used
+we need to give the users options to choose models, from the free once.
+implement the best uses of the settings in the tool.
+we can give options how they are, their profession, and skills and knowledge and how they want their responses. then use them for the best relative api prompt requests.
 
 J:\WD Works\stop-pro…ct\[id]\page.jsx:62 Uncaught InvalidCharacterError: Failed to execute 'btoa' on 'Window': The string to be encoded contains characters outside of the Latin1 range.
 at handleExport (J:\WD Works\stop-pro…[id]\page.jsx:62:21)
