@@ -1,27 +1,50 @@
 import { auth } from "@clerk/nextjs/server";
 import { connectDB } from "@/lib/db/mongoose";
 import Project from "@/lib/models/Project";
-import { redirect } from "next/navigation";
 
+// GET /project/[id]/export?format=json|markdown
+// For signed-in users: fetches from MongoDB
+// For guests: reads the project from the ?data= query param (client passes it)
 export async function GET(request, { params }) {
+  const { id } = await params;
+  const { searchParams } = new URL(request.url);
+  const format = searchParams.get("format") ?? "json";
+
+  let project = null;
+
   try {
     const { userId } = await auth();
-    if (!userId) {
-      return new Response("Unauthorized", { status: 401 });
+
+    if (userId) {
+      // Signed-in: fetch from MongoDB
+      await connectDB();
+      const doc = await Project.findOne({ id, userId }).lean();
+      if (doc) {
+        const { _id, __v, ...clean } = doc;
+        project = clean;
+      }
     }
 
-    await connectDB();
-    const { id } = await params;
-    const project = await Project.findOne({ id, userId }).lean();
+    // Guest fallback: client encodes project as base64 in ?data=
+    if (!project) {
+      const encoded = searchParams.get("data");
+      if (encoded) {
+        try {
+          project = JSON.parse(
+            Buffer.from(encoded, "base64").toString("utf-8")
+          );
+        } catch {
+          return new Response("Invalid project data", { status: 400 });
+        }
+      }
+    }
 
-    if (!project) return new Response("Project not found", { status: 404 });
-
-    const { searchParams } = new URL(request.url);
-    const format = searchParams.get("format") ?? "json";
+    if (!project) {
+      return new Response("Project not found", { status: 404 });
+    }
 
     if (format === "markdown") {
-      const md = toMarkdown(project);
-      return new Response(md, {
+      return new Response(toMarkdown(project), {
         headers: {
           "Content-Type": "text/markdown; charset=utf-8",
           "Content-Disposition": `attachment; filename="${slug(
@@ -31,9 +54,7 @@ export async function GET(request, { params }) {
       });
     }
 
-    // Strip MongoDB internals
-    const { _id, __v, ...clean } = project;
-    return new Response(JSON.stringify(clean, null, 2), {
+    return new Response(JSON.stringify(project, null, 2), {
       headers: {
         "Content-Type": "application/json",
         "Content-Disposition": `attachment; filename="${slug(
@@ -56,6 +77,7 @@ function slug(title) {
 
 function toMarkdown(p) {
   const lines = [];
+
   lines.push(`# ${p.projectTitle}`);
   lines.push("");
   lines.push(`> ${p.oneLineGoal}`);
@@ -66,15 +88,18 @@ function toMarkdown(p) {
     lines.push(p.problemStatement);
     lines.push("");
   }
+
   if (p.targetUser) {
     lines.push(`**Target user:** ${p.targetUser}`);
     lines.push("");
   }
+
   if (p.successCriteria?.length) {
     lines.push("## Success criteria");
     p.successCriteria.forEach((c) => lines.push(`- ${c}`));
     lines.push("");
   }
+
   if (p.scope) {
     lines.push("## Scope");
     if (p.scope.mustHave?.length) {
@@ -92,17 +117,19 @@ function toMarkdown(p) {
     lines.push("");
   }
 
-  (p.phases ?? []).forEach((phase, i) => {
+  p.phases?.forEach((phase, i) => {
     lines.push(`## Phase ${i + 1}: ${phase.name}`);
     lines.push(phase.objective);
     lines.push("");
-    (phase.milestones ?? []).forEach((m) => {
+
+    phase.milestones?.forEach((m) => {
       lines.push(`### ${m.name}`);
       if (m.deadline) lines.push(`**Deadline:** ${m.deadline}`);
       if (m.doneWhen) lines.push(`**Done when:** ${m.doneWhen}`);
       if (m.risk) lines.push(`**Risk:** ${m.risk}`);
       lines.push("");
-      const tasks = (p.tasks ?? []).filter((t) => t.milestoneId === m.id);
+
+      const tasks = p.tasks?.filter((t) => t.milestoneId === m.id) ?? [];
       tasks.forEach((t) => {
         lines.push(`- [${t.status === "done" ? "x" : " "}] ${t.title}`);
       });
@@ -113,12 +140,15 @@ function toMarkdown(p) {
   if (p.blockers?.length) {
     lines.push("## Blockers");
     p.blockers.forEach((b) => {
-      lines.push(
-        `- ${b.description} (${
-          b.status === "resolved" ? "resolved" : "active"
-        })`
-      );
+      const status = b.status === "resolved" ? "~~resolved~~" : "**active**";
+      lines.push(`- ${b.description} (${status})`);
     });
+    lines.push("");
+  }
+
+  if (p.toolsSuggested?.length) {
+    lines.push("## Suggested tools");
+    p.toolsSuggested.forEach((t) => lines.push(`- ${t}`));
     lines.push("");
   }
 
@@ -135,5 +165,6 @@ function toMarkdown(p) {
   lines.push(
     `*Exported from StopProcast on ${new Date().toLocaleDateString()}*`
   );
+
   return lines.join("\n");
 }

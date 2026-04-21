@@ -8,10 +8,12 @@ import { StepScope } from "@/components/intake/StepScope";
 import { StepReview } from "@/components/intake/StepReview";
 import { StepCommit } from "@/components/intake/StepCommit";
 import { useProjectStore } from "@/lib/store/projectStore";
+import { DataProvider } from "@/components/providers/DataProvider";
+import { SavePromptModal } from "@/components/ui/SavePromptModal";
 
 const STEPS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
 
-export default function NewProjectPage() {
+function NewProjectContent() {
   const router = useRouter();
   const addProject = useProjectStore((s) => s.addProject);
 
@@ -25,8 +27,9 @@ export default function NewProjectPage() {
     .map(([i, answer]) => ({ question: `Q${parseInt(i) + 1}`, answer }))
     .filter((c) => c.answer.trim());
 
-  const handleCommit = ({ deadline }) => {
-    const id = addProject({
+  const handleCommit = async ({ deadline }) => {
+    // addProject is async — must await so we get the id back reliably
+    const id = await addProject({
       ...blueprint,
       scopeLevel,
       completionDate: null,
@@ -44,7 +47,6 @@ export default function NewProjectPage() {
       {/* Progress header */}
       <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-6 py-4">
         <div className="max-w-2xl mx-auto">
-          {/* Step indicators */}
           <div className="flex items-center gap-2">
             {STEPS.map((label, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -132,6 +134,17 @@ export default function NewProjectPage() {
           )}
         </div>
       </div>
+
+      {/* Save nudge for guests */}
+      <SavePromptModal />
     </div>
+  );
+}
+
+export default function NewProjectPage() {
+  return (
+    <DataProvider>
+      <NewProjectContent />
+    </DataProvider>
   );
 }

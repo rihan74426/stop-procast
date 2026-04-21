@@ -6,11 +6,11 @@ import { useProjectStore } from "@/lib/store/projectStore";
 import { ConfettiBlast } from "@/components/completion/ConfettiBlast";
 import { ProjectStats } from "@/components/completion/ProjectStats";
 import { Postmortem } from "@/components/completion/Postmortem";
-import { TopBar } from "@/components/layout/Topbar";
+import { TopBar } from "@/components/layout/TopBar";
 import { Button } from "@/components/ui/Button";
+import { DataProvider } from "@/components/providers/DataProvider";
 
-export default function CompletePage({ params }) {
-  const { id } = use(params);
+function CompleteContent({ id }) {
   const project = useProjectStore((s) => s.getProject(id));
   const [section, setSection] = useState("celebrate"); // celebrate | retro | done
 
@@ -31,7 +31,6 @@ export default function CompletePage({ params }) {
         <div className="w-full max-w-2xl">
           {section === "celebrate" && (
             <div className="flex flex-col gap-8 text-center items-center">
-              {/* Hero */}
               <div>
                 <div className="text-6xl mb-4">🚀</div>
                 <h1 className="font-display font-bold text-4xl text-[var(--text-primary)] mb-3">
@@ -45,7 +44,6 @@ export default function CompletePage({ params }) {
                 </p>
               </div>
 
-              {/* Stats */}
               <div className="w-full text-left">
                 <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-4 text-center">
                   Project stats
@@ -85,7 +83,7 @@ export default function CompletePage({ params }) {
               <div>
                 <div className="text-5xl mb-4">🎯</div>
                 <h2 className="font-display font-bold text-3xl text-[var(--text-primary)] mb-3">
-                  What`s next?
+                  What's next?
                 </h2>
                 <p className="text-[var(--text-secondary)] max-w-sm">
                   Your retrospective is saved. Build on this momentum.
@@ -113,5 +111,14 @@ export default function CompletePage({ params }) {
         </div>
       </main>
     </div>
+  );
+}
+
+export default function CompletePage({ params }) {
+  const { id } = use(params);
+  return (
+    <DataProvider>
+      <CompleteContent id={id} />
+    </DataProvider>
   );
 }

@@ -3,9 +3,11 @@
 import Link from "next/link";
 import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/Button";
+import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
 
 export function TopBar() {
   const { theme, toggle } = useTheme();
+  const { isSignedIn, isLoaded } = useUser();
 
   return (
     <header className="h-14 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex items-center px-4 gap-3 sticky top-0 z-30">
@@ -38,6 +40,18 @@ export function TopBar() {
       >
         {theme === "dark" ? <SunIcon /> : <MoonIcon />}
       </Button>
+
+      {/* Auth — sign in prompt or avatar */}
+      {isLoaded &&
+        (isSignedIn ? (
+          <UserButton afterSignOutUrl="/" />
+        ) : (
+          <SignInButton mode="modal">
+            <button className="h-8 px-3 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all">
+              Sign in to save
+            </button>
+          </SignInButton>
+        ))}
     </header>
   );
 }

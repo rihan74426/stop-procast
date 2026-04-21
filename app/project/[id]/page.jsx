@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { DataProvider } from "@/components/providers/DataProvider";
-import { TopBar } from "@/components/layout/Topbar";
+import { SavePromptModal } from "@/components/ui/SavePromptModal";
+import { TopBar } from "@/components/layout/TopBar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { NextAction } from "@/components/project/NextAction";
 import { PhaseTimeline } from "@/components/project/PhaseTimeline";
@@ -19,8 +20,7 @@ import { Badge } from "@/components/ui/Badge";
 import { overallProgress } from "@/lib/utils/progress";
 import { formatDate, projectAgeLabel } from "@/lib/utils/date";
 
-export default function ProjectPage({ params }) {
-  const { id } = use(params);
+function ProjectContent({ id }) {
   const router = useRouter();
   const project = useProjectStore((s) => s.getProject(id));
   const deleteProject = useProjectStore((s) => s.deleteProject);
@@ -52,14 +52,16 @@ export default function ProjectPage({ params }) {
   };
 
   const handleComplete = () => {
-    if (
-      confirm(
-        "Mark this project as shipped? This will trigger the completion flow."
-      )
-    ) {
+    if (confirm("Mark this project as shipped?")) {
       completeProject(id);
       router.push(`/project/${id}/complete`);
     }
+  };
+
+  // Export: encode project for guest users who have no MongoDB record
+  const handleExport = (format = "json") => {
+    const encoded = btoa(JSON.stringify(project));
+    window.location.href = `/project/${id}/export?format=${format}&data=${encoded}`;
   };
 
   return (
@@ -88,7 +90,7 @@ export default function ProjectPage({ params }) {
             <div className="grid grid-cols-1 gap-8 lg:grid-cols-[1fr_300px]">
               {/* ── Left column ───────────────────────────────────── */}
               <div className="flex flex-col gap-6 min-w-0">
-                {/* Project header */}
+                {/* Header */}
                 <div>
                   <div className="flex items-start justify-between gap-4 mb-2">
                     <h1 className="font-display font-semibold text-3xl text-[var(--text-primary)] leading-tight">
@@ -119,19 +121,15 @@ export default function ProjectPage({ params }) {
                   </div>
                 </div>
 
-                {/* Pressure & streak */}
                 <ProjectPressure project={project} />
                 <StreakBanner project={project} />
 
-                {/* Phase timeline */}
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
                   <PhaseTimeline project={project} />
                 </div>
 
-                {/* Next action — only for active projects */}
                 {!isCompleted && <NextAction project={project} />}
 
-                {/* Task list */}
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
                   <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-4">
                     All tasks
@@ -142,7 +140,7 @@ export default function ProjectPage({ params }) {
 
               {/* ── Right column ──────────────────────────────────── */}
               <div className="flex flex-col gap-5">
-                {/* Quick stats */}
+                {/* Stats */}
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
                   <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-4">
                     Stats
@@ -209,7 +207,7 @@ export default function ProjectPage({ params }) {
                   <BlockerPanel project={project} />
                 </div>
 
-                {/* Tools suggested */}
+                {/* Suggested tools */}
                 {project.toolsSuggested?.length > 0 && (
                   <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5">
                     <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
@@ -239,11 +237,20 @@ export default function ProjectPage({ params }) {
                       🚀 Mark as shipped
                     </Button>
                   )}
-                  <Link href={`/project/${id}/export`}>
-                    <Button variant="ghost" className="w-full justify-center">
-                      Export project
-                    </Button>
-                  </Link>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleExport("json")}
+                    className="w-full justify-center"
+                  >
+                    Export JSON
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleExport("markdown")}
+                    className="w-full justify-center"
+                  >
+                    Export Markdown
+                  </Button>
                   <Button
                     variant="danger"
                     onClick={handleDelete}
@@ -257,6 +264,18 @@ export default function ProjectPage({ params }) {
           </div>
         </main>
       </div>
+
+      {/* Save nudge for guests */}
+      <SavePromptModal />
     </div>
+  );
+}
+
+export default function ProjectPage({ params }) {
+  const { id } = use(params);
+  return (
+    <DataProvider>
+      <ProjectContent id={id} />
+    </DataProvider>
   );
 }

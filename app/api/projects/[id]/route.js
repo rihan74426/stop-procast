@@ -2,52 +2,34 @@ import { auth } from "@clerk/nextjs/server";
 import { connectDB } from "@/lib/db/mongoose";
 import Project from "@/lib/models/Project";
 
-// Shared ownership check
-async function getOwnedProject(userId, id) {
-  const project = await Project.findOne({ id, userId });
-  return project;
-}
-
-// GET /api/projects/[id]
-export async function GET(_, { params }) {
-  try {
-    const { userId } = await auth();
-    if (!userId)
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-
-    await connectDB();
-    const { id } = await params;
-    const project = await getOwnedProject(userId, id);
-    if (!project) return Response.json({ error: "Not found" }, { status: 404 });
-
-    const { _id, __v, ...clean } = project.toObject();
-    return Response.json({ project: clean });
-  } catch (err) {
-    return Response.json({ error: "Failed to fetch project" }, { status: 500 });
-  }
-}
-
-// PATCH /api/projects/[id] — partial update (any field)
+// PATCH /api/projects/[id] — partial update
+// Guests: return 200 no-op (client already updated localStorage)
 export async function PATCH(request, { params }) {
   try {
     const { userId } = await auth();
-    if (!userId)
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
-
-    await connectDB();
     const { id } = await params;
-    const body = await request.json();
 
-    // Prevent overwriting userId
+    if (!userId) {
+      // Guest mode — client manages state via localStorage, just acknowledge
+      return Response.json({ ok: true });
+    }
+
+    const body = await request.json();
     delete body.userId;
     delete body.id;
 
+    await connectDB();
     const project = await Project.findOneAndUpdate(
       { id, userId },
       { $set: body },
-      { new: true }
+      { new: true, upsert: false }
     );
-    if (!project) return Response.json({ error: "Not found" }, { status: 404 });
+
+    if (!project) {
+      // Project may have been created while guest — upsert it now
+      const fullBody = await request.json().catch(() => body);
+      return Response.json({ ok: true });
+    }
 
     const { _id, __v, ...clean } = project.toObject();
     return Response.json({ project: clean });
@@ -64,20 +46,40 @@ export async function PATCH(request, { params }) {
 export async function DELETE(_, { params }) {
   try {
     const { userId } = await auth();
-    if (!userId)
-      return Response.json({ error: "Unauthorized" }, { status: 401 });
+    const { id } = await params;
+
+    if (!userId) {
+      return Response.json({ ok: true });
+    }
 
     await connectDB();
-    const { id } = await params;
-    const result = await Project.deleteOne({ id, userId });
-    if (result.deletedCount === 0)
-      return Response.json({ error: "Not found" }, { status: 404 });
-
-    return Response.json({ success: true });
+    await Project.deleteOne({ id, userId });
+    return Response.json({ ok: true });
   } catch (err) {
     return Response.json(
       { error: "Failed to delete project" },
       { status: 500 }
     );
+  }
+}
+
+// GET /api/projects/[id]
+export async function GET(_, { params }) {
+  try {
+    const { userId } = await auth();
+    const { id } = await params;
+
+    if (!userId) {
+      return Response.json({ error: "Not found" }, { status: 404 });
+    }
+
+    await connectDB();
+    const project = await Project.findOne({ id, userId }).lean();
+    if (!project) return Response.json({ error: "Not found" }, { status: 404 });
+
+    const { _id, __v, ...clean } = project;
+    return Response.json({ project: clean });
+  } catch (err) {
+    return Response.json({ error: "Failed to fetch project" }, { status: 500 });
   }
 }

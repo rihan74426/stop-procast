@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useUser, SignInButton } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
 
 const navItems = [
@@ -12,6 +13,7 @@ const navItems = [
 
 export function Sidebar() {
   const pathname = usePathname();
+  const { isSignedIn, isLoaded } = useUser();
   const projects = useProjectStore((s) => s.projects);
   const activeProjects = projects.filter((p) => !p.completionDate);
 
@@ -40,7 +42,7 @@ export function Sidebar() {
         })}
       </nav>
 
-      {/* Recent projects */}
+      {/* Active projects list */}
       {activeProjects.length > 0 && (
         <div className="px-3 pb-3 mt-2">
           <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider px-3 mb-2">
@@ -69,12 +71,25 @@ export function Sidebar() {
 
       <div className="flex-1" />
 
-      {/* Footer */}
-      <div className="p-4 border-t border-[var(--border)]">
-        <p className="text-xs text-[var(--text-tertiary)]">
-          {activeProjects.length} active project
-          {activeProjects.length !== 1 ? "s" : ""}
-        </p>
+      {/* Footer — sign-in nudge for guests, project count for members */}
+      <div className="p-3 border-t border-[var(--border)]">
+        {isLoaded && !isSignedIn ? (
+          <SignInButton mode="modal">
+            <button className="w-full rounded-[var(--r-md)] bg-[var(--violet-bg)] border border-[var(--violet)] px-3 py-2.5 text-left transition-colors hover:bg-[var(--violet)] hover:text-white group">
+              <p className="text-xs font-medium text-[var(--violet-dim)] group-hover:text-white transition-colors">
+                ☁️ Save to cloud
+              </p>
+              <p className="text-xs text-[var(--text-tertiary)] group-hover:text-white/70 transition-colors mt-0.5">
+                Sign in to keep your data
+              </p>
+            </button>
+          </SignInButton>
+        ) : (
+          <p className="text-xs text-[var(--text-tertiary)] px-1">
+            {activeProjects.length} active project
+            {activeProjects.length !== 1 ? "s" : ""}
+          </p>
+        )}
       </div>
     </aside>
   );

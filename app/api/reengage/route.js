@@ -1,19 +1,16 @@
-import Anthropic from "@anthropic-ai/sdk";
+import { openrouterGenerate } from "@/lib/ai/openrouter";
 import { buildReengagePrompt } from "@/lib/ai/prompts";
-
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
 export async function POST(request) {
   try {
     const { project } = await request.json();
-    const msg = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 150,
-      messages: [{ role: "user", content: buildReengagePrompt(project) }],
-    });
-    const text = msg.content.find((b) => b.type === "text")?.text ?? "";
+    if (!project) {
+      return Response.json({ error: "Missing project" }, { status: 400 });
+    }
+    const text = await openrouterGenerate(null, buildReengagePrompt(project));
     return Response.json({ suggestion: text });
   } catch (err) {
-    return Response.json({ error: err.message }, { status: 500 });
+    console.error("[reengage] error:", err);
+    return Response.json({ suggestion: null }, { status: 500 });
   }
 }

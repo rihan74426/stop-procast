@@ -8,6 +8,7 @@ import { TopBar } from "@/components/layout/Topbar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Button } from "@/components/ui/Button";
 import { DataProvider } from "@/components/providers/DataProvider";
+import { SavePromptModal } from "@/components/ui/SavePromptModal";
 
 function DashboardContent() {
   const projects = useProjectStore((s) => s.projects);
@@ -94,6 +95,7 @@ export default function DashboardPage() {
   return (
     <DataProvider>
       <DashboardContent />
+      <SavePromptModal />
     </DataProvider>
   );
 }

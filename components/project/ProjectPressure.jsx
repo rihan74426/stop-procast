@@ -5,31 +5,35 @@ import { getPressure, PRESSURE_LABELS } from "@/lib/pressure";
 
 export function ProjectPressure({ project }) {
   const [suggestion, setSuggestion] = useState(null);
+  const [fetched, setFetched] = useState(false);
+
   const pressure = getPressure(project);
 
-  const idleReason = pressure.reasons.find(
-    (r) =>
-      (r.type === "idle" && r.severity === "high") || r.severity === "critical"
-  );
-
-  // Fetch AI re-engagement suggestion for high-pressure idle projects
+  // Only fire once per project when it reaches critical level
+  // Stable dependency: project.id + pressure.level prevents re-fetch loops
   useEffect(() => {
-    if (!idleReason || pressure.level !== "critical") return;
+    if (pressure.level !== "critical") return;
+    if (fetched) return;
+
     let cancelled = false;
+    setFetched(true);
+
     fetch("/api/reengage", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ project }),
     })
-      .then((r) => r.json())
+      .then((r) => (r.ok ? r.json() : null))
       .then((d) => {
-        if (!cancelled) setSuggestion(d.suggestion);
+        if (!cancelled && d?.suggestion) setSuggestion(d.suggestion);
       })
       .catch(() => {});
+
     return () => {
       cancelled = true;
     };
-  }, [project.id]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [project.id, pressure.level]);
 
   if (pressure.level === "none" || pressure.level === "low") return null;
 
