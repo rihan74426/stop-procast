@@ -1,12 +1,12 @@
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { SavePromptModal } from "@/components/ui/SavePromptModal";
-import { TopBar } from "@/components/layout/TopBar";
+import { TopBar } from "@/components/layout/Topbar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Footer } from "@/components/layout/Footer";
 import { NextAction } from "@/components/project/NextAction";
@@ -15,6 +15,7 @@ import { TaskList } from "@/components/project/TaskList";
 import { BlockerPanel } from "@/components/project/BlockerPanel";
 import { StreakBanner } from "@/components/project/StreakBanner";
 import { ProjectPressure } from "@/components/project/ProjectPressure";
+import { EmailExportModal } from "@/components/project/EmailExportModal";
 import { ProgressRing } from "@/components/ui/Progress";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
@@ -23,7 +24,7 @@ import { formatDate, projectAgeLabel } from "@/lib/utils/date";
 import { useI18n } from "@/lib/i18n";
 
 /**
- * UTF-8 safe base64 — fixes btoa crash with Arabic/Chinese/emoji characters
+ * UTF-8 safe base64 — fixes btoa crash with Arabic/Chinese/emoji
  */
 function toBase64Safe(str) {
   return btoa(
@@ -39,6 +40,7 @@ function ProjectContent({ id }) {
   const project = useProjectStore((s) => s.getProject(id));
   const deleteProject = useProjectStore((s) => s.deleteProject);
   const completeProject = useProjectStore((s) => s.completeProject);
+  const [showEmailExport, setShowEmailExport] = useState(false);
 
   if (!project) {
     return (
@@ -265,6 +267,14 @@ function ProjectContent({ id }) {
                       {t("project_mark_shipped")}
                     </Button>
                   )}
+                  {/* Email export — available to ALL users, no auth required */}
+                  <Button
+                    variant="ghost"
+                    onClick={() => setShowEmailExport(true)}
+                    className="w-full justify-center"
+                  >
+                    ✉️ {t("project_export_email")}
+                  </Button>
                   <Button
                     variant="ghost"
                     onClick={handleExportPDF}
@@ -300,6 +310,14 @@ function ProjectContent({ id }) {
           <Footer />
         </main>
       </div>
+
+      {/* Email export modal — no auth required */}
+      <EmailExportModal
+        open={showEmailExport}
+        onClose={() => setShowEmailExport(false)}
+        project={project}
+      />
+
       <SavePromptModal />
     </div>
   );

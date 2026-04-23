@@ -2,15 +2,32 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useState, useRef, useEffect } from "react";
 import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/Button";
 import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
-import { useI18n } from "@/lib/i18n/context";
+import { useI18n } from "@/lib/i18n";
+import { LANGUAGES } from "@/lib/i18n/translations";
 
 export function TopBar() {
   const { theme, toggle } = useTheme();
   const { isSignedIn, isLoaded } = useUser();
-  const { t } = useI18n();
+  const { t, locale, changeLocale } = useI18n();
+  const [langOpen, setLangOpen] = useState(false);
+  const langRef = useRef(null);
+
+  // Close on outside click
+  useEffect(() => {
+    function handleClick(e) {
+      if (langRef.current && !langRef.current.contains(e.target)) {
+        setLangOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const currentLang = LANGUAGES.find((l) => l.code === locale) || LANGUAGES[0];
 
   return (
     <header className="h-14 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex items-center px-3 sm:px-4 gap-2 sm:gap-3 sticky top-0 z-30">
@@ -34,6 +51,61 @@ export function TopBar() {
       </Link>
 
       <div className="flex-1" />
+
+      {/* Language picker */}
+      <div ref={langRef} className="relative">
+        <button
+          onClick={() => setLangOpen((o) => !o)}
+          className="h-8 px-2.5 flex items-center gap-1.5 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all"
+          aria-label="Change language"
+        >
+          <span>{currentLang.flag}</span>
+          <span className="hidden sm:inline">{currentLang.label}</span>
+          <svg
+            width="10"
+            height="10"
+            viewBox="0 0 10 10"
+            fill="none"
+            className={`transition-transform duration-150 ${
+              langOpen ? "rotate-180" : ""
+            }`}
+          >
+            <path
+              d="M2 3.5l3 3 3-3"
+              stroke="currentColor"
+              strokeWidth="1.4"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
+        </button>
+
+        {langOpen && (
+          <div className="absolute right-0 top-full mt-1.5 w-44 rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)] overflow-hidden z-50">
+            {LANGUAGES.map((lang) => (
+              <button
+                key={lang.code}
+                onClick={() => {
+                  changeLocale(lang.code);
+                  setLangOpen(false);
+                }}
+                className={[
+                  "w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors",
+                  locale === lang.code
+                    ? "bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium"
+                    : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]",
+                ].join(" ")}
+              >
+                <span className="text-base">{lang.flag}</span>
+                <span>{lang.label}</span>
+                {locale === lang.code && (
+                  <span className="ml-auto text-[var(--violet)]">✓</span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* Theme toggle */}
       <Button

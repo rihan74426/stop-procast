@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { AI_MODELS, getStoredModel, setStoredModel } from "@/lib/ai/models";
+import { useI18n } from "@/lib/i18n";
 
 const EXAMPLES = [
   "A mobile app that helps remote teams do async standups without boring meetings",
@@ -10,24 +12,30 @@ const EXAMPLES = [
 ];
 
 export function StepCapture({ value, onChange, onNext }) {
+  const { t } = useI18n();
   const [focused, setFocused] = useState(false);
+  const [selectedModel, setSelectedModel] = useState(getStoredModel);
 
   const canProceed = value.trim().length >= 20;
+
+  const handleModelSelect = (id) => {
+    setSelectedModel(id);
+    setStoredModel(id);
+  };
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8">
       {/* Heading */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)] mb-2">
-          What do you want to build?
+          {t("intake_what")}
         </h1>
         <p className="text-sm sm:text-base text-[var(--text-secondary)]">
-          Describe your idea in plain language. Messy is fine — the more honest,
-          the better the plan.
+          {t("intake_what_desc")}
         </p>
       </div>
 
-      {/* Input */}
+      {/* Textarea */}
       <div
         className={[
           "rounded-[var(--r-lg)] border-2 transition-colors duration-200",
@@ -62,6 +70,75 @@ export function StepCapture({ value, onChange, onNext }) {
         </div>
       </div>
 
+      {/* AI Model selector */}
+      <div>
+        <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-2.5">
+          {t("model_choose")}
+        </p>
+        <div className="grid grid-cols-3 gap-2">
+          {AI_MODELS.map((model) => {
+            const isSelected = selectedModel === model.id;
+            return (
+              <button
+                key={model.id}
+                type="button"
+                onClick={() => handleModelSelect(model.id)}
+                className={[
+                  "relative text-left rounded-[var(--r-md)] border-2 px-3 py-2.5 transition-all duration-150",
+                  isSelected
+                    ? "border-[var(--violet)] bg-[var(--violet-bg)]"
+                    : "border-[var(--border)] hover:border-[var(--slate-4)] bg-[var(--bg-surface)]",
+                ].join(" ")}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <span
+                    className={`text-xs font-semibold ${
+                      isSelected
+                        ? "text-[var(--violet-dim)]"
+                        : "text-[var(--text-primary)]"
+                    }`}
+                  >
+                    {model.name}
+                  </span>
+                  <span
+                    className={[
+                      "text-[9px] px-1.5 py-0.5 rounded-full font-medium shrink-0",
+                      isSelected
+                        ? "bg-[var(--violet)] text-white"
+                        : "bg-[var(--bg-muted)] text-[var(--text-tertiary)]",
+                    ].join(" ")}
+                  >
+                    {model.badge}
+                  </span>
+                </div>
+                <p
+                  className={`text-[10px] leading-snug ${
+                    isSelected
+                      ? "text-[var(--violet-dim)]"
+                      : "text-[var(--text-tertiary)]"
+                  }`}
+                >
+                  {model.description}
+                </p>
+                {isSelected && (
+                  <div className="absolute top-2 right-2 w-3.5 h-3.5 rounded-full bg-[var(--violet)] flex items-center justify-center">
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                      <path
+                        d="M1.5 4l1.5 1.5 3-3"
+                        stroke="white"
+                        strokeWidth="1.4"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      />
+                    </svg>
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Examples */}
       <div>
         <p className="text-xs text-[var(--text-tertiary)] mb-2 sm:mb-3 uppercase tracking-wider font-medium">
@@ -88,7 +165,7 @@ export function StepCapture({ value, onChange, onNext }) {
           size="lg"
           className="gap-2 sm:gap-3 w-full sm:w-auto justify-center"
         >
-          Continue
+          {t("intake_continue")}
           <ArrowRight />
         </Button>
       </div>

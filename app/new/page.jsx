@@ -7,11 +7,12 @@ import { StepClarify } from "@/components/intake/StepClarify";
 import { StepScope } from "@/components/intake/StepScope";
 import { StepReview } from "@/components/intake/StepReview";
 import { StepCommit } from "@/components/intake/StepCommit";
-import { AuthGateModal } from "@/components/ui/AuthGateModal";
+import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { SavePromptModal } from "@/components/ui/SavePromptModal";
 import { useI18n } from "@/lib/i18n/context";
+import { TopBar } from "@/components/layout/Topbar";
 
 const STEPS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
 
@@ -64,6 +65,7 @@ function NewProjectContent() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-surface)] flex flex-col">
+      <TopBar />
       {/* Progress header */}
       <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-4 sm:px-6 py-3 sm:py-4 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto">

@@ -226,3 +226,58 @@ npm install jspdf
 - [ ] Analytics dashboard
 - [ ] More languages (Japanese, Portuguese, Hindi, Russian)
 - [ ] Mobile app (React Native / Expo)
+
+the auth before export, unactivated exports remove
+reply in languages that have been asked with in the other tabs.
+user can use the example response in the placeholder by pressing Tab button or something on the phone, or by completing the suggested text by typing. like when type similar to the suggestion it'll appear right beside it. or a side button to select the suggestion.
+we'll let users initilize and work on the project without auth. but after a while of using it, completing tasks we'll encourage to login to save progress, and when exporting it user will need to sign up to send the file to their email. sign-up once, use forever with saving your progress and more features.
+the project wasn't saved after logged in. all previous project disappered. we must save the progress and localstorage data to mongoDB initially after signing-up and logging in.
+This whole application is not only for tech or softwares. this is about anything in the world, tasks, plans, business, project, learning, anything. so make the vibe and system like that everywhere.
+
+show toast on the background activity when needed like internet disconnection, failure, restart, fallback. the retry after a fail request is not working. in the detailed model2, and in the model3 the review requests are failing. remove all the models, only use OPENROUTER_MODEL=openrouter/free and as a fallback use OPENROUTER_MODEL1=meta-llama/llama-3.2-3b-instruct:free
+no need user's preference.
+
+users can go back, move between intake steps and edit their inputs by back button or tapping on the steps icons. the review back from commit are making the reviews regenerate that is not right. it should be as it was. do not regenerate when it is already generated.
+
+the ai api is getting limited by time. I need this to be free forever:
+A 429 error means you've hit a **rate limit**. Here's what you need to know and how to use OpenRouter for free.
+
+## Understanding the 429 Error
+
+A 429 (Too Many Requests) error occurs when you exceed OpenRouter's rate limits. OpenRouter enforces rate limits globally — creating additional accounts or API keys will **not** help, as capacity is governed globally [^1].
+
+## How to Use OpenRouter for Free
+
+OpenRouter offers free model variants — these are models with IDs ending in `:free` (e.g., `meta-llama/llama-3.1-8b-instruct:free`). The following limits apply to free models [^1]:
+
+- **Rate limit:** Up to **20 requests per minute**
+- **Daily limit (no credits purchased):** Limited number of requests per day
+- **Daily limit (purchased at least $10 in credits):** Higher daily request limit
+
+> Making additional accounts or API keys will not affect your rate limits, as we govern capacity globally. We do however have different rate limits for different models, so you can share the load that way if you do run into issues.
+
+## What You Can Do to Fix the 429 Error
+
+- **Slow down your requests** — Add delays between API calls to stay within the per-minute rate limit.
+- **Switch to a different model** — Since rate limits differ per model, spreading requests across multiple free models can help [^1].
+- **Check your credit balance** — If your account has a **negative credit balance**, you may see 402 errors even for free models. Adding credits to bring your balance above zero resolves this [^1].
+- **Monitor your usage** — Check your current rate limit and remaining credits by calling:
+
+```bash
+curl https://openrouter.ai/api/v1/key \
+  -H "Authorization: Bearer YOUR_OPENROUTER_API_KEY"
+```
+
+This returns details like `usage`, `usage_daily`, `limit_remaining`, and `is_free_tier` so you can understand where you stand [^1].
+
+- **Purchase credits** — Buying at least the minimum credit threshold increases your daily free model request limit significantly [^1].
+
+## Summary
+
+To use OpenRouter for free, use model IDs ending in `:free` and stay within the rate limits. If you're hitting 429s, slow down your request rate, spread load across different models, or consider purchasing a small amount of credits to unlock higher daily limits.
+
+[^1]: https://openrouter.ai/docs/api/reference/limits
+
+optimize the usage with this and show the problem according to the code. decrease the ai usage from everywhere. control and use ai smartly that requires low volume. you're sending two requests at a time.
+
+also limit a user's request so that users can use it smoothly.

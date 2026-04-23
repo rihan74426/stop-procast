@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { useTheme } from "@/lib/theme";
-import { TopBar } from "@/components/layout/TopBar";
+import { TopBar } from "@/components/layout/Topbar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/Button";
