@@ -6,8 +6,9 @@ import Link from "next/link";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { SavePromptModal } from "@/components/ui/SavePromptModal";
-import { TopBar } from "@/components/layout/Topbar"; // Fixed casing (was Topbar)
+import { TopBar } from "@/components/layout/TopBar";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { Footer } from "@/components/layout/Footer";
 import { NextAction } from "@/components/project/NextAction";
 import { PhaseTimeline } from "@/components/project/PhaseTimeline";
 import { TaskList } from "@/components/project/TaskList";
@@ -19,9 +20,22 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { overallProgress } from "@/lib/utils/progress";
 import { formatDate, projectAgeLabel } from "@/lib/utils/date";
+import { useI18n } from "@/lib/i18n";
+
+/**
+ * UTF-8 safe base64 — fixes btoa crash with Arabic/Chinese/emoji characters
+ */
+function toBase64Safe(str) {
+  return btoa(
+    encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+      String.fromCharCode(parseInt(p1, 16))
+    )
+  );
+}
 
 function ProjectContent({ id }) {
   const router = useRouter();
+  const { t } = useI18n();
   const project = useProjectStore((s) => s.getProject(id));
   const deleteProject = useProjectStore((s) => s.deleteProject);
   const completeProject = useProjectStore((s) => s.completeProject);
@@ -31,10 +45,10 @@ function ProjectContent({ id }) {
       <div className="flex h-screen items-center justify-center px-4">
         <div className="text-center">
           <p className="text-[var(--text-secondary)] mb-4">
-            Project not found.
+            {t("project_not_found")}
           </p>
           <Link href="/">
-            <Button variant="ghost">← Dashboard</Button>
+            <Button variant="ghost">← {t("nav_dashboard")}</Button>
           </Link>
         </div>
       </div>
@@ -59,17 +73,24 @@ function ProjectContent({ id }) {
   };
 
   const handleExport = (format = "json") => {
-    const encoded = btoa(JSON.stringify(project));
+    const encoded = toBase64Safe(JSON.stringify(project));
     window.location.href = `/project/${id}/export?format=${format}&data=${encoded}`;
+  };
+
+  const handleExportPDF = async () => {
+    try {
+      const { exportProjectPDF } = await import("@/lib/utils/exportPDF");
+      await exportProjectPDF(project);
+    } catch (err) {
+      console.error("PDF export failed:", err);
+    }
   };
 
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
-
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopBar />
-
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
             {/* Breadcrumb */}
@@ -78,7 +99,7 @@ function ProjectContent({ id }) {
                 href="/"
                 className="hover:text-[var(--text-primary)] transition-colors shrink-0"
               >
-                Dashboard
+                {t("nav_dashboard")}
               </Link>
               <span>/</span>
               <span className="text-[var(--text-primary)] truncate">
@@ -87,9 +108,8 @@ function ProjectContent({ id }) {
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-[1fr_280px] xl:grid-cols-[1fr_300px]">
-              {/* ── Left column ───────────────────────────────────── */}
+              {/* Left column */}
               <div className="flex flex-col gap-5 sm:gap-6 min-w-0">
-                {/* Header */}
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-2">
                     <h1 className="font-display font-semibold text-2xl sm:text-3xl text-[var(--text-primary)] leading-tight">
@@ -119,8 +139,10 @@ function ProjectContent({ id }) {
                     </Badge>
                     {project.timeline && (
                       <Badge variant="slate">
-                        Target:{" "}
-                        {formatDate(project.timeline) || project.timeline}
+                        {t("project_target", {
+                          date:
+                            formatDate(project.timeline) || project.timeline,
+                        })}
                       </Badge>
                     )}
                     {isCompleted && <Badge status="completed">✓ Shipped</Badge>}
@@ -138,38 +160,41 @@ function ProjectContent({ id }) {
 
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                   <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-4">
-                    All tasks
+                    {t("project_all_tasks")}
                   </p>
                   <TaskList project={project} />
                 </div>
               </div>
 
-              {/* ── Right column ──────────────────────────────────── */}
+              {/* Right column */}
               <div className="flex flex-col gap-4 sm:gap-5 pb-16 lg:pb-0">
                 {/* Stats */}
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                   <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3 sm:mb-4">
-                    Stats
+                    {t("project_stats")}
                   </p>
                   <div className="grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-3">
                     {[
                       {
-                        label: "Done",
+                        label: t("project_done"),
                         value: project.tasks.filter((t) => t.status === "done")
                           .length,
                       },
                       {
-                        label: "Todo",
+                        label: t("project_todo"),
                         value: project.tasks.filter((t) => t.status === "todo")
                           .length,
                       },
                       {
-                        label: "Blocked",
+                        label: t("project_blocked"),
                         value: project.tasks.filter(
                           (t) => t.status === "blocked"
                         ).length,
                       },
-                      { label: "Streak", value: `${project.streakDays}d` },
+                      {
+                        label: t("project_streak"),
+                        value: `${project.streakDays}d`,
+                      },
                     ].map(({ label, value }) => (
                       <div
                         key={label}
@@ -186,11 +211,10 @@ function ProjectContent({ id }) {
                   </div>
                 </div>
 
-                {/* Success criteria */}
                 {project.successCriteria?.length > 0 && (
                   <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                     <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
-                      Success criteria
+                      {t("project_success_criteria")}
                     </p>
                     <ul className="flex flex-col gap-2">
                       {project.successCriteria.map((c, i) => (
@@ -208,21 +232,19 @@ function ProjectContent({ id }) {
                   </div>
                 )}
 
-                {/* Blockers */}
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                   <BlockerPanel project={project} />
                 </div>
 
-                {/* Suggested tools */}
                 {project.toolsSuggested?.length > 0 && (
                   <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                     <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
-                      Suggested tools
+                      {t("project_tools")}
                     </p>
                     <div className="flex flex-wrap gap-2">
-                      {project.toolsSuggested.map((t, i) => (
+                      {project.toolsSuggested.map((tool, i) => (
                         <Badge key={i} variant="slate">
-                          {t}
+                          {tool}
                         </Badge>
                       ))}
                     </div>
@@ -231,8 +253,8 @@ function ProjectContent({ id }) {
 
                 {/* Actions */}
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5 flex flex-col gap-2">
-                  <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-2">
-                    Actions
+                  <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-1">
+                    {t("project_actions")}
                   </p>
                   {!isCompleted && (
                     <Button
@@ -240,37 +262,44 @@ function ProjectContent({ id }) {
                       onClick={handleComplete}
                       className="w-full justify-center"
                     >
-                      🚀 Mark as shipped
+                      {t("project_mark_shipped")}
                     </Button>
                   )}
+                  <Button
+                    variant="ghost"
+                    onClick={handleExportPDF}
+                    className="w-full justify-center"
+                  >
+                    {t("project_export_pdf")}
+                  </Button>
                   <Button
                     variant="ghost"
                     onClick={() => handleExport("json")}
                     className="w-full justify-center"
                   >
-                    Export JSON
+                    {t("project_export_json")}
                   </Button>
                   <Button
                     variant="ghost"
                     onClick={() => handleExport("markdown")}
                     className="w-full justify-center"
                   >
-                    Export Markdown
+                    {t("project_export_md")}
                   </Button>
                   <Button
                     variant="danger"
                     onClick={handleDelete}
                     className="w-full justify-center"
                   >
-                    Delete project
+                    {t("project_delete")}
                   </Button>
                 </div>
               </div>
             </div>
           </div>
+          <Footer />
         </main>
       </div>
-
       <SavePromptModal />
     </div>
   );

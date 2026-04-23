@@ -3,28 +3,50 @@
 import { useState, useEffect } from "react";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { useTheme } from "@/lib/theme";
-import { TopBar } from "@/components/layout/Topbar"; // Fixed casing
+import { TopBar } from "@/components/layout/TopBar";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/Button";
 import { clearLocal } from "@/lib/persistence";
 import { DataProvider } from "@/components/providers/DataProvider";
+import { useI18n } from "@/lib/i18n";
+import { LOCALES, LOCALE_NAMES } from "@/lib/i18n/config";
+import { AI_MODELS, getStoredModel, setStoredModel } from "@/lib/ai/models";
+import { loadUserProfile, saveUserProfile } from "@/lib/userProfile";
 
 function SettingsContent() {
   const { theme, toggle } = useTheme();
+  const { t, locale, changeLocale } = useI18n();
   const projects = useProjectStore((s) => s.projects);
 
-  const [openrouterKey, setOpenrouterKey] = useState("");
-  const [saved, setSaved] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("model1");
+  const [profile, setProfile] = useState({
+    profession: "",
+    skills: "",
+    experienceLevel: "intermediate",
+    responseStyle: "detailed",
+    extraContext: "",
+  });
+  const [profileSaved, setProfileSaved] = useState(false);
 
   useEffect(() => {
-    setOpenrouterKey(localStorage.getItem("sp_openrouter_key") ?? "");
+    setSelectedModel(getStoredModel());
+    setProfile(loadUserProfile());
   }, []);
 
-  const handleSaveKey = () => {
-    localStorage.setItem("sp_openrouter_key", openrouterKey);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleModelChange = (id) => {
+    setSelectedModel(id);
+    setStoredModel(id);
+  };
+
+  const handleProfileChange = (key, val) =>
+    setProfile((p) => ({ ...p, [key]: val }));
+
+  const handleSaveProfile = () => {
+    saveUserProfile(profile);
+    setProfileSaved(true);
+    setTimeout(() => setProfileSaved(false), 2000);
   };
 
   const handleExportAll = () => {
@@ -37,7 +59,7 @@ function SettingsContent() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `stopprocast-backup-${Date.now()}.json`;
+    a.download = `momentum-backup-${Date.now()}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -57,78 +79,216 @@ function SettingsContent() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopBar />
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8 pb-16 lg:pb-8">
+          <div className="max-w-2xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
             <h1 className="font-display font-semibold text-xl sm:text-2xl text-[var(--text-primary)] mb-6 sm:mb-8">
-              Settings
+              {t("settings_title")}
             </h1>
 
-            <div className="flex flex-col gap-4 sm:gap-6">
+            <div className="flex flex-col gap-4 sm:gap-6 pb-4">
               {/* Appearance */}
-              <Section title="Appearance">
+              <Section title={t("settings_appearance")}>
                 <Row
-                  label="Theme"
-                  description="Switch between light and dark mode"
+                  label={t("settings_theme")}
+                  description={t("settings_theme_desc")}
                 >
                   <Button variant="ghost" size="sm" onClick={toggle}>
-                    {theme === "dark" ? "☀️ Light mode" : "🌙 Dark mode"}
+                    {theme === "dark"
+                      ? t("settings_light")
+                      : t("settings_dark")}
                   </Button>
                 </Row>
+                <div>
+                  <p className="text-sm font-medium text-[var(--text-primary)] mb-1">
+                    {t("settings_language")}
+                  </p>
+                  <p className="text-xs text-[var(--text-tertiary)] mb-3">
+                    {t("settings_language_desc")}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {LOCALES.map((loc) => (
+                      <button
+                        key={loc}
+                        onClick={() => changeLocale(loc)}
+                        className={[
+                          "px-3 py-1.5 text-xs rounded-[var(--r-full)] border transition-all font-medium",
+                          loc === locale
+                            ? "bg-[var(--violet)] text-white border-[var(--violet)]"
+                            : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--violet)] hover:text-[var(--violet-dim)]",
+                        ].join(" ")}
+                      >
+                        {LOCALE_NAMES[loc]}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </Section>
 
-              {/* AI */}
-              <Section title="AI Integration">
-                <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed">
-                  StopProcast uses OpenRouter to generate project plans. Your
-                  key is stored in your browser only. Get a free key at{" "}
-                  <a
-                    href="https://openrouter.ai/keys"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[var(--violet)] hover:underline"
-                  >
-                    openrouter.ai/keys
-                  </a>
+              {/* AI Model */}
+              <Section title={t("settings_ai_model")}>
+                <p className="text-sm text-[var(--text-secondary)] -mt-1 leading-relaxed">
+                  {t("settings_ai_model_desc")}
                 </p>
-                <div className="flex gap-2">
-                  <input
-                    type="password"
-                    value={openrouterKey}
-                    onChange={(e) => setOpenrouterKey(e.target.value)}
-                    placeholder="sk-or-v1-..."
-                    className="flex-1 min-w-0 h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] font-mono focus:outline-none focus:ring-2 focus:ring-[var(--violet)]"
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  {AI_MODELS.map((model) => {
+                    const isSelected = selectedModel === model.id;
+                    return (
+                      <button
+                        key={model.id}
+                        onClick={() => handleModelChange(model.id)}
+                        className={[
+                          "text-left p-3.5 rounded-[var(--r-lg)] border-2 transition-all",
+                          isSelected
+                            ? "border-[var(--violet)] bg-[var(--violet-bg)]"
+                            : "border-[var(--border)] hover:border-[var(--slate-4,#c8c8d4)] bg-[var(--bg-surface)]",
+                        ].join(" ")}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-semibold text-[var(--text-primary)]">
+                            {model.name}
+                          </span>
+                          <span
+                            className={[
+                              "text-[10px] px-2 py-0.5 rounded-full font-medium shrink-0",
+                              isSelected
+                                ? "bg-[var(--violet)] text-white"
+                                : "bg-[var(--bg-muted)] text-[var(--text-tertiary)]",
+                            ].join(" ")}
+                          >
+                            {model.badge}
+                          </span>
+                        </div>
+                        <p className="text-xs text-[var(--text-secondary)] leading-snug">
+                          {model.description}
+                        </p>
+                        {isSelected && (
+                          <p className="text-[11px] text-[var(--violet-dim)] font-medium mt-2">
+                            ✓ Currently active
+                          </p>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              </Section>
+
+              {/* Your Profile */}
+              <Section title={t("settings_ai_profile")}>
+                <p className="text-sm text-[var(--text-secondary)] -mt-1 leading-relaxed">
+                  {t("settings_ai_profile_desc")}
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                  <Field label={t("settings_profession")}>
+                    <input
+                      type="text"
+                      value={profile.profession}
+                      onChange={(e) =>
+                        handleProfileChange("profession", e.target.value)
+                      }
+                      placeholder={t("settings_profession_placeholder")}
+                      className="w-full h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--violet)]"
+                    />
+                  </Field>
+                  <Field label={t("settings_skills")}>
+                    <input
+                      type="text"
+                      value={profile.skills}
+                      onChange={(e) =>
+                        handleProfileChange("skills", e.target.value)
+                      }
+                      placeholder={t("settings_skills_placeholder")}
+                      className="w-full h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--violet)]"
+                    />
+                  </Field>
+                </div>
+
+                <Field label={t("settings_experience")}>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {["beginner", "intermediate", "advanced", "expert"].map(
+                      (level) => (
+                        <button
+                          key={level}
+                          onClick={() =>
+                            handleProfileChange("experienceLevel", level)
+                          }
+                          className={[
+                            "py-2 text-xs rounded-[var(--r-md)] border font-medium capitalize transition-all",
+                            profile.experienceLevel === level
+                              ? "bg-[var(--violet)] text-white border-[var(--violet)]"
+                              : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--violet)] hover:text-[var(--text-primary)]",
+                          ].join(" ")}
+                        >
+                          {t(`settings_exp_${level}`)}
+                        </button>
+                      )
+                    )}
+                  </div>
+                </Field>
+
+                <Field label={t("settings_response_style")}>
+                  <div className="grid grid-cols-2 gap-2">
+                    {["concise", "detailed", "friendly", "technical"].map(
+                      (style) => (
+                        <button
+                          key={style}
+                          onClick={() =>
+                            handleProfileChange("responseStyle", style)
+                          }
+                          className={[
+                            "py-2 px-3 text-xs rounded-[var(--r-md)] border font-medium text-left transition-all",
+                            profile.responseStyle === style
+                              ? "bg-[var(--violet)] text-white border-[var(--violet)]"
+                              : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--violet)] hover:text-[var(--text-primary)]",
+                          ].join(" ")}
+                        >
+                          {t(`settings_style_${style}`)}
+                        </button>
+                      )
+                    )}
+                  </div>
+                </Field>
+
+                <Field label={t("settings_extra_context")}>
+                  <textarea
+                    rows={3}
+                    value={profile.extraContext}
+                    onChange={(e) =>
+                      handleProfileChange("extraContext", e.target.value)
+                    }
+                    placeholder={t("settings_extra_placeholder")}
+                    className="w-full px-3 py-2.5 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--violet)]"
                   />
+                </Field>
+
+                <div className="flex justify-end">
                   <Button
-                    onClick={handleSaveKey}
-                    variant={saved ? "subtle" : "primary"}
-                    size="md"
-                    className="shrink-0"
+                    variant={profileSaved ? "subtle" : "primary"}
+                    onClick={handleSaveProfile}
                   >
-                    {saved ? "✓ Saved" : "Save"}
+                    {profileSaved
+                      ? t("settings_profile_saved")
+                      : t("settings_save_profile")}
                   </Button>
                 </div>
-                <p className="text-xs text-[var(--text-tertiary)] mt-2">
-                  Model is set via{" "}
-                  <code className="font-mono">OPENROUTER_MODEL</code> in{" "}
-                  <code className="font-mono">.env.local</code>. Default:
-                  DeepSeek Chat v3 (free).
-                </p>
               </Section>
 
               {/* Data */}
-              <Section title="Data">
+              <Section title={t("settings_data")}>
                 <Row
-                  label="Export all projects"
-                  description={`${projects.length} project${
-                    projects.length !== 1 ? "s" : ""
-                  } saved`}
+                  label={t("settings_export_all")}
+                  description={
+                    projects.length !== 1
+                      ? t("settings_export_desc_plural", { n: projects.length })
+                      : t("settings_export_desc", { n: projects.length })
+                  }
                 >
                   <Button variant="ghost" size="sm" onClick={handleExportAll}>
-                    Export JSON
+                    {t("settings_export_json")}
                   </Button>
                 </Row>
                 <Row
-                  label="Clear local cache"
-                  description="Removes local cache only. Your data in MongoDB is preserved."
+                  label={t("settings_clear_cache")}
+                  description={t("settings_clear_desc")}
                 >
                   <Button
                     variant="danger"
@@ -136,25 +296,25 @@ function SettingsContent() {
                     onClick={handleClearAll}
                     className="shrink-0"
                   >
-                    {confirmClear ? "Confirm?" : "Clear cache"}
+                    {confirmClear
+                      ? t("settings_clear_confirm")
+                      : t("settings_clear_btn")}
                   </Button>
                 </Row>
               </Section>
 
               {/* About */}
-              <Section title="About">
+              <Section title={t("settings_about")}>
                 <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                  StopProcast is a project execution OS. Drop in an idea, get an
-                  AI-generated blueprint, and let the pressure system keep you
-                  moving until it ships.
+                  {t("settings_about_desc")}
                 </p>
-                <p className="text-xs text-[var(--text-tertiary)] mt-3">
-                  Version 0.1.0 · AI by OpenRouter · Auth by Clerk · DB by
-                  MongoDB
+                <p className="text-xs text-[var(--text-tertiary)] mt-0.5">
+                  {t("settings_version")}
                 </p>
               </Section>
             </div>
           </div>
+          <Footer />
         </main>
       </div>
     </div>
@@ -177,14 +337,16 @@ function Section({ title, children }) {
           {title}
         </p>
       </div>
-      <div className="px-4 sm:px-5 py-4 flex flex-col gap-4">{children}</div>
+      <div className="px-4 sm:px-5 py-4 sm:py-5 flex flex-col gap-4 sm:gap-5">
+        {children}
+      </div>
     </div>
   );
 }
 
 function Row({ label, description, children }) {
   return (
-    <div className="flex items-center justify-between gap-3 sm:gap-4">
+    <div className="flex items-center justify-between gap-4">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium text-[var(--text-primary)]">
           {label}
@@ -196,6 +358,17 @@ function Row({ label, description, children }) {
         )}
       </div>
       <div className="shrink-0">{children}</div>
+    </div>
+  );
+}
+
+function Field({ label, children }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="text-sm font-medium text-[var(--text-primary)]">
+        {label}
+      </label>
+      {children}
     </div>
   );
 }

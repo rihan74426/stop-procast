@@ -1,11 +1,12 @@
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/lib/theme";
+import { I18nProvider } from "@/lib/i18n";
 
 export const metadata = {
-  title: "StopProcast — Finish What You Start",
+  title: "Momentum — Finish What You Start",
   description:
-    "A project execution OS that turns raw ideas into shipped products.",
+    "Turn raw ideas into shipped projects. AI-powered planning with built-in accountability.",
 };
 
 export default function RootLayout({ children }) {
@@ -22,7 +23,9 @@ export default function RootLayout({ children }) {
           />
         </head>
         <body>
-          <ThemeProvider>{children}</ThemeProvider>
+          <ThemeProvider>
+            <I18nProvider>{children}</I18nProvider>
+          </ThemeProvider>
         </body>
       </html>
     </ClerkProvider>

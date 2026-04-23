@@ -1,47 +1,81 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
-import { useUIStore } from "@/lib/store/uiStore";
 import { useState, useEffect } from "react";
+import { useI18n } from "@/lib/i18n/context";
+import { FiGrid, FiPlus, FiSettings, FiMenu, FiX } from "react-icons/fi";
 
-const navItems = [
-  { href: "/", label: "Dashboard", icon: GridIcon },
-  { href: "/new", label: "New Project", icon: PlusIcon },
-  { href: "/settings", label: "Settings", icon: CogIcon },
-];
-
-function SidebarContent({ onClose }) {
+export function Sidebar() {
+  const { t } = useI18n();
   const pathname = usePathname();
   const { isSignedIn, isLoaded } = useUser();
   const projects = useProjectStore((s) => s.projects);
   const activeProjects = projects.filter((p) => !p.completionDate);
+  const [mobileOpen, setMobileOpen] = useState(false);
 
-  return (
+  useEffect(() => {
+    setMobileOpen(false);
+  }, [pathname]);
+
+  const navItems = [
+    { href: "/", label: t("nav_dashboard"), icon: FiGrid },
+    { href: "/new", label: t("nav_new_project"), icon: FiPlus },
+    { href: "/settings", label: t("nav_settings"), icon: FiSettings },
+  ];
+
+  const SidebarContent = ({ onClose }) => (
     <div className="flex flex-col h-full w-56">
-      {/* Mobile close button */}
+      {/* Mobile close */}
       {onClose && (
         <div className="flex items-center justify-between px-3 py-3 border-b border-[var(--border)] lg:hidden">
-          <span className="font-display font-semibold text-sm text-[var(--text-primary)]">
-            StopProcast
-          </span>
+          <div className="flex items-center gap-2">
+            <div className="h-6 w-6 rounded-[var(--r-sm)] overflow-hidden bg-[var(--violet)]">
+              <Image
+                src="/logo.png"
+                alt="Momentum"
+                width={24}
+                height={24}
+                className="object-cover"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+            </div>
+            <span className="font-display font-semibold text-sm text-[var(--text-primary)]">
+              Momentum
+            </span>
+          </div>
           <button
             onClick={onClose}
             className="h-8 w-8 flex items-center justify-center rounded-[var(--r-md)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]"
           >
-            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-              <path
-                d="M11 3L3 11M3 3l8 8"
-                stroke="currentColor"
-                strokeWidth="1.5"
-                strokeLinecap="round"
-              />
-            </svg>
+            <FiX size={14} />
           </button>
         </div>
       )}
+
+      {/* Logo on desktop */}
+      <div className="hidden lg:flex items-center gap-2 px-4 py-4 border-b border-[var(--border)]">
+        <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden bg-[var(--violet)]">
+          <Image
+            src="/logo.png"
+            alt="Momentum"
+            width={28}
+            height={28}
+            className="object-cover"
+            onError={(e) => {
+              e.currentTarget.style.display = "none";
+            }}
+          />
+        </div>
+        <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)]">
+          Momentum
+        </span>
+      </div>
 
       {/* Nav */}
       <nav className="p-3 flex flex-col gap-1">
@@ -67,11 +101,11 @@ function SidebarContent({ onClose }) {
         })}
       </nav>
 
-      {/* Active projects list */}
+      {/* Active projects */}
       {activeProjects.length > 0 && (
         <div className="px-3 pb-3 mt-2">
           <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider px-3 mb-2">
-            Active
+            {t("nav_active")}
           </p>
           <div className="flex flex-col gap-0.5">
             {activeProjects.slice(0, 5).map((p) => (
@@ -103,7 +137,7 @@ function SidebarContent({ onClose }) {
           <SignInButton mode="modal">
             <button className="w-full rounded-[var(--r-md)] bg-[var(--violet-bg)] border border-[var(--violet)] px-3 py-2.5 text-left transition-colors hover:bg-[var(--violet)] hover:text-white group">
               <p className="text-xs font-medium text-[var(--violet-dim)] group-hover:text-white transition-colors">
-                ☁️ Save to cloud
+                ☁️ {t("nav_sign_in")}
               </p>
               <p className="text-xs text-[var(--text-tertiary)] group-hover:text-white/70 transition-colors mt-0.5">
                 Sign in to keep your data
@@ -112,35 +146,22 @@ function SidebarContent({ onClose }) {
           </SignInButton>
         ) : (
           <p className="text-xs text-[var(--text-tertiary)] px-1">
-            {activeProjects.length} active project
-            {activeProjects.length !== 1 ? "s" : ""}
+            {activeProjects.length}{" "}
+            {activeProjects.length !== 1
+              ? t("dash_active_projects_plural")
+              : t("dash_active_projects")}
           </p>
         )}
       </div>
     </div>
   );
-}
-
-export function Sidebar() {
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  // Close on route change
-  const pathname = usePathname();
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
 
   return (
     <>
-      {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-56 shrink-0 border-r border-[var(--border)] bg-[var(--bg-elevated)] flex-col h-full">
         <SidebarContent />
       </aside>
 
-      {/* Mobile hamburger button — rendered in TopBar slot via portal-like button */}
-      {/* We expose a trigger via the MobileSidebarTrigger component below */}
-
-      {/* Mobile drawer overlay */}
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 lg:hidden"
@@ -152,7 +173,6 @@ export function Sidebar() {
         />
       )}
 
-      {/* Mobile drawer */}
       <aside
         className={[
           "fixed inset-y-0 left-0 z-50 w-56 bg-[var(--bg-elevated)] border-r border-[var(--border)] flex flex-col",
@@ -163,26 +183,17 @@ export function Sidebar() {
         <SidebarContent onClose={() => setMobileOpen(false)} />
       </aside>
 
-      {/* Mobile trigger button — floating hamburger */}
       <button
         onClick={() => setMobileOpen(true)}
         className={[
           "fixed bottom-4 left-4 z-30 lg:hidden",
           "h-11 w-11 rounded-full bg-[var(--violet)] text-white shadow-[var(--shadow-lg)]",
-          "flex items-center justify-center",
-          "transition-all duration-200 hover:bg-[var(--violet-dim)] active:scale-95",
+          "flex items-center justify-center transition-all duration-200 hover:bg-[var(--violet-dim)] active:scale-95",
           mobileOpen ? "opacity-0 pointer-events-none" : "opacity-100",
         ].join(" ")}
         aria-label="Open menu"
       >
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-          <path
-            d="M2 4h12M2 8h12M2 12h12"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
+        <FiMenu size={16} />
       </button>
     </>
   );

@@ -4,145 +4,54 @@ import {
   buildClarifyPrompt,
   buildReengagePrompt,
 } from "@/lib/ai/prompts";
-import { openrouterGenerate, openrouterStream } from "@/lib/ai/openrouter";
-
-// Switch via .env.local: AI_PROVIDER=openrouter | anthropic
-const PROVIDER = process.env.AI_PROVIDER ?? "openrouter";
+import { aiGenerate, aiStream } from "@/lib/ai/client";
 
 export async function POST(request) {
   try {
     const body = await request.json();
-    const { type, idea, clarifications, scopeLevel, project } = body;
+    // NOTE: profileContext is a plain pre-built string from the client.
+    // We NEVER import client-only modules (loadUserProfile, buildProfileContext) here.
+    const {
+      type,
+      idea,
+      clarifications,
+      scopeLevel,
+      project,
+      modelId,
+      profileContext,
+    } = body;
 
     if (!type) {
       return Response.json({ error: "Missing 'type' field" }, { status: 400 });
     }
 
-    if (PROVIDER === "anthropic") {
-      return handleAnthropic(type, {
+    if (type === "clarify") {
+      const text = await aiGenerate(buildClarifyPrompt(idea), modelId);
+      return Response.json({ questions: text });
+    }
+
+    if (type === "reengage") {
+      const text = await aiGenerate(buildReengagePrompt(project), modelId);
+      return Response.json({ suggestion: text });
+    }
+
+    if (type === "generate") {
+      const userPrompt = buildUserPrompt({
         idea,
         clarifications,
         scopeLevel,
-        project,
+        profileContext:
+          typeof profileContext === "string" ? profileContext : "",
+      });
+      const stream = await aiStream(SYSTEM_PROMPT, userPrompt, modelId);
+      return new Response(stream, {
+        headers: { "Content-Type": "text/plain; charset=utf-8" },
       });
     }
 
-    return handleOpenRouter(type, {
-      idea,
-      clarifications,
-      scopeLevel,
-      project,
-    });
+    return Response.json({ error: `Unknown type: ${type}` }, { status: 400 });
   } catch (err) {
-    console.error("[generate] error:", err);
-    return Response.json(
-      { error: err.message ?? "Generation failed" },
-      { status: 500 }
-    );
+    console.error("[generate] error:", err.message);
+    return Response.json({ error: "Generation failed." }, { status: 500 });
   }
-}
-
-// ─── OpenRouter handler ───────────────────────────────────────────────────────
-
-async function handleOpenRouter(
-  type,
-  { idea, clarifications, scopeLevel, project }
-) {
-  if (!process.env.OPENROUTER_API_KEY) {
-    return Response.json(
-      { error: "OPENROUTER_API_KEY is not set in .env.local" },
-      { status: 500 }
-    );
-  }
-
-  // 1. Clarify — returns JSON array of 3 questions
-  if (type === "clarify") {
-    const text = await openrouterGenerate(null, buildClarifyPrompt(idea));
-    return Response.json({ questions: text });
-  }
-
-  // 2. Re-engage — returns a short motivational action sentence
-  if (type === "reengage") {
-    const text = await openrouterGenerate(null, buildReengagePrompt(project));
-    return Response.json({ suggestion: text });
-  }
-
-  // 3. Generate — streams the full project blueprint JSON
-  if (type === "generate") {
-    const stream = await openrouterStream(
-      SYSTEM_PROMPT,
-      buildUserPrompt({ idea, clarifications, scopeLevel })
-    );
-
-    return new Response(stream, {
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
-  }
-
-  return Response.json({ error: `Unknown type: ${type}` }, { status: 400 });
-}
-
-// ─── Anthropic handler (kept for commercial tier) ─────────────────────────────
-
-async function handleAnthropic(
-  type,
-  { idea, clarifications, scopeLevel, project }
-) {
-  const Anthropic = (await import("@anthropic-ai/sdk")).default;
-  const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
-
-  if (type === "clarify") {
-    const msg = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 500,
-      messages: [{ role: "user", content: buildClarifyPrompt(idea) }],
-    });
-    const text = msg.content.find((b) => b.type === "text")?.text ?? "[]";
-    return Response.json({ questions: text });
-  }
-
-  if (type === "reengage") {
-    const msg = await client.messages.create({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 150,
-      messages: [{ role: "user", content: buildReengagePrompt(project) }],
-    });
-    const text = msg.content.find((b) => b.type === "text")?.text ?? "";
-    return Response.json({ suggestion: text });
-  }
-
-  if (type === "generate") {
-    const stream = await client.messages.stream({
-      model: "claude-sonnet-4-20250514",
-      max_tokens: 4000,
-      system: SYSTEM_PROMPT,
-      messages: [
-        {
-          role: "user",
-          content: buildUserPrompt({ idea, clarifications, scopeLevel }),
-        },
-      ],
-    });
-
-    const encoder = new TextEncoder();
-    const readable = new ReadableStream({
-      async start(controller) {
-        for await (const chunk of stream) {
-          if (
-            chunk.type === "content_block_delta" &&
-            chunk.delta.type === "text_delta"
-          ) {
-            controller.enqueue(encoder.encode(chunk.delta.text));
-          }
-        }
-        controller.close();
-      },
-    });
-
-    return new Response(readable, {
-      headers: { "Content-Type": "text/plain; charset=utf-8" },
-    });
-  }
-
-  return Response.json({ error: `Unknown type: ${type}` }, { status: 400 });
 }

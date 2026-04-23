@@ -1,7 +1,7 @@
 @AGENTS.md
 @PLAN.md
 
-# StopProcast — Project Intelligence File
+# Momentum — Project Intelligence File
 
 Single source of truth for all development. Read before writing any code.
 
@@ -9,7 +9,7 @@ Single source of truth for all development. Read before writing any code.
 
 ## What this app is
 
-**StopProcast** is a _Project Execution OS_ — not a task manager.
+**Momentum** (formerly StopProcast) is a _Project Execution OS_ — not a task manager.
 
 A user drops in a raw idea. The app converts it into a structured project contract via AI,
 then keeps dragging it forward until it ships. The core differentiator is
@@ -27,101 +27,202 @@ then keeps dragging it forward until it ships. The core differentiator is
 | 3     | Core Pages & AI Intake         | ✅ Done |
 | 4     | Execution Mode & Pressure      | ✅ Done |
 | 5     | Completion, Postmortem, Polish | ✅ Done |
-| 6     | Auth, DB, OpenRouter           | ✅ Done |
-
-**Status key:** ⬜ Not started · 🔄 In progress · ✅ Done · ❌ Blocked
+| 6     | Auth, DB, AI Integration       | ✅ Done |
+| 7     | i18n, Model Picker, PDF Export | ✅ Done |
 
 ---
 
 ## Tech stack
 
-| Layer       | Technology                                         | Notes                            |
-| ----------- | -------------------------------------------------- | -------------------------------- |
-| Framework   | Next.js 15 (App Router)                            |                                  |
-| Styling     | Tailwind CSS v4 + CSS custom properties            | All tokens in `app/globals.css`  |
-| State       | Zustand + Immer                                    | Dual-layer persistence           |
-| Auth        | Clerk                                              | Free tier, handles all auth UI   |
-| Database    | MongoDB via Mongoose                               | Free M0 cluster on Atlas         |
-| AI (active) | OpenRouter — `deepseek/deepseek-chat-v3-0324:free` | Free, swap model in `.env.local` |
-| AI (future) | Anthropic Claude (kept in codebase)                | Activate when monetising         |
-| Motion      | Framer Motion                                      |                                  |
-| Drag & drop | @dnd-kit/core + @dnd-kit/sortable                  |                                  |
-| Confetti    | canvas-confetti                                    | Completion ceremony              |
+| Layer      | Technology                          | Notes                              |
+| ---------- | ----------------------------------- | ---------------------------------- |
+| Framework  | Next.js 15 (App Router)             |                                    |
+| Styling    | Tailwind CSS v4 + CSS custom props  | All tokens in `app/globals.css`    |
+| State      | Zustand + Immer                     | Dual-layer persistence             |
+| Auth       | Clerk                               | Optional — guests use localStorage |
+| Database   | MongoDB via Mongoose                | Free M0 cluster on Atlas           |
+| AI         | Abstracted via `lib/ai/client.js`   | Provider not exposed in UI         |
+| i18n       | Custom context + translations       | 6 languages: en/es/fr/de/zh/ar     |
+| PDF export | jsPDF (client-side, dynamic import) | No server needed                   |
+| Motion     | Framer Motion                       |                                    |
 
 ---
 
 ## AI provider system
 
-The AI layer is **provider-switchable** via a single env var:
+**Provider details are intentionally hidden from users.** Never mention OpenRouter, model names,
+or API keys in the UI. The `lib/ai/client.js` file is the only place that knows the provider.
+
+Three model slots available via `.env.local`:
 
 ```
-AI_PROVIDER=openrouter   # default — free via OpenRouter
-AI_PROVIDER=anthropic    # paid — direct Anthropic API
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_MODEL=z-ai/glm-4.5-air:free           # "Balanced" in UI
+OPENROUTER_MODEL2=arcee-ai/trinity-large-preview:free  # "Detailed" in UI
+OPENROUTER_MODEL3=nvidia/nemotron-3-super-120b-a12b:free  # "Comprehensive" in UI
+NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
 
-To change the model used through OpenRouter, update `.env.local`:
-
-```
-OPENROUTER_MODEL=deepseek/deepseek-chat-v3-0324:free   # free (default) — best JSON output
-OPENROUTER_MODEL=meta-llama/llama-3.3-70b-instruct:free  # free alternative
-OPENROUTER_MODEL=google/gemini-2.5-pro-exp-03-25:free    # free, Google
-OPENROUTER_MODEL=openrouter/free                          # auto-select any free model
-OPENROUTER_MODEL=anthropic/claude-sonnet-4-5              # paid
-OPENROUTER_MODEL=openai/gpt-4o                            # paid
-```
-
-> ⚠️ `google/gemini-2.0-flash-exp:free` was removed from OpenRouter in early 2025.
+Add more models by adding `OPENROUTER_MODEL4`, `MODEL5`, etc. and updating `lib/ai/models.js`.
 
 ---
 
-## Data persistence
+## CRITICAL: Server/Client boundary for AI
 
-All project data is stored in **two layers**:
+**The `buildPersonaContext` / `buildProfileContext` error pattern:**
 
-1. **localStorage** — instant reads/writes, offline capable, used as a cache
-2. **MongoDB** — source of truth, survives across devices and browsers
+❌ WRONG — importing client utilities in a server route:
+
+```js
+// app/api/generate/route.js — THIS CRASHES
+import { buildProfileContext } from "@/lib/userProfile"; // if userProfile.js has "use client"
+```
+
+✅ CORRECT — build profile context on the client, send as plain string:
+
+```js
+// Client component (StepReview.jsx):
+const profileContext = buildProfileContext(loadUserProfile()); // pure string
+fetch("/api/generate", { body: JSON.stringify({ ..., profileContext }) });
+
+// Server route (route.js):
+const { profileContext } = body; // receives as plain string — NO import from userProfile
+```
+
+**Rule:** `lib/userProfile.js` must NEVER have `"use client"` at the top. It's a pure utility.
+The API route (`app/api/generate/route.js`) must NEVER import from `lib/userProfile.js`.
 
 ---
 
-## Architecture rules
+## i18n system
 
-1. All project state lives in `lib/store/projectStore.js`. No ad hoc `useState` for data.
-2. The full project JSON schema is in `lib/schema.js`. Add fields there first, then `lib/models/Project.js`.
-3. AI calls only in `app/api/generate/route.js`. Never call OpenRouter or Anthropic from client components.
-4. All design tokens in `app/globals.css`. No hardcoded colors anywhere.
-5. Every async boundary gets a skeleton loader — never a blank flash.
-6. Path alias: `@/` maps to project root (`jsconfig.json`).
-7. Never hardcode `userId` — always read from Clerk `auth()` in API routes.
-8. **File naming**: component files must be PascalCase (`TopBar.jsx` not `Topbar.jsx`) to avoid import failures on case-sensitive filesystems (Linux/Docker).
+- Provider: `lib/i18n/index.js` — `I18nProvider` + `useI18n()` hook
+- Config: `lib/i18n/config.js` — locale list, RTL list
+- Translations: `lib/i18n/translations.js` — all 6 language objects
+- Wrap `app/layout.js` body with `<I18nProvider>`
+- Use `const { t } = useI18n()` in any client component
+- RTL support: Arabic sets `dir="rtl"` on `<html>` automatically
 
 ---
 
-## Key files at a glance
+## Export system
 
-| File                                    | Purpose                                       |
-| --------------------------------------- | --------------------------------------------- |
-| `.env.local`                            | All secrets — AI key, Clerk keys, MongoDB URI |
-| `middleware.js`                         | Clerk route protection                        |
-| `app/globals.css`                       | Design tokens, dark mode, fonts               |
-| `lib/schema.js`                         | Project data model + factory functions        |
-| `lib/models/Project.js`                 | Mongoose schema (MongoDB)                     |
-| `lib/db/mongoose.js`                    | MongoDB connection with caching               |
-| `lib/ai/openrouter.js`                  | OpenRouter client (streaming + non-streaming) |
-| `lib/store/projectStore.js`             | All project CRUD + dual-layer persistence     |
-| `lib/persistence.js`                    | localStorage + MongoDB API helpers            |
-| `app/api/generate/route.js`             | AI generation — OpenRouter or Anthropic       |
-| `app/api/projects/route.js`             | REST: GET all, POST create                    |
-| `app/api/projects/[id]/route.js`        | REST: GET, PATCH, DELETE one                  |
-| `components/providers/DataProvider.jsx` | Hydrates store from MongoDB post-auth         |
-| `components/layout/TopBar.jsx`          | Top navigation bar (PascalCase — important!)  |
+### UTF-8 safe base64 (btoa fix)
 
-// need to show login modal before start project. say it's free. after login then redirect to the project page and save everything.
-// we also need to use it in multiple languages.
-// a good fonts will be used
-we need to give the users options to choose models, from the free once.
-implement the best uses of the settings in the tool.
-we can give options how they are, their profession, and skills and knowledge and how they want their responses. then use them for the best relative api prompt requests.
+The standard `btoa()` crashes with non-Latin1 characters (Arabic, Chinese, emoji).
+Always use the safe encoding function in `app/project/[id]/page.jsx`:
 
-J:\WD Works\stop-pro…ct\[id]\page.jsx:62 Uncaught InvalidCharacterError: Failed to execute 'btoa' on 'Window': The string to be encoded contains characters outside of the Latin1 range.
-at handleExport (J:\WD Works\stop-pro…[id]\page.jsx:62:21)
-at onClick (J:\WD Works\stop-pro…id]\page.jsx:248:36)
+```js
+function toBase64Safe(str) {
+  return btoa(
+    encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+      String.fromCharCode(parseInt(p1, 16))
+    )
+  );
+}
+```
+
+The server-side export route decodes with `Buffer.from(encoded, "base64").toString("utf-8")`
+followed by `decodeURIComponent()`.
+
+### PDF export
+
+Client-side only via `lib/utils/exportPDF.js` using jsPDF.
+Loaded dynamically: `const { exportProjectPDF } = await import("@/lib/utils/exportPDF")`.
+**Requires:** `npm install jspdf` in package.json.
+
+---
+
+## Settings page rules
+
+The settings page (`app/settings/page.jsx`) must:
+
+- ✅ Show AI model selector (friendly names only — "Balanced", "Detailed", "Comprehensive")
+- ✅ Show user profile form (profession, skills, experience, response style, extra context)
+- ✅ Show language selector (6 language pills)
+- ✅ Show theme toggle
+- ✅ Show data export/clear
+- ❌ NEVER show API key input fields
+- ❌ NEVER mention "OpenRouter", model IDs, or provider names
+
+---
+
+## Auth model
+
+Auth is **optional**. Users can use every feature without signing in.
+
+- Guests: data lives in localStorage only.
+- Signed-in users: data syncs to MongoDB via `/api/projects`.
+- **Auth gate**: shown after blueprint is generated (in `StepReview`), before committing the plan.
+  Located at `components/auth/AuthGateModal.jsx`. It's a friendly modal — NOT a hard block.
+  Users can click "Continue without saving" to proceed as guest.
+- Never block any page with `auth.protect()`.
+- API routes check `userId` from Clerk but return graceful no-ops for guests.
+
+---
+
+## Naming
+
+The app is called **Momentum** everywhere. The old name "StopProcast" is retired.
+
+- Page title: "Momentum — Finish What You Start"
+- Logo: `/public/logo.png` — used in TopBar, Sidebar, AuthGateModal
+- Fallback if logo missing: violet box with arrow SVG
+
+---
+
+## Footer
+
+`components/layout/Footer.jsx` — shown on Dashboard (when projects exist), Project page, Settings.
+Contains developer portfolio CTA: https://nuruddin-webician.vercel.app/
+
+---
+
+## File naming
+
+- Components: PascalCase `.jsx` (e.g. `TopBar.jsx` not `Topbar.jsx`)
+- Pages: `page.js` or `page.jsx`
+- API routes: `route.js`
+- Utilities: camelCase `.js`
+
+---
+
+## Key files
+
+| File                                   | Purpose                                           |
+| -------------------------------------- | ------------------------------------------------- |
+| `lib/ai/client.js`                     | Server-only AI wrapper (provider hidden)          |
+| `lib/ai/models.js`                     | Model slot definitions (friendly names only)      |
+| `lib/ai/prompts.js`                    | System + user prompt builders                     |
+| `lib/userProfile.js`                   | Profile load/save + buildProfileContext (pure)    |
+| `lib/i18n/index.js`                    | I18nProvider + useI18n hook                       |
+| `lib/i18n/config.js`                   | Locale list + RTL list                            |
+| `lib/i18n/translations.js`             | All 6 language translation objects                |
+| `lib/utils/exportPDF.js`               | Client-side PDF export via jsPDF                  |
+| `components/auth/AuthGateModal.jsx`    | Post-blueprint auth gate (not a hard block)       |
+| `components/layout/Footer.jsx`         | Footer with developer portfolio CTA               |
+| `components/project/PhaseTimeline.jsx` | Responsive phase progress (mobile + desktop)      |
+| `app/api/generate/route.js`            | AI generation — receives profileContext as string |
+
+---
+
+## Package.json additions needed
+
+```bash
+npm install jspdf
+```
+
+---
+
+## Post-MVP backlog
+
+- [ ] Recurring check-ins / deadline reminders (cron)
+- [ ] Timeline / Gantt visualization
+- [ ] Task dependency mapping
+- [ ] AI weekly status summary
+- [ ] Rich text notes per phase (Tiptap)
+- [ ] Export to Notion / CSV
+- [ ] Team collaboration (shared projects)
+- [ ] Analytics dashboard
+- [ ] More languages (Japanese, Portuguese, Hindi, Russian)
+- [ ] Mobile app (React Native / Expo)

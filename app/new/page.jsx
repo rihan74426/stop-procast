@@ -7,14 +7,17 @@ import { StepClarify } from "@/components/intake/StepClarify";
 import { StepScope } from "@/components/intake/StepScope";
 import { StepReview } from "@/components/intake/StepReview";
 import { StepCommit } from "@/components/intake/StepCommit";
+import { AuthGateModal } from "@/components/ui/AuthGateModal";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { SavePromptModal } from "@/components/ui/SavePromptModal";
+import { useI18n } from "@/lib/i18n/context";
 
 const STEPS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
 
 function NewProjectContent() {
   const router = useRouter();
+  const { t } = useI18n();
   const addProject = useProjectStore((s) => s.addProject);
 
   const [step, setStep] = useState(0);
@@ -22,14 +25,24 @@ function NewProjectContent() {
   const [clarifyAnswers, setClarifyAnswers] = useState({});
   const [scopeLevel, setScopeLevel] = useState("standard");
   const [blueprint, setBlueprint] = useState(null);
+  const [showAuthGate, setShowAuthGate] = useState(false);
+  const [pendingBlueprint, setPendingBlueprint] = useState(null);
 
   const clarifications = Object.entries(clarifyAnswers)
     .map(([i, answer]) => ({ question: `Q${parseInt(i) + 1}`, answer }))
     .filter((c) => c.answer.trim());
 
+  // Called when user hits "Commit to this plan" in StepReview
+  const handleBlueprintReady = (bp) => {
+    setPendingBlueprint(bp);
+    setBlueprint(bp);
+    setStep(4);
+  };
+
   const handleCommit = async ({ deadline }) => {
+    const bp = blueprint || pendingBlueprint;
     const id = await addProject({
-      ...blueprint,
+      ...bp,
       scopeLevel,
       completionDate: null,
       ...(deadline ? { timeline: deadline } : {}),
@@ -37,9 +50,17 @@ function NewProjectContent() {
     router.push(`/project/${id}`);
   };
 
+  // Show auth gate when user tries to start project (step commit)
+  const handleCommitWithAuthCheck = (commitData) => {
+    // Store commitData and run handleCommit
+    handleCommit(commitData);
+  };
+
   const handleClarifyChange = (index, value) => {
     setClarifyAnswers((prev) => ({ ...prev, [index]: value }));
   };
+
+  const stepLabels = ["Capture", "Clarify", "Scope", "Review", "Commit"];
 
   return (
     <div className="min-h-screen bg-[var(--bg-surface)] flex flex-col">
@@ -47,7 +68,7 @@ function NewProjectContent() {
       <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-4 sm:px-6 py-3 sm:py-4 sticky top-0 z-10">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-1.5 sm:gap-2">
-            {STEPS.map((label, i) => (
+            {stepLabels.map((label, i) => (
               <div key={i} className="flex items-center gap-1.5 sm:gap-2">
                 <div className="flex items-center gap-1.5 sm:gap-2">
                   <div
@@ -72,7 +93,7 @@ function NewProjectContent() {
                     {label}
                   </span>
                 </div>
-                {i < STEPS.length - 1 && (
+                {i < stepLabels.length - 1 && (
                   <div
                     className={`h-px w-4 sm:w-8 transition-colors duration-300 ${
                       i < step ? "bg-[var(--emerald)]" : "bg-[var(--border)]"
@@ -118,21 +139,33 @@ function NewProjectContent() {
               clarifications={clarifications}
               scopeLevel={scopeLevel}
               onBack={() => setStep(2)}
-              onCommit={(bp) => {
-                setBlueprint(bp);
-                setStep(4);
-              }}
+              onCommit={handleBlueprintReady}
             />
           )}
           {step === 4 && blueprint && (
             <StepCommit
               blueprint={blueprint}
               onBack={() => setStep(3)}
-              onConfirm={handleCommit}
+              onConfirm={(commitData) => {
+                // Show auth gate before final commit
+                setShowAuthGate(true);
+                // Store commit data
+                window._pendingCommit = commitData;
+              }}
             />
           )}
         </div>
       </div>
+
+      {/* Auth Gate Modal */}
+      <AuthGateModal
+        open={showAuthGate}
+        onClose={() => setShowAuthGate(false)}
+        onContinue={() => {
+          setShowAuthGate(false);
+          handleCommit(window._pendingCommit || {});
+        }}
+      />
 
       <SavePromptModal />
     </div>

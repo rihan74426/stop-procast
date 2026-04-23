@@ -2,9 +2,7 @@ import { auth } from "@clerk/nextjs/server";
 import { connectDB } from "@/lib/db/mongoose";
 import Project from "@/lib/models/Project";
 
-// GET /project/[id]/export?format=json|markdown
-// For signed-in users: fetches from MongoDB
-// For guests: reads the project from the ?data= query param (client passes it)
+// GET /project/[id]/export?format=json|markdown&data=<base64>
 export async function GET(request, { params }) {
   const { id } = await params;
   const { searchParams } = new URL(request.url);
@@ -16,7 +14,6 @@ export async function GET(request, { params }) {
     const { userId } = await auth();
 
     if (userId) {
-      // Signed-in: fetch from MongoDB
       await connectDB();
       const doc = await Project.findOne({ id, userId }).lean();
       if (doc) {
@@ -25,16 +22,23 @@ export async function GET(request, { params }) {
       }
     }
 
-    // Guest fallback: client encodes project as base64 in ?data=
     if (!project) {
       const encoded = searchParams.get("data");
       if (encoded) {
         try {
-          project = JSON.parse(
-            Buffer.from(encoded, "base64").toString("utf-8")
-          );
+          // Server uses Buffer — handles ALL Unicode (Arabic, Chinese, emoji, etc.)
+          // Client used encodeURIComponent-based btoa to produce this base64
+          const decoded = Buffer.from(encoded, "base64").toString("utf-8");
+          project = JSON.parse(decodeURIComponent(decoded));
         } catch {
-          return new Response("Invalid project data", { status: 400 });
+          // Fallback: try direct base64 decode (older format)
+          try {
+            project = JSON.parse(
+              Buffer.from(encoded, "base64").toString("utf-8")
+            );
+          } catch {
+            return new Response("Invalid project data", { status: 400 });
+          }
         }
       }
     }
@@ -77,10 +81,10 @@ function slug(title) {
 
 function toMarkdown(p) {
   const lines = [];
-
   lines.push(`# ${p.projectTitle}`);
   lines.push("");
   lines.push(`> ${p.oneLineGoal}`);
+  lines.push(`*Exported from Momentum on ${new Date().toLocaleDateString()}*`);
   lines.push("");
 
   if (p.problemStatement) {
@@ -88,18 +92,15 @@ function toMarkdown(p) {
     lines.push(p.problemStatement);
     lines.push("");
   }
-
   if (p.targetUser) {
     lines.push(`**Target user:** ${p.targetUser}`);
     lines.push("");
   }
-
   if (p.successCriteria?.length) {
-    lines.push("## Success criteria");
+    lines.push("## Success Criteria");
     p.successCriteria.forEach((c) => lines.push(`- ${c}`));
     lines.push("");
   }
-
   if (p.scope) {
     lines.push("## Scope");
     if (p.scope.mustHave?.length) {
@@ -116,19 +117,16 @@ function toMarkdown(p) {
     }
     lines.push("");
   }
-
   p.phases?.forEach((phase, i) => {
     lines.push(`## Phase ${i + 1}: ${phase.name}`);
-    lines.push(phase.objective);
+    lines.push(phase.objective || "");
     lines.push("");
-
     phase.milestones?.forEach((m) => {
       lines.push(`### ${m.name}`);
       if (m.deadline) lines.push(`**Deadline:** ${m.deadline}`);
       if (m.doneWhen) lines.push(`**Done when:** ${m.doneWhen}`);
       if (m.risk) lines.push(`**Risk:** ${m.risk}`);
       lines.push("");
-
       const tasks = p.tasks?.filter((t) => t.milestoneId === m.id) ?? [];
       tasks.forEach((t) => {
         lines.push(`- [${t.status === "done" ? "x" : " "}] ${t.title}`);
@@ -136,35 +134,26 @@ function toMarkdown(p) {
       if (tasks.length) lines.push("");
     });
   });
-
   if (p.blockers?.length) {
     lines.push("## Blockers");
     p.blockers.forEach((b) => {
-      const status = b.status === "resolved" ? "~~resolved~~" : "**active**";
-      lines.push(`- ${b.description} (${status})`);
+      const s = b.status === "resolved" ? "~~resolved~~" : "**active**";
+      lines.push(`- ${b.description} (${s})`);
     });
     lines.push("");
   }
-
   if (p.toolsSuggested?.length) {
-    lines.push("## Suggested tools");
+    lines.push("## Suggested Tools");
     p.toolsSuggested.forEach((t) => lines.push(`- ${t}`));
     lines.push("");
   }
-
   if (p.postmortem?.answers?.length) {
     lines.push("## Retrospective");
     p.postmortem.answers.forEach((a) => {
       lines.push(`**${a.question}**`);
-      lines.push(a.answer);
+      lines.push(a.answer || "—");
       lines.push("");
     });
   }
-
-  lines.push("---");
-  lines.push(
-    `*Exported from StopProcast on ${new Date().toLocaleDateString()}*`
-  );
-
   return lines.join("\n");
 }
