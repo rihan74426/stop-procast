@@ -2,6 +2,8 @@ import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/lib/theme";
 import { I18nProvider } from "@/lib/i18n";
+import { ToastContainer } from "@/components/ui/Toast";
+import { NetworkMonitor } from "@/components/ui/NetworkMonitor";
 
 export const metadata = {
   title: "Momentum — Finish What You Start",
@@ -24,7 +26,11 @@ export default function RootLayout({ children }) {
         </head>
         <body>
           <ThemeProvider>
-            <I18nProvider>{children}</I18nProvider>
+            <I18nProvider>
+              {children}
+              <ToastContainer />
+              <NetworkMonitor />
+            </I18nProvider>
           </ThemeProvider>
         </body>
       </html>

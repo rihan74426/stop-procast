@@ -1,41 +1,77 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Input } from "@/components/ui/Input";
+import { useEffect, useState, useRef } from "react";
 import { Button } from "@/components/ui/Button";
+import { canMakeRequest, recordRequest } from "@/lib/ai/rateLimit";
+import { toast } from "@/lib/toast";
 import { parseClarifyQuestions } from "@/lib/ai/parser";
 
-export function StepClarify({ idea, answers, onChange, onNext, onBack }) {
-  const [questions, setQuestions] = useState([]);
-  const [loading, setLoading] = useState(true);
+/**
+ * Accepts `cachedQuestions` prop — if set, skips AI fetch entirely.
+ * This prevents re-fetching when the user navigates back.
+ */
+export function StepClarify({
+  idea,
+  answers,
+  onChange,
+  onNext,
+  onBack,
+  cachedQuestions,
+  onQuestionsLoaded,
+}) {
+  const [questions, setQuestions] = useState(cachedQuestions ?? []);
+  const [loading, setLoading] = useState(!cachedQuestions);
   const [error, setError] = useState(null);
+  const hasFetched = useRef(!!cachedQuestions);
 
   useEffect(() => {
-    let cancelled = false;
-    async function fetchQuestions() {
-      try {
-        setLoading(true);
-        const res = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ type: "clarify", idea }),
-        });
-        const data = await res.json();
-        if (!cancelled) {
-          setQuestions(parseClarifyQuestions(data.questions));
-        }
-      } catch (e) {
-        if (!cancelled)
-          setError("Failed to load questions. You can skip this step.");
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    }
+    if (hasFetched.current) return;
+    hasFetched.current = true;
     fetchQuestions();
-    return () => {
-      cancelled = true;
-    };
-  }, [idea]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  async function fetchQuestions() {
+    if (!canMakeRequest("clarify")) {
+      setError(
+        "Daily question limit reached. You can skip this step and continue."
+      );
+      setLoading(false);
+      toast.warn("Skipping clarify questions — daily limit reached.");
+      return;
+    }
+
+    const loadId = toast.loading("Thinking up some questions…");
+    try {
+      setLoading(true);
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type: "clarify", idea }),
+      });
+
+      toast.dismiss(loadId);
+
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}));
+        throw new Error(d.error ?? "Failed to load questions");
+      }
+
+      recordRequest("clarify");
+      const data = await res.json();
+      const parsed = parseClarifyQuestions(data.questions);
+      setQuestions(parsed);
+      onQuestionsLoaded?.(parsed); // bubble up so parent can cache
+    } catch (e) {
+      toast.dismiss(loadId);
+      toast.error("Couldn't load questions — you can skip this step.", {
+        duration: 5000,
+      });
+      setError("Couldn't load questions. You can skip this step.");
+    } finally {
+      setLoading(false);
+    }
+  }
 
   const canProceed =
     questions.length === 0 || questions.every((_, i) => answers[i]?.trim());
@@ -47,7 +83,7 @@ export function StepClarify({ idea, answers, onChange, onNext, onBack }) {
           A few quick questions
         </h1>
         <p className="text-[var(--text-secondary)]">
-          These help the AI build a plan that actually fits your situation.
+          These help shape a plan that fits your actual situation.
         </p>
       </div>
 
@@ -65,8 +101,8 @@ export function StepClarify({ idea, answers, onChange, onNext, onBack }) {
         </div>
       )}
 
-      {error && (
-        <div className="rounded-[var(--r-lg)] border border-[var(--coral)] bg-[var(--coral-bg)] px-5 py-4 text-sm text-[var(--coral)]">
+      {error && !loading && (
+        <div className="rounded-[var(--r-lg)] border border-[var(--amber)] bg-[var(--amber-bg)] px-5 py-4 text-sm text-[var(--amber)]">
           {error}
         </div>
       )}
@@ -101,7 +137,7 @@ export function StepClarify({ idea, answers, onChange, onNext, onBack }) {
           <Button variant="ghost" onClick={onNext}>
             Skip
           </Button>
-          <Button onClick={onNext} disabled={!canProceed} size="lg">
+          <Button onClick={onNext} disabled={!canProceed && !error} size="lg">
             Build my plan →
           </Button>
         </div>

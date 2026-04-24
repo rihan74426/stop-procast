@@ -6,9 +6,9 @@ const SCOPES = [
   {
     id: "lean",
     label: "Lean",
-    subtitle: "Ship fast, learn fast",
+    subtitle: "Start fast, learn fast",
     description:
-      "Ruthlessly minimal. 2 phases, core features only. Perfect for validating an idea.",
+      "Bare essentials only. 2 phases, core steps. Perfect for testing an idea or starting a new habit.",
     timeHint: "2–3 weeks",
     color: "var(--emerald)",
     bg: "var(--emerald-bg)",
@@ -18,7 +18,7 @@ const SCOPES = [
     label: "Standard",
     subtitle: "Balanced & realistic",
     description:
-      "Solid plan with 3 phases. All important features, no gold-plating.",
+      "Solid plan with 3 phases. All the important steps, no overwhelm.",
     timeHint: "4–8 weeks",
     color: "var(--violet)",
     bg: "var(--violet-bg)",
@@ -29,7 +29,7 @@ const SCOPES = [
     label: "Ambitious",
     subtitle: "Full vision",
     description:
-      "4–5 phases covering everything. For projects you're fully committed to.",
+      "4–5 phases covering every angle. For goals you're fully committed to seeing through.",
     timeHint: "8–16 weeks",
     color: "var(--amber)",
     bg: "var(--amber-bg)",
@@ -41,11 +41,10 @@ export function StepScope({ value, onChange, onBack, onNext }) {
     <div className="flex flex-col gap-6 sm:gap-8">
       <div>
         <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)] mb-2">
-          Choose your scope
+          How ambitious is this?
         </h1>
         <p className="text-sm sm:text-base text-[var(--text-secondary)]">
-          This shapes how the AI plans your project. You can always adjust
-          later.
+          This shapes the depth of your plan. You can always adjust as you go.
         </p>
       </div>
 
@@ -71,8 +70,6 @@ export function StepScope({ value, onChange, onBack, onNext }) {
                   Recommended
                 </span>
               )}
-
-              {/* Color dot */}
               <div
                 className="w-7 h-7 sm:w-8 sm:h-8 rounded-[var(--r-md)] flex items-center justify-center mb-3 sm:mb-4"
                 style={{ background: scope.bg }}
@@ -82,7 +79,6 @@ export function StepScope({ value, onChange, onBack, onNext }) {
                   style={{ background: scope.color }}
                 />
               </div>
-
               <p className="font-display font-semibold text-base sm:text-lg text-[var(--text-primary)] mb-0.5">
                 {scope.label}
               </p>
@@ -95,7 +91,6 @@ export function StepScope({ value, onChange, onBack, onNext }) {
               <p className="text-xs font-medium" style={{ color: scope.color }}>
                 ≈ {scope.timeHint}
               </p>
-
               {selected && (
                 <div
                   className="absolute top-3 sm:top-4 right-3 sm:right-4 w-5 h-5 rounded-full flex items-center justify-center"

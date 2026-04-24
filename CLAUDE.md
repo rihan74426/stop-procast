@@ -227,57 +227,382 @@ npm install jspdf
 - [ ] More languages (Japanese, Portuguese, Hindi, Russian)
 - [ ] Mobile app (React Native / Expo)
 
-the auth before export, unactivated exports remove
-reply in languages that have been asked with in the other tabs.
-user can use the example response in the placeholder by pressing Tab button or something on the phone, or by completing the suggested text by typing. like when type similar to the suggestion it'll appear right beside it. or a side button to select the suggestion.
-we'll let users initilize and work on the project without auth. but after a while of using it, completing tasks we'll encourage to login to save progress, and when exporting it user will need to sign up to send the file to their email. sign-up once, use forever with saving your progress and more features.
-the project wasn't saved after logged in. all previous project disappered. we must save the progress and localstorage data to mongoDB initially after signing-up and logging in.
-This whole application is not only for tech or softwares. this is about anything in the world, tasks, plans, business, project, learning, anything. so make the vibe and system like that everywhere.
+text ghosting auto complete
+the navigation incompletes the process and have to restart the process, doesn't keep the progress saved. only back navigation no forward.
 
-show toast on the background activity when needed like internet disconnection, failure, restart, fallback. the retry after a fail request is not working. in the detailed model2, and in the model3 the review requests are failing. remove all the models, only use OPENROUTER_MODEL=openrouter/free and as a fallback use OPENROUTER_MODEL1=meta-llama/llama-3.2-3b-instruct:free
-no need user's preference.
+GET /api/projects error: MongoServerSelectionError: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert
+internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
 
-users can go back, move between intake steps and edit their inputs by back button or tapping on the steps icons. the review back from commit are making the reviews regenerate that is not right. it should be as it was. do not regenerate when it is already generated.
+    at async GET (app\api\projects\route.js:17:22)
 
-the ai api is getting limited by time. I need this to be free forever:
-A 429 error means you've hit a **rate limit**. Here's what you need to know and how to use OpenRouter for free.
+15 |
+16 | await connectDB();
 
-## Understanding the 429 Error
+> 17 | const projects = await Project.find({ userId })
 
-A 429 (Too Many Requests) error occurs when you exceed OpenRouter's rate limits. OpenRouter enforces rate limits globally — creating additional accounts or API keys will **not** help, as capacity is governed globally [^1].
+     |                      ^
 
-## How to Use OpenRouter for Free
+18 | .sort({ createdAt: -1 })
+19 | .lean();
+20 | const clean = projects.map(({ \_id, \_\_v, ...p }) => p); {
+errorLabelSet: Set(0) {},
+reason: [TopologyDescription],
+code: undefined,
+[cause]: [MongoNetworkError: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openss 16 | await connectDB();
 
-OpenRouter offers free model variants — these are models with IDs ending in `:free` (e.g., `meta-llama/llama-3.1-8b-instruct:free`). The following limits apply to free models [^1]:
+> 17 | const projects = await Project.find({ userId })
 
-- **Rate limit:** Up to **20 requests per minute**
-- **Daily limit (no credits purchased):** Limited number of requests per day
-- **Daily limit (purchased at least $10 in credits):** Higher daily request limit
+     |                      ^
 
-> Making additional accounts or API keys will not affect your rate limits, as we govern capacity globally. We do however have different rate limits for different models, so you can share the load that way if you do run into issues.
+18 | .sort({ createdAt: -1 })
+19 | .lean();
+20 | const clean = projects.map(({ \_id, **v, ...p }) => p); {
+errorLabelSet: Set(0) {},
+reason: [TopologyDescription],
+code: undefined,
+[cause]: [MongoNetworkError: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openss 19 | .lean();
+20 | const clean = projects.map(({ \_id, **v, ...p }) => p); {
+errorLabelSet: Set(0) {},
+reason: [TopologyDescription],
+code: undefined,
+[cause]: [MongoNetworkError: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openss code: undefined,
+[cause]: [MongoNetworkError: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openss [cause]: [MongoNetworkError: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+] {
+errorLabelSet: Set(1) { 'ResetPool' },
+beforeHandshake: false,
+[cause]: [Error: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+] {
+library: 'SSL routines',
+reason: 'tlsv1 alert internal error',
+code: 'ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR'
+}
+}
+}
+GET /api/projects 500 in 30691ms
 
-## What You Can Do to Fix the 429 Error
+] {
+errorLabelSet: Set(1) { 'ResetPool' },
+beforeHandshake: false,
+[cause]: [Error: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+] {
+library: 'SSL routines',
+reason: 'tlsv1 alert internal error',
+code: 'ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR'
+}
+}
+] {
+errorLabelSet: Set(1) { 'ResetPool' },
+beforeHandshake: false,
+[cause]: [Error: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+] {
+library: 'SSL routines',
+reason: 'tlsv1 alert internal error',
+] {
+errorLabelSet: Set(1) { 'ResetPool' },
+beforeHandshake: false,
+[cause]: [Error: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+] {
+errorLabelSet: Set(1) { 'ResetPool' },
+beforeHandshake: false,
+] {
+errorLabelSet: Set(1) { 'ResetPool' },
+] {
+errorLabelSet: Set(1) { 'ResetPool' },
+] {
+] {
+] {
+errorLabelSet: Set(1) { 'ResetPool' },
+errorLabelSet: Set(1) { 'ResetPool' },
+beforeHandshake: false,
+beforeHandshake: false,
+[cause]: [Error: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+] {
+library: 'SSL routines',
+reason: 'tlsv1 alert internal error',
+code: 'ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR'
+}
+}
+}
+GET /api/projects 500 in 30691ms
+✓ Compiled in 1281ms (471 modules)
+GET /new 200 in 155ms
+GET /new 200 in 93ms
+○ Compiling /api/generate ...
+✓ Compiled /api/generate in 1903ms (1265 modules)
+POST /api/generate 200 in 10834ms
+POST /api/generate 200 in 81379ms
+POST /api/generate 200 in 180083ms
+POST /api/generate 200 in 57658ms
+○ Compiling /api/projects ...
+✓ Compiled /api/projects in 843ms (827 modules)
+POST /api/projects 201 in 1247ms
+○ Compiling /project/[id] ...
+✓ Compiled /project/[id] in 5s (1790 modules)
+✓ Compiled in 870ms (682 modules)
+GET /project/706658ad-7f19-4a7d-8752-95ee48c36f52 200 in 13785ms
+GET /project/706658ad-7f19-4a7d-8752-95ee48c36f52 200 in 152ms
+GET /project/706658ad-7f19-4a7d-8752-95ee48c36f52 200 in 102ms
+○ Compiling /api/reengage ...
+✓ Compiled /api/reengage in 1888ms (1794 modules)
+GET /project/706658ad-7f19-4a7d-8752-95ee48c36f52 200 in 597ms
+[reengage] error: TypeError: fetch failed
+at async openrouterGenerate (lib\ai\openrouter.js:20:15)
+at async POST (app\api\reengage\route.js:10:18)
+18 | ) {
+19 | const model = modelOverride || DEFAULT_MODEL();
 
-- **Slow down your requests** — Add delays between API calls to stay within the per-minute rate limit.
-- **Switch to a different model** — Since rate limits differ per model, spreading requests across multiple free models can help [^1].
-- **Check your credit balance** — If your account has a **negative credit balance**, you may see 402 errors even for free models. Adding credits to bring your balance above zero resolves this [^1].
-- **Monitor your usage** — Check your current rate limit and remaining credits by calling:
+> 20 | const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+
+     |               ^
+
+21 | method: "POST",
+22 | headers: headers(),
+23 | body: JSON.stringify({ {
+[cause]: [Error [ConnectTimeoutError]: Connect Timeout Error (attempted addresses: 104.18.2.115:443, 104.18.3.115:443, timeout: 10000ms)] {
+code: 'UND_ERR_CONNECT_TIMEOUT'
+}
+}
+POST /api/reengage 500 in 12968ms
+[reengage] error: TypeError: fetch failed
+at async openrouterGenerate (lib\ai\openrouter.js:20:15)
+at async POST (app\api\reengage\route.js:10:18)
+18 | ) {
+19 | const model = modelOverride || DEFAULT_MODEL();
+
+> 20 | const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+
+     |               ^
+
+21 | method: "POST",
+22 | headers: headers(),
+23 | body: JSON.stringify({ {
+at async POST (app\api\reengage\route.js:10:18)
+18 | ) {
+19 | const model = modelOverride || DEFAULT_MODEL();
+
+> 20 | const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+
+     |               ^
+
+21 | method: "POST",
+22 | headers: headers(),
+at async POST (app\api\reengage\route.js:10:18)
+18 | ) {
+19 | const model = modelOverride || DEFAULT_MODEL();
+
+> 20 | const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+
+     |               ^
+
+21 | method: "POST",
+at async POST (app\api\reengage\route.js:10:18)
+18 | ) {
+19 | const model = modelOverride || DEFAULT_MODEL();
+
+> 20 | const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+
+     |               ^
+    at async POST (app\api\reengage\route.js:10:18)
+
+18 | ) {
+19 | const model = modelOverride || DEFAULT_MODEL();
+
+> 20 | const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+
+    at async POST (app\api\reengage\route.js:10:18)
+
+18 | ) {
+19 | const model = modelOverride || DEFAULT_MODEL();
+
+> 20 | const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+
+     |               ^
+    at async POST (app\api\reengage\route.js:10:18)
+
+18 | ) {
+19 | const model = modelOverride || DEFAULT_MODEL();
+
+> 20 | const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+
+    at async POST (app\api\reengage\route.js:10:18)
+
+18 | ) {
+19 | const model = modelOverride || DEFAULT_MODEL();
+
+> 20 | const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+
+     |               ^
+    at async POST (app\api\reengage\route.js:10:18)
+
+18 | ) {
+19 | const model = modelOverride || DEFAULT_MODEL();
+
+> 20 | const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+
+     |               ^
+
+21 | method: "POST",
+at async POST (app\api\reengage\route.js:10:18)
+18 | ) {
+19 | const model = modelOverride || DEFAULT_MODEL();
+
+> 20 | const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+
+     |               ^
+
+21 | method: "POST",
+at async POST (app\api\reengage\route.js:10:18)
+18 | ) {
+19 | const model = modelOverride || DEFAULT_MODEL();
+
+> 20 | const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+
+     |               ^
+
+> 20 | const res = await fetch(`${OPENROUTER_BASE}/chat/completions`, {
+
+     |               ^
+
+21 | method: "POST",
+22 | headers: headers(),
+23 | body: JSON.stringify({ {
+[cause]: [Error [ConnectTimeoutError]: Connect Timeout Error (attempted addresses: 104.18.2.115:443, 104.18.3.115:443, timeout: 10000ms)] {
+code: 'UND_ERR_CONNECT_TIMEOUT'
+}
+}
+POST /api/reengage 500 in 13152ms
+GET / 200 in 1023ms
+POST / 200 in 65ms
+POST / 200 in 105ms
+GET /api/projects error: MongoServerSelectionError: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert
+internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+
+    at async GET (app\api\projects\route.js:17:22)
+
+15 |
+16 | await connectDB();
+
+> 17 | const projects = await Project.find({ userId })
+
+     |                      ^
+
+18 | .sort({ createdAt: -1 })
+19 | .lean();
+20 | const clean = projects.map(({ \_id, **v, ...p }) => p); {
+errorLabelSet: Set(0) {},
+reason: [TopologyDescription],
+code: undefined,
+[cause]: [MongoNetworkError: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openss 20 | const clean = projects.map(({ \_id, **v, ...p }) => p); {
+errorLabelSet: Set(0) {},
+reason: [TopologyDescription],
+code: undefined,
+[cause]: [MongoNetworkError: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openss reason: [TopologyDescription],
+code: undefined,
+[cause]: [MongoNetworkError: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+[cause]: [MongoNetworkError: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+l\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+] {
+] {
+errorLabelSet: Set(1) { 'ResetPool' },
+beforeHandshake: false,
+[cause]: [Error: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+] {
+library: 'SSL routines',
+reason: 'tlsv1 alert internal error',
+beforeHandshake: false,
+[cause]: [Error: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+] {
+library: 'SSL routines',
+reason: 'tlsv1 alert internal error',
+code: 'ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR'
+}
+}
+}
+GET /api/projects 500 in 30318ms
+
+    beforeHandshake: false,
+    [cause]: [Error: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+    ] {
+      library: 'SSL routines',
+      reason: 'tlsv1 alert internal error',
+      code: 'ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR'
+    }
+
+}
+}
+GET /api/projects 500 in 30318ms
+
+    beforeHandshake: false,
+    [cause]: [Error: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+    ] {
+      library: 'SSL routines',
+      reason: 'tlsv1 alert internal error',
+      code: 'ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR'
+    }
+
+}
+}
+GET /api/projects 500 in 30318ms
+
+    beforeHandshake: false,
+    [cause]: [Error: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+    ] {
+      library: 'SSL routines',
+      reason: 'tlsv1 alert internal error',
+      code: 'ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR'
+    }
+    [cause]: [Error: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
+    ] {
+      library: 'SSL routines',
+      reason: 'tlsv1 alert internal error',
+      library: 'SSL routines',
+      reason: 'tlsv1 alert internal error',
+      reason: 'tlsv1 alert internal error',
+      code: 'ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR'
+    }
+
+}
+}
+GET /api/projects 500 in 30318ms
+
+## Strategies to Maximize Sessions on the Free Tier
+
+**Reduce tokens per request**
+
+- Keep your prompts concise and focused — avoid padding or redundant context
+- Trim conversation history aggressively; only include the messages necessary for the model to understand the current task
+- Use shorter system prompts
+
+**Use Response Caching**
+OpenRouter offers a **Response Caching** feature (currently in beta) that returns cached responses for identical requests at **zero cost** — all billable usage counters are reported as `0` [^3]. If any of your 4 requests per session are repeated or templated (e.g., a fixed system prompt + same query), enabling caching with the `X-OpenRouter-Cache: true` header can eliminate token costs for those hits entirely:
 
 ```bash
-curl https://openrouter.ai/api/v1/key \
-  -H "Authorization: Bearer YOUR_OPENROUTER_API_KEY"
+curl https://openrouter.ai/api/v1/chat/completions \
+  -H "Authorization: Bearer $OPENROUTER_API_KEY" \
+  -H "Content-Type: application/json" \
+  -H "X-OpenRouter-Cache: true" \
+  -d '{
+    "model": "openrouter/free",
+    "messages": [{"role": "user", "content": "Your repeated query here"}]
+  }'
 ```
 
-This returns details like `usage`, `usage_daily`, `limit_remaining`, and `is_free_tier` so you can understand where you stand [^1].
+**Monitor usage per response**
+Every OpenRouter response automatically includes a `usage` object with token counts and cost — no extra API calls needed [^4]. Use this to identify which of your 4 requests is consuming the most tokens and optimize those first:
 
-- **Purchase credits** — Buying at least the minimum credit threshold increases your daily free model request limit significantly [^1].
+```python
+response = client.chat.completions.create(
+    model="openrouter/free",
+    messages=[{"role": "user", "content": "Your message"}]
+)
+print("Usage Stats:", response.usage)
+```
 
-## Summary
+**Batch your work efficiently**
 
-To use OpenRouter for free, use model IDs ending in `:free` and stay within the rate limits. If you're hitting 429s, slow down your request rate, spread load across different models, or consider purchasing a small amount of credits to unlock higher daily limits.
+- Structure your 4 requests per session so each one builds on the last without re-sending large context blocks
+- Pass only the _delta_ of information in each follow-up message rather than the full conversation history where possible
 
-[^1]: https://openrouter.ai/docs/api/reference/limits
+these error came after starting to the end and then login. mongodb is failing on fetching the project data and saving them.
 
-optimize the usage with this and show the problem according to the code. decrease the ai usage from everywhere. control and use ai smartly that requires low volume. you're sending two requests at a time.
-
-also limit a user's request so that users can use it smoothly.
+we need to save every calls and project on mongodb first. then when user logs in and we connect them to the user by updating them and mark them.

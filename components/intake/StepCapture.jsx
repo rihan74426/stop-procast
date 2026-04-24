@@ -1,31 +1,99 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/Button";
-import { AI_MODELS, getStoredModel, setStoredModel } from "@/lib/ai/models";
 import { useI18n } from "@/lib/i18n";
 
 const EXAMPLES = [
-  "A mobile app that helps remote teams do async standups without boring meetings",
-  "A Chrome extension that blocks distracting sites during deep work sessions",
-  "A SaaS tool for freelancers to auto-generate invoices from time logs",
+  "Learn conversational Spanish in 3 months through daily 20-minute practice sessions",
+  "Plan and launch a home bakery business selling to local cafes and weekend markets",
+  "Write and self-publish a short non-fiction book about my area of expertise",
+  "Renovate my kitchen on a budget — new cabinets, counters, and lighting",
+  "Get fit enough to run a 10K race, starting from zero current fitness",
+  "Launch a freelance design service and land my first 3 paying clients",
+  "Build a habit of reading 20 books this year with a daily reading routine",
 ];
+
+const SUGGESTIONS = [
+  {
+    trigger: "learn",
+    ghost: " a new skill and track my progress week by week",
+  },
+  { trigger: "build", ghost: " something real and put it in front of people" },
+  {
+    trigger: "start",
+    ghost: " from scratch and reach a clear, measurable goal",
+  },
+  { trigger: "plan", ghost: " every step with clear milestones and deadlines" },
+  { trigger: "launch", ghost: " it publicly and get real feedback" },
+  { trigger: "write", ghost: " and publish it for the audience that needs it" },
+  {
+    trigger: "create",
+    ghost: " something valuable and share it with the world",
+  },
+  { trigger: "improve", ghost: " consistently by building a daily routine" },
+  { trigger: "grow", ghost: " it into something sustainable and repeatable" },
+  {
+    trigger: "finish",
+    ghost: " what I started and finally ship the final version",
+  },
+  { trigger: "open", ghost: " a business and serve my first real customers" },
+  { trigger: "get", ghost: " measurable results through focused daily action" },
+];
+
+function getGhostText(value) {
+  if (!value || value.length < 4) return "";
+  const lower = value.toLowerCase().trim();
+  const words = lower.split(/\s+/);
+  const lastWord = words[words.length - 1];
+  const partial = SUGGESTIONS.find(
+    (s) =>
+      s.trigger.startsWith(lastWord) &&
+      lastWord.length >= 3 &&
+      lastWord !== s.trigger
+  );
+  if (partial) return partial.trigger.slice(lastWord.length) + partial.ghost;
+  const full = SUGGESTIONS.find(
+    (s) => lower.endsWith(" " + s.trigger) || lower === s.trigger
+  );
+  if (full) return full.ghost;
+  return "";
+}
 
 export function StepCapture({ value, onChange, onNext }) {
   const { t } = useI18n();
   const [focused, setFocused] = useState(false);
-  const [selectedModel, setSelectedModel] = useState(getStoredModel);
-
+  const [exampleIdx, setExampleIdx] = useState(0);
+  const textareaRef = useRef(null);
+  const ghost = getGhostText(value);
   const canProceed = value.trim().length >= 20;
 
-  const handleModelSelect = (id) => {
-    setSelectedModel(id);
-    setStoredModel(id);
+  useEffect(() => {
+    const timer = setInterval(
+      () => setExampleIdx((i) => (i + 1) % EXAMPLES.length),
+      3500
+    );
+    return () => clearInterval(timer);
+  }, []);
+
+  const acceptGhost = () => {
+    if (!ghost) return;
+    onChange(value + ghost);
+    setTimeout(() => {
+      const el = textareaRef.current;
+      if (el) el.selectionStart = el.selectionEnd = el.value.length;
+    }, 0);
+  };
+
+  const handleKeyDown = (e) => {
+    if (ghost && (e.key === "Tab" || e.key === "ArrowRight")) {
+      e.preventDefault();
+      acceptGhost();
+    }
   };
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8">
-      {/* Heading */}
       <div>
         <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)] mb-2">
           {t("intake_what")}
@@ -35,117 +103,88 @@ export function StepCapture({ value, onChange, onNext }) {
         </p>
       </div>
 
-      {/* Textarea */}
-      <div
-        className={[
-          "rounded-[var(--r-lg)] border-2 transition-colors duration-200",
-          focused ? "border-[var(--violet)]" : "border-[var(--border)]",
-        ].join(" ")}
-      >
-        <textarea
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          placeholder="e.g. I want to build a tool that helps indie makers track their projects without getting overwhelmed by complex PM software..."
-          rows={5}
-          className="w-full bg-transparent px-4 sm:px-5 py-3 sm:py-4 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none focus:outline-none text-sm sm:text-base leading-relaxed"
-          autoFocus
-        />
-        <div className="px-4 sm:px-5 py-2.5 sm:py-3 border-t border-[var(--border)] flex items-center justify-between">
-          <span
-            className={`text-xs ${
-              value.length < 20
-                ? "text-[var(--text-tertiary)]"
-                : "text-[var(--emerald)]"
-            }`}
-          >
-            {value.length < 20
-              ? `${20 - value.length} more chars`
-              : "✓ Good — more detail = better plan"}
-          </span>
-          <span className="text-xs text-[var(--text-tertiary)]">
-            {value.length} chars
-          </span>
+      <div className="relative">
+        <div
+          className={[
+            "rounded-[var(--r-lg)] border-2 transition-colors duration-200",
+            focused ? "border-[var(--violet)]" : "border-[var(--border)]",
+          ].join(" ")}
+        >
+          {ghost && focused && (
+            <div
+              aria-hidden="true"
+              className="absolute top-0 left-0 w-full px-4 sm:px-5 py-3 sm:py-4 text-sm sm:text-base leading-relaxed pointer-events-none select-none whitespace-pre-wrap break-words z-0"
+              style={{ fontFamily: "inherit" }}
+            >
+              <span className="invisible">{value}</span>
+              <span className="text-[var(--text-tertiary)] opacity-55">
+                {ghost}
+              </span>
+            </div>
+          )}
+
+          <textarea
+            ref={textareaRef}
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            onKeyDown={handleKeyDown}
+            placeholder={`e.g. ${EXAMPLES[exampleIdx]}`}
+            rows={5}
+            className="w-full bg-transparent px-4 sm:px-5 py-3 sm:py-4 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none focus:outline-none text-sm sm:text-base leading-relaxed relative z-10"
+            autoFocus
+          />
+
+          <div className="px-4 sm:px-5 py-2.5 sm:py-3 border-t border-[var(--border)] flex items-center justify-between relative z-10">
+            <span
+              className={`text-xs ${
+                value.length < 20
+                  ? "text-[var(--text-tertiary)]"
+                  : "text-[var(--emerald)]"
+              }`}
+            >
+              {value.length < 20
+                ? `${20 - value.length} more to go`
+                : "✓ Great — more detail = better plan"}
+            </span>
+            <div className="flex items-center gap-2">
+              {ghost && focused && (
+                <>
+                  <button
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      acceptGhost();
+                    }}
+                    className="text-xs px-2 py-0.5 rounded border border-[var(--border)] text-[var(--text-tertiary)] hover:text-[var(--text-primary)] hover:border-[var(--violet)] transition-all hidden sm:block"
+                  >
+                    Tab ↹
+                  </button>
+                  <button
+                    onMouseDown={(e) => {
+                      e.preventDefault();
+                      acceptGhost();
+                    }}
+                    className="text-xs px-2.5 py-1 rounded-full bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium sm:hidden active:scale-95 transition-transform"
+                  >
+                    Accept →
+                  </button>
+                </>
+              )}
+              <span className="text-xs text-[var(--text-tertiary)]">
+                {value.length}
+              </span>
+            </div>
+          </div>
         </div>
       </div>
 
-      {/* AI Model selector */}
-      <div>
-        <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-2.5">
-          {t("model_choose")}
-        </p>
-        <div className="grid grid-cols-3 gap-2">
-          {AI_MODELS.map((model) => {
-            const isSelected = selectedModel === model.id;
-            return (
-              <button
-                key={model.id}
-                type="button"
-                onClick={() => handleModelSelect(model.id)}
-                className={[
-                  "relative text-left rounded-[var(--r-md)] border-2 px-3 py-2.5 transition-all duration-150",
-                  isSelected
-                    ? "border-[var(--violet)] bg-[var(--violet-bg)]"
-                    : "border-[var(--border)] hover:border-[var(--slate-4)] bg-[var(--bg-surface)]",
-                ].join(" ")}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span
-                    className={`text-xs font-semibold ${
-                      isSelected
-                        ? "text-[var(--violet-dim)]"
-                        : "text-[var(--text-primary)]"
-                    }`}
-                  >
-                    {model.name}
-                  </span>
-                  <span
-                    className={[
-                      "text-[9px] px-1.5 py-0.5 rounded-full font-medium shrink-0",
-                      isSelected
-                        ? "bg-[var(--violet)] text-white"
-                        : "bg-[var(--bg-muted)] text-[var(--text-tertiary)]",
-                    ].join(" ")}
-                  >
-                    {model.badge}
-                  </span>
-                </div>
-                <p
-                  className={`text-[10px] leading-snug ${
-                    isSelected
-                      ? "text-[var(--violet-dim)]"
-                      : "text-[var(--text-tertiary)]"
-                  }`}
-                >
-                  {model.description}
-                </p>
-                {isSelected && (
-                  <div className="absolute top-2 right-2 w-3.5 h-3.5 rounded-full bg-[var(--violet)] flex items-center justify-center">
-                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                      <path
-                        d="M1.5 4l1.5 1.5 3-3"
-                        stroke="white"
-                        strokeWidth="1.4"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      />
-                    </svg>
-                  </div>
-                )}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Examples */}
       <div>
         <p className="text-xs text-[var(--text-tertiary)] mb-2 sm:mb-3 uppercase tracking-wider font-medium">
           Need inspiration?
         </p>
         <div className="flex flex-col gap-2">
-          {EXAMPLES.map((ex, i) => (
+          {EXAMPLES.slice(0, 4).map((ex, i) => (
             <button
               key={i}
               onClick={() => onChange(ex)}
@@ -157,7 +196,6 @@ export function StepCapture({ value, onChange, onNext }) {
         </div>
       </div>
 
-      {/* CTA */}
       <div className="flex justify-end">
         <Button
           onClick={onNext}
@@ -166,23 +204,17 @@ export function StepCapture({ value, onChange, onNext }) {
           className="gap-2 sm:gap-3 w-full sm:w-auto justify-center"
         >
           {t("intake_continue")}
-          <ArrowRight />
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+            <path
+              d="M3 8h10M9 4l4 4-4 4"
+              stroke="currentColor"
+              strokeWidth="1.6"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+            />
+          </svg>
         </Button>
       </div>
     </div>
-  );
-}
-
-function ArrowRight() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <path
-        d="M3 8h10M9 4l4 4-4 4"
-        stroke="currentColor"
-        strokeWidth="1.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }

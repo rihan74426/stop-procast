@@ -3,6 +3,7 @@
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { SavePromptModal } from "@/components/ui/SavePromptModal";
@@ -23,9 +24,6 @@ import { overallProgress } from "@/lib/utils/progress";
 import { formatDate, projectAgeLabel } from "@/lib/utils/date";
 import { useI18n } from "@/lib/i18n";
 
-/**
- * UTF-8 safe base64 — fixes btoa crash with Arabic/Chinese/emoji
- */
 function toBase64Safe(str) {
   return btoa(
     encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) =>
@@ -68,7 +66,7 @@ function ProjectContent({ id }) {
   };
 
   const handleComplete = () => {
-    if (confirm("Mark this project as shipped?")) {
+    if (confirm("Mark this project as complete?")) {
       completeProject(id);
       router.push(`/project/${id}/complete`);
     }
@@ -147,7 +145,7 @@ function ProjectContent({ id }) {
                         })}
                       </Badge>
                     )}
-                    {isCompleted && <Badge status="completed">✓ Shipped</Badge>}
+                    {isCompleted && <Badge status="completed">✓ Done</Badge>}
                   </div>
                 </div>
 
@@ -267,7 +265,7 @@ function ProjectContent({ id }) {
                       {t("project_mark_shipped")}
                     </Button>
                   )}
-                  {/* Email export — available to ALL users, no auth required */}
+                  {/* Email export — requires auth (handled inside modal) */}
                   <Button
                     variant="ghost"
                     onClick={() => setShowEmailExport(true)}
@@ -275,19 +273,13 @@ function ProjectContent({ id }) {
                   >
                     ✉️ {t("project_export_email")}
                   </Button>
+                  {/* PDF and file exports available to all */}
                   <Button
                     variant="ghost"
                     onClick={handleExportPDF}
                     className="w-full justify-center"
                   >
                     {t("project_export_pdf")}
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={() => handleExport("json")}
-                    className="w-full justify-center"
-                  >
-                    {t("project_export_json")}
                   </Button>
                   <Button
                     variant="ghost"
@@ -311,13 +303,11 @@ function ProjectContent({ id }) {
         </main>
       </div>
 
-      {/* Email export modal — no auth required */}
       <EmailExportModal
         open={showEmailExport}
         onClose={() => setShowEmailExport(false)}
         project={project}
       />
-
       <SavePromptModal />
     </div>
   );

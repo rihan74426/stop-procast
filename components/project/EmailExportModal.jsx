@@ -1,36 +1,30 @@
 "use client";
 
 import { useState } from "react";
+import { useUser, SignInButton, SignUpButton } from "@clerk/nextjs";
 import { useI18n } from "@/lib/i18n";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 
-/**
- * EmailExportModal
- * Works for BOTH guests (passes projectData as base64) and auth users (passes projectId).
- * No auth required to export — this is a feature, not a gate.
- */
 export function EmailExportModal({ open, onClose, project }) {
   const { t } = useI18n();
+  const { isSignedIn } = useUser();
   const [email, setEmail] = useState("");
   const [format, setFormat] = useState("markdown");
-  const [status, setStatus] = useState("idle"); // idle | sending | success | error
+  const [status, setStatus] = useState("idle");
 
   const isValidEmail = email.includes("@") && email.includes(".");
 
   const handleSend = async () => {
     if (!isValidEmail || !project) return;
     setStatus("sending");
-
     try {
-      // Encode project data so guests can export without auth
       const encoded = btoa(
         encodeURIComponent(JSON.stringify(project)).replace(
           /%([0-9A-F]{2})/g,
           (_, p1) => String.fromCharCode(parseInt(p1, 16))
         )
       );
-
       const res = await fetch("/api/export-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -41,12 +35,7 @@ export function EmailExportModal({ open, onClose, project }) {
           projectData: encoded,
         }),
       });
-
-      if (res.ok) {
-        setStatus("success");
-      } else {
-        setStatus("error");
-      }
+      setStatus(res.ok ? "success" : "error");
     } catch {
       setStatus("error");
     }
@@ -59,11 +48,64 @@ export function EmailExportModal({ open, onClose, project }) {
   };
 
   const formats = [
-    { id: "markdown", label: t("export_email_format_md") },
-    { id: "json", label: t("export_email_format_json") },
-    { id: "both", label: `${t("export_email_format_pdf")} + MD` },
+    { id: "markdown", label: "Markdown" },
+    { id: "json", label: "JSON" },
+    { id: "both", label: "Both" },
   ];
 
+  // Auth gate for non-signed-in users
+  if (!isSignedIn) {
+    return (
+      <Modal
+        open={open}
+        onClose={handleClose}
+        title="Export via Email"
+        size="sm"
+      >
+        <div className="flex flex-col gap-5">
+          <div className="flex flex-col items-center gap-4 py-4 text-center">
+            <div className="w-14 h-14 rounded-[var(--r-xl)] bg-[var(--violet-bg)] flex items-center justify-center text-2xl">
+              ✉️
+            </div>
+            <div>
+              <p className="font-display font-semibold text-lg text-[var(--text-primary)] mb-1">
+                Sign in to export
+              </p>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-xs">
+                Create a free account to export your plan — and keep all your
+                work saved across devices.
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-2 w-full mt-1">
+              <SignUpButton mode="modal">
+                <button
+                  onClick={handleClose}
+                  className="w-full h-11 rounded-[var(--r-md)] bg-[var(--violet)] text-white text-sm font-semibold hover:bg-[var(--violet-dim)] transition-colors active:scale-[0.98]"
+                >
+                  Create free account
+                </button>
+              </SignUpButton>
+              <SignInButton mode="modal">
+                <button
+                  onClick={handleClose}
+                  className="w-full h-11 rounded-[var(--r-md)] border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-colors"
+                >
+                  Sign in
+                </button>
+              </SignInButton>
+            </div>
+
+            <p className="text-xs text-[var(--text-tertiary)]">
+              Free forever. No credit card required.
+            </p>
+          </div>
+        </div>
+      </Modal>
+    );
+  }
+
+  // Signed-in: show full export form
   return (
     <Modal
       open={open}
@@ -91,13 +133,10 @@ export function EmailExportModal({ open, onClose, project }) {
           </div>
         ) : (
           <>
-            <div>
-              <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                {t("export_email_desc")}
-              </p>
-            </div>
+            <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+              {t("export_email_desc")}
+            </p>
 
-            {/* Format selector */}
             <div>
               <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                 {t("export_email_format")}
@@ -120,7 +159,6 @@ export function EmailExportModal({ open, onClose, project }) {
               </div>
             </div>
 
-            {/* Email input */}
             <div>
               <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
                 {t("export_email_label")}
@@ -146,14 +184,13 @@ export function EmailExportModal({ open, onClose, project }) {
               </p>
             )}
 
-            {/* Project preview */}
             <div className="rounded-[var(--r-md)] bg-[var(--bg-subtle)] px-3 py-2.5 flex items-center gap-3">
               <div className="w-8 h-8 rounded-[var(--r-sm)] bg-[var(--violet-bg)] flex items-center justify-center text-sm shrink-0">
                 📦
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-[var(--text-primary)] truncate">
-                  {project?.projectTitle || "Untitled project"}
+                  {project?.projectTitle || "Untitled"}
                 </p>
                 <p className="text-xs text-[var(--text-tertiary)]">
                   {project?.tasks?.length || 0} tasks ·{" "}

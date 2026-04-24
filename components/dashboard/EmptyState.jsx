@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/Button";
 export function EmptyState() {
   return (
     <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
-      {/* Animated icon */}
       <div className="relative mb-8">
         <div className="w-20 h-20 rounded-[var(--r-xl)] bg-[var(--violet-bg)] flex items-center justify-center">
           <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
@@ -19,16 +18,16 @@ export function EmptyState() {
             />
           </svg>
         </div>
-        {/* Ping animation */}
         <div className="absolute inset-0 rounded-[var(--r-xl)] bg-[var(--violet-bg)] animate-ping opacity-40" />
       </div>
 
       <h2 className="font-display font-semibold text-2xl text-[var(--text-primary)] mb-3">
-        Your first project is waiting
+        Your first goal is waiting
       </h2>
       <p className="text-[var(--text-secondary)] max-w-sm leading-relaxed mb-8">
-        Drop in an idea — rough or half-formed, it doesn`t matter. The AI will
-        turn it into a structured plan you can actually execute.
+        Whether it's a business idea, a fitness goal, a creative project, or
+        anything else — drop it in and get a structured plan you can actually
+        follow.
       </p>
 
       <Link href="/new">
@@ -46,7 +45,7 @@ export function EmptyState() {
       </Link>
 
       <p className="mt-6 text-xs text-[var(--text-tertiary)]">
-        Takes 2 minutes. No setup required.
+        Takes 2 minutes. Works for any goal, any domain.
       </p>
     </div>
   );

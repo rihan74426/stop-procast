@@ -7,82 +7,139 @@ import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { useI18n } from "@/lib/i18n";
-import { getStoredModel, AI_MODELS } from "@/lib/ai/models";
 import { loadUserProfile, buildProfileContext } from "@/lib/userProfile";
+import { canMakeRequest, recordRequest } from "@/lib/ai/rateLimit";
+import { toast } from "@/lib/toast";
 
+/**
+ * StepReview receives an optional `cachedBlueprint` prop.
+ * If it already exists (user went back from StepCommit), we skip generation entirely.
+ * Generation is only triggered when cachedBlueprint is null/undefined.
+ */
 export function StepReview({
   idea,
   clarifications,
   scopeLevel,
+  cachedBlueprint, // ← key prop: if set, skip AI call
   onBack,
   onCommit,
 }) {
   const { isSignedIn } = useUser();
   const { t } = useI18n();
 
+  const [blueprint, setBlueprint] = useState(cachedBlueprint ?? null);
   const [raw, setRaw] = useState("");
-  const [blueprint, setBlueprint] = useState(null);
-  const [status, setStatus] = useState("streaming");
+  const [status, setStatus] = useState(cachedBlueprint ? "done" : "idle");
   const [error, setError] = useState(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
   const rawRef = useRef("");
+  const loadingToastId = useRef(null);
+  const hasStarted = useRef(false);
 
+  // Only generate once, and only when no cached blueprint
   useEffect(() => {
-    let cancelled = false;
+    if (cachedBlueprint) return; // already have it — skip
+    if (hasStarted.current) return;
+    hasStarted.current = true;
+    runGeneration();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    async function stream() {
-      try {
-        // ✅ Build profileContext entirely on client — send as plain string
-        const modelId = getStoredModel();
-        const profile = loadUserProfile();
-        const profileContext = buildProfileContext(profile); // pure transform, no server call
-
-        const res = await fetch("/api/generate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "generate",
-            idea,
-            clarifications,
-            scopeLevel,
-            modelId,
-            profileContext, // plain string — safe to send
-          }),
-        });
-
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || "Generation failed");
-        }
-
-        const reader = res.body.getReader();
-        const decoder = new TextDecoder();
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done || cancelled) break;
-          rawRef.current += decoder.decode(value);
-          setRaw(rawRef.current);
-        }
-
-        if (!cancelled) {
-          const parsed = parseBlueprint(rawRef.current);
-          setBlueprint(parsed);
-          setStatus("done");
-        }
-      } catch (e) {
-        if (!cancelled) {
-          setError(e.message);
-          setStatus("error");
-        }
-      }
+  async function runGeneration() {
+    // Client-side daily quota check
+    if (!canMakeRequest("generate")) {
+      setError(
+        "You've reached today's plan generation limit. Come back tomorrow — your ideas will still be here!"
+      );
+      setStatus("error");
+      toast.warn("Daily plan limit reached. Resets at midnight.");
+      return;
     }
 
-    stream();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+    setStatus("streaming");
+    setRaw("");
+    setError(null);
+    rawRef.current = "";
+
+    loadingToastId.current = toast.loading("Building your plan…");
+
+    try {
+      const profile = loadUserProfile();
+      const profileContext = buildProfileContext(profile);
+
+      const res = await fetch("/api/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          type: "generate",
+          idea,
+          clarifications,
+          scopeLevel,
+          profileContext,
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        const code = errData.code ?? "AI_ERROR";
+        const message = errData.error ?? "Plan generation failed.";
+
+        toast.dismiss(loadingToastId.current);
+
+        if (code === "RATE_LIMITED") {
+          toast.warn(
+            "Rate limited — retrying with fallback model in 3 seconds…"
+          );
+          await new Promise((r) => setTimeout(r, 3000));
+          return runGeneration(); // retry once with server fallback
+        }
+
+        if (code === "QUOTA_EXCEEDED") {
+          toast.error("Daily AI quota reached. Try again tomorrow.");
+        } else {
+          toast.error(message, {
+            action: {
+              label: "Retry",
+              onClick: () => {
+                hasStarted.current = false;
+                runGeneration();
+              },
+            },
+          });
+        }
+
+        throw new Error(message);
+      }
+
+      recordRequest("generate");
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        rawRef.current += decoder.decode(value);
+        setRaw(rawRef.current);
+      }
+
+      const parsed = parseBlueprint(rawRef.current);
+      setBlueprint(parsed);
+      setStatus("done");
+
+      toast.dismiss(loadingToastId.current);
+      toast.success("Your plan is ready!");
+    } catch (e) {
+      toast.dismiss(loadingToastId.current);
+      setError(e.message);
+      setStatus("error");
+    }
+  }
+
+  const handleRetry = () => {
+    hasStarted.current = false;
+    runGeneration();
+  };
 
   const handleCommitClick = () => {
     if (!isSignedIn) {
@@ -92,65 +149,44 @@ export function StepReview({
     }
   };
 
-  // ── Error state ──────────────────────────────────────────────
+  // ── Error ───────────────────────────────────────────────────────
   if (status === "error") {
     return (
       <div className="flex flex-col gap-6">
         <div className="rounded-[var(--r-lg)] border border-[var(--coral)] bg-[var(--coral-bg)] p-5 text-[var(--coral)]">
-          <p className="font-medium mb-1">Generation failed</p>
+          <p className="font-medium mb-1">Couldn't generate your plan</p>
           <p className="text-sm opacity-80">{error}</p>
         </div>
         <div className="flex gap-3">
           <Button variant="ghost" onClick={onBack}>
             {t("common_back")}
           </Button>
-          <Button
-            onClick={() => {
-              setStatus("streaming");
-              setRaw("");
-              setError(null);
-              rawRef.current = "";
-            }}
-          >
-            {t("common_retry")}
-          </Button>
+          <Button onClick={handleRetry}>{t("common_retry")}</Button>
         </div>
       </div>
     );
   }
 
-  // ── Streaming state ──────────────────────────────────────────
-  if (status === "streaming") {
-    const currentModel = AI_MODELS.find((m) => m.id === getStoredModel());
+  // ── Streaming ───────────────────────────────────────────────────
+  if (status === "streaming" || status === "idle") {
     return (
       <div className="flex flex-col gap-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)] mb-2">
             {t("intake_review_title")}
           </h1>
-          <div className="flex items-center gap-2">
-            <p className="text-[var(--text-secondary)] text-sm sm:text-base">
-              {t("intake_review_subtitle")}
-            </p>
-            {currentModel && (
-              <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium shrink-0">
-                {currentModel.name}
-              </span>
-            )}
-          </div>
+          <p className="text-[var(--text-secondary)] text-sm sm:text-base">
+            {t("intake_review_subtitle")}
+          </p>
         </div>
 
-        {/* Live stream display */}
         <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-surface)] p-4 sm:p-5 font-mono text-xs text-[var(--text-tertiary)] max-h-56 sm:max-h-64 overflow-y-auto leading-relaxed">
           {raw || (
-            <span className="animate-pulse text-[var(--text-tertiary)]">
-              {t("intake_review_thinking")}
-            </span>
+            <span className="animate-pulse">{t("intake_review_thinking")}</span>
           )}
           <span className="inline-block w-0.5 h-3 bg-[var(--violet)] ml-0.5 animate-pulse align-middle" />
         </div>
 
-        {/* Animated progress hint */}
         <div className="flex items-center gap-3">
           <div className="flex gap-1">
             {[0, 1, 2].map((i) => (
@@ -164,7 +200,7 @@ export function StepReview({
             ))}
           </div>
           <p className="text-xs text-[var(--text-tertiary)]">
-            Building your blueprint…
+            Building your plan…
           </p>
         </div>
 
@@ -178,7 +214,7 @@ export function StepReview({
     );
   }
 
-  // ── Done state ───────────────────────────────────────────────
+  // ── Done ────────────────────────────────────────────────────────
   return (
     <>
       <div className="flex flex-col gap-6 sm:gap-8">
@@ -200,11 +236,8 @@ export function StepReview({
         {/* Phases */}
         <div>
           <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
-            {t("intake_review_phases", {
-              phases: blueprint.phases.length,
-              tasks: blueprint.tasks.length,
-              timeline: blueprint.timeline,
-            })}
+            {blueprint.phases.length} phases · {blueprint.tasks.length} tasks ·{" "}
+            {blueprint.timeline}
           </p>
           <div className="flex flex-col gap-2 sm:gap-3">
             {blueprint.phases.map((phase, i) => (
