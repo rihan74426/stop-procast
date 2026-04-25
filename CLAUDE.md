@@ -227,8 +227,8 @@ npm install jspdf
 - [ ] More languages (Japanese, Portuguese, Hindi, Russian)
 - [ ] Mobile app (React Native / Expo)
 
-text ghosting auto complete
-the navigation incompletes the process and have to restart the process, doesn't keep the progress saved. only back navigation no forward.
+text ghost-text auto complete is not done in the clarify and other examples in input.
+the navigation incompletes the process in the steps and have to restart the process, doesn't keep the progress saved. only back navigation no forward. need to set the navigation correctly so that it doesn't have to fill or generate again if not edited or changed. user can move forward and backward between completed steps.
 
 GET /api/projects error: MongoServerSelectionError: 24290000:error:0A000438:SSL routines:ssl3_read_bytes:tlsv1 alert
 internal error:openssl\ssl\record\rec_layer_s3.c:916:SSL alert number 80
