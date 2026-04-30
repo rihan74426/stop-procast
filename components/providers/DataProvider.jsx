@@ -3,11 +3,14 @@
 import { useEffect, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
+import { claimAnonymousProjects } from "@/lib/persistence";
 
 /**
- * Wrap pages that need project data.
- * On first sign-in, uploads any locally-created projects to MongoDB,
- * then loads the full merged set. Prevents data loss after auth.
+ * Wrap every page that reads project data.
+ *
+ * Sign-in flow:
+ *   1. claimAnonymousProjects() — links sessionId docs to userId in MongoDB
+ *   2. hydrateFromServer()      — merges remote + local into the store
  */
 export function DataProvider({ children }) {
   const { isSignedIn, isLoaded } = useUser();
@@ -16,12 +19,21 @@ export function DataProvider({ children }) {
   const syncStarted = useRef(false);
 
   useEffect(() => {
-    if (!isLoaded) return;
-    if (!isSignedIn) return;
-    if (hydrated) return;
-    if (syncStarted.current) return;
+    if (!isLoaded || !isSignedIn || hydrated || syncStarted.current) return;
     syncStarted.current = true;
-    hydrateFromServer();
+
+    (async () => {
+      try {
+        const { count } = await claimAnonymousProjects();
+        if (count > 0) {
+          console.log(`[DataProvider] claimed ${count} anonymous projects`);
+        }
+      } catch {
+        // non-fatal
+      } finally {
+        hydrateFromServer();
+      }
+    })();
   }, [isLoaded, isSignedIn, hydrated, hydrateFromServer]);
 
   return <>{children}</>;

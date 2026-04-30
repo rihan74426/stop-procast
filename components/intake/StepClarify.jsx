@@ -1,15 +1,97 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/Button";
 import { canMakeRequest, recordRequest } from "@/lib/ai/rateLimit";
-import { toast } from "@/lib/toast";
 import { parseClarifyQuestions } from "@/lib/ai/parser";
+import { toast } from "@/lib/toast";
 
 /**
- * Accepts `cachedQuestions` prop — if set, skips AI fetch entirely.
- * This prevents re-fetching when the user navigates back.
+ * GhostInput — inline suggestion that completes on Tab / Accept button.
+ * Shows ghost suffix when typed value is a prefix of the suggestion.
  */
+function GhostInput({ value, suggestion, placeholder, onChange }) {
+  const inputRef = useRef(null);
+
+  // Only show ghost when user has typed ≥2 chars and suggestion starts with what they typed
+  const showGhost =
+    suggestion &&
+    value.length >= 2 &&
+    suggestion.toLowerCase().startsWith(value.toLowerCase()) &&
+    suggestion.toLowerCase() !== value.toLowerCase();
+
+  const ghostSuffix = showGhost ? suggestion.slice(value.length) : "";
+
+  const acceptSuggestion = () => {
+    onChange(suggestion);
+    setTimeout(() => {
+      const el = inputRef.current;
+      if (el) el.setSelectionRange(el.value.length, el.value.length);
+    }, 0);
+  };
+
+  const handleKeyDown = (e) => {
+    if (ghostSuffix && (e.key === "Tab" || e.key === "ArrowRight")) {
+      e.preventDefault();
+      acceptSuggestion();
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <div className="relative flex gap-2 items-center">
+        {/* Ghost overlay sits behind the real input */}
+        {ghostSuffix && (
+          <div
+            aria-hidden="true"
+            className="absolute left-0 top-0 h-10 flex items-center px-3 text-sm pointer-events-none select-none w-full overflow-hidden"
+            style={{ fontFamily: "inherit" }}
+          >
+            <span className="invisible whitespace-pre">{value}</span>
+            <span className="text-[var(--text-tertiary)] opacity-55 whitespace-pre">
+              {ghostSuffix}
+            </span>
+          </div>
+        )}
+
+        <input
+          ref={inputRef}
+          type="text"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={placeholder}
+          className="flex-1 h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)] transition-all relative z-10"
+          style={{ background: "transparent" }}
+        />
+
+        {ghostSuffix && (
+          <button
+            onMouseDown={(e) => {
+              e.preventDefault();
+              acceptSuggestion();
+              inputRef.current?.focus();
+            }}
+            className="shrink-0 h-8 px-2.5 text-xs font-medium rounded-[var(--r-md)] bg-[var(--violet-bg)] text-[var(--violet-dim)] border border-[var(--violet)] hover:bg-[var(--violet)] hover:text-white transition-all"
+          >
+            Accept ↹
+          </button>
+        )}
+      </div>
+
+      {ghostSuffix && (
+        <p className="text-[10px] text-[var(--text-tertiary)] pl-1">
+          Press{" "}
+          <kbd className="px-1 py-0.5 rounded bg-[var(--bg-muted)] font-mono text-[10px]">
+            Tab
+          </kbd>{" "}
+          or tap Accept to complete
+        </p>
+      )}
+    </div>
+  );
+}
+
 export function StepClarify({
   idea,
   answers,
@@ -33,14 +115,10 @@ export function StepClarify({
 
   async function fetchQuestions() {
     if (!canMakeRequest("clarify")) {
-      setError(
-        "Daily question limit reached. You can skip this step and continue."
-      );
+      setError("Daily question limit reached. You can skip this step.");
       setLoading(false);
-      toast.warn("Skipping clarify questions — daily limit reached.");
       return;
     }
-
     const loadId = toast.loading("Thinking up some questions…");
     try {
       setLoading(true);
@@ -49,24 +127,54 @@ export function StepClarify({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ type: "clarify", idea }),
       });
-
       toast.dismiss(loadId);
+      if (!res.ok) throw new Error("Failed to load questions");
+      recordRequest("clarify");
 
-      if (!res.ok) {
-        const d = await res.json().catch(() => ({}));
-        throw new Error(d.error ?? "Failed to load questions");
+      const data = await res.json();
+
+      // Accept various shapes: { questions: [...] } | { questions: "..." } | { result/output: "..." } | [...]
+      let raw = data?.questions ?? data?.result ?? data?.output ?? data;
+
+      let parsed = [];
+
+      if (typeof raw === "string") {
+        // parse a textual payload
+        parsed = parseClarifyQuestions(raw);
+      } else if (Array.isArray(raw)) {
+        // normalize array items into { question, placeholder }
+        parsed = raw
+          .map((item) => {
+            if (typeof item === "string") {
+              return { question: item, placeholder: item };
+            }
+            if (item && typeof item === "object") {
+              return {
+                question: item.question ?? item.q ?? item.text ?? "",
+                placeholder:
+                  item.placeholder ?? item.hint ?? item.suggestion ?? "",
+              };
+            }
+            return null;
+          })
+          .filter(Boolean);
+      } else {
+        // fallback: try parsing stringified data
+        try {
+          parsed = parseClarifyQuestions(JSON.stringify(data));
+        } catch {
+          parsed = [];
+        }
       }
 
-      recordRequest("clarify");
-      const data = await res.json();
-      const parsed = parseClarifyQuestions(data.questions);
-      setQuestions(parsed);
-      onQuestionsLoaded?.(parsed); // bubble up so parent can cache
-    } catch (e) {
+      if (!parsed || parsed.length === 0) {
+        setError("Couldn't load questions. You can skip this step.");
+      } else {
+        setQuestions(parsed);
+        onQuestionsLoaded?.(parsed);
+      }
+    } catch {
       toast.dismiss(loadId);
-      toast.error("Couldn't load questions — you can skip this step.", {
-        duration: 5000,
-      });
       setError("Couldn't load questions. You can skip this step.");
     } finally {
       setLoading(false);
@@ -117,12 +225,11 @@ export function StepClarify({
               <label className="block text-sm font-medium text-[var(--text-primary)] mb-3">
                 {i + 1}. {q.question}
               </label>
-              <input
-                type="text"
-                placeholder={q.placeholder ?? ""}
+              <GhostInput
                 value={answers[i] ?? ""}
-                onChange={(e) => onChange(i, e.target.value)}
-                className="w-full h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)] transition-all"
+                suggestion={q.placeholder ?? ""}
+                placeholder={q.placeholder ?? "Your answer…"}
+                onChange={(val) => onChange(i, val)}
               />
             </div>
           ))}

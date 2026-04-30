@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { ProjectCard } from "@/components/dashboard/ProjectCard";
@@ -10,6 +11,7 @@ import { Footer } from "@/components/layout/Footer";
 import { Button } from "@/components/ui/Button";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { SavePromptModal } from "@/components/ui/SavePromptModal";
+import { ImportProjectModal } from "@/components/project/ImportProjectModal";
 import { useI18n } from "@/lib/i18n";
 
 function DashboardContent() {
@@ -17,6 +19,7 @@ function DashboardContent() {
   const projects = useProjectStore((s) => s.projects);
   const active = projects.filter((p) => !p.completionDate);
   const completed = projects.filter((p) => p.completionDate);
+  const [showImport, setShowImport] = useState(false);
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -40,22 +43,45 @@ function DashboardContent() {
                       })}
                 </p>
               </div>
-              <Link href="/new">
-                <Button size="sm" className="gap-1.5 sm:gap-2">
-                  <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+
+              <div className="flex items-center gap-2">
+                {/* Import button */}
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowImport(true)}
+                  className="gap-1.5"
+                  title="Import a project from JSON"
+                >
+                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
                     <path
-                      d="M7 1v12M1 7h12"
+                      d="M7 1v8M4 6l3 3 3-3M2 11h10"
                       stroke="currentColor"
-                      strokeWidth="1.8"
+                      strokeWidth="1.6"
                       strokeLinecap="round"
+                      strokeLinejoin="round"
                     />
                   </svg>
-                  <span className="hidden sm:inline">
-                    {t("dashboard_new_project")}
-                  </span>
-                  <span className="sm:hidden">{t("dashboard_new")}</span>
+                  <span className="hidden sm:inline">Import</span>
                 </Button>
-              </Link>
+
+                <Link href="/new">
+                  <Button size="sm" className="gap-1.5 sm:gap-2">
+                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+                      <path
+                        d="M7 1v12M1 7h12"
+                        stroke="currentColor"
+                        strokeWidth="1.8"
+                        strokeLinecap="round"
+                      />
+                    </svg>
+                    <span className="hidden sm:inline">
+                      {t("dashboard_new_project")}
+                    </span>
+                    <span className="sm:hidden">{t("dashboard_new")}</span>
+                  </Button>
+                </Link>
+              </div>
             </div>
 
             {projects.length === 0 && <EmptyState />}
@@ -89,6 +115,11 @@ function DashboardContent() {
           {projects.length > 0 && <Footer />}
         </main>
       </div>
+
+      <ImportProjectModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+      />
       <SavePromptModal />
     </div>
   );

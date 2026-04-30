@@ -33,12 +33,12 @@ export function TopBar() {
     <header className="h-14 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex items-center px-3 sm:px-4 gap-2 sm:gap-3 sticky top-0 z-30">
       {/* Logo */}
       <Link href="/" className="flex items-center gap-2 mr-2 shrink-0">
-        <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden bg-[var(--violet)] flex items-center justify-center">
+        <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center">
           <Image
-            src="/logo.png"
+            src="/favicon.png"
             alt="Momentum"
             width={28}
-            height={28}
+            height={40}
             className="object-cover"
             onError={(e) => {
               e.currentTarget.style.display = "none";

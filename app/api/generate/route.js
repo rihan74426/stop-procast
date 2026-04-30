@@ -6,32 +6,28 @@ import {
 } from "@/lib/ai/prompts";
 import { aiGenerate, aiStream } from "@/lib/ai/client";
 
-// Simple in-memory rate limiter (per IP, resets on server restart)
-// For production, replace with Redis or similar
+// In-memory rate limiter (per IP) — resets on server restart
+// For production: replace with Redis/Upstash
 const ipUsage = new Map();
-const WINDOW_MS = 60_000; // 1 minute
-const MAX_PER_MINUTE = 3; // max 3 AI requests per IP per minute
+const WINDOW_MS = 60_000;
+const MAX_PER_MINUTE = 5; // slightly more generous than before
 
 function checkRateLimit(ip) {
   const now = Date.now();
   const entry = ipUsage.get(ip) ?? { count: 0, windowStart: now };
-
-  // Reset window if expired
   if (now - entry.windowStart > WINDOW_MS) {
     entry.count = 0;
     entry.windowStart = now;
   }
-
   entry.count++;
   ipUsage.set(ip, entry);
 
-  // Clean up old entries every 100 requests
+  // Cleanup stale entries
   if (ipUsage.size > 500) {
     for (const [k, v] of ipUsage) {
       if (now - v.windowStart > WINDOW_MS * 5) ipUsage.delete(k);
     }
   }
-
   return entry.count <= MAX_PER_MINUTE;
 }
 
@@ -46,13 +42,9 @@ function getClientIP(request) {
 export async function POST(request) {
   try {
     const ip = getClientIP(request);
-
     if (!checkRateLimit(ip)) {
       return Response.json(
-        {
-          error: "Too many requests. Please wait a moment before trying again.",
-          code: "RATE_LIMITED",
-        },
+        { error: "Too many requests. Wait a moment.", code: "RATE_LIMITED" },
         { status: 429 }
       );
     }
@@ -62,23 +54,26 @@ export async function POST(request) {
       body;
 
     if (!type) {
-      return Response.json(
-        { error: "Missing type field.", code: "BAD_REQUEST" },
-        { status: 400 }
-      );
+      return Response.json({ error: "Missing type." }, { status: 400 });
     }
 
     if (type === "clarify") {
+      if (!idea)
+        return Response.json({ error: "Missing idea." }, { status: 400 });
       const text = await aiGenerate(buildClarifyPrompt(idea));
       return Response.json({ questions: text });
     }
 
     if (type === "reengage") {
+      if (!project)
+        return Response.json({ error: "Missing project." }, { status: 400 });
       const text = await aiGenerate(buildReengagePrompt(project));
       return Response.json({ suggestion: text });
     }
 
     if (type === "generate") {
+      if (!idea)
+        return Response.json({ error: "Missing idea." }, { status: 400 });
       const userPrompt = buildUserPrompt({
         idea,
         clarifications,
@@ -92,13 +87,9 @@ export async function POST(request) {
       });
     }
 
-    return Response.json(
-      { error: `Unknown type: ${type}`, code: "BAD_REQUEST" },
-      { status: 400 }
-    );
+    return Response.json({ error: `Unknown type: ${type}` }, { status: 400 });
   } catch (err) {
     console.error("[generate] error:", err.message);
-
     const status = err.status ?? 500;
     const code =
       status === 429
@@ -108,11 +99,10 @@ export async function POST(request) {
         : "AI_ERROR";
     const message =
       status === 429
-        ? "AI rate limit reached. Please wait 30 seconds and try again."
+        ? "Rate limit reached. Wait 30s and retry."
         : status === 402
-        ? "AI quota exceeded for today. Please try again tomorrow."
+        ? "AI quota exceeded. Try again tomorrow."
         : "Plan generation failed. Please try again.";
-
     return Response.json({ error: message, code }, { status });
   }
 }

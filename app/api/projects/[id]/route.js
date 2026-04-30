@@ -1,85 +1,83 @@
 import { auth } from "@clerk/nextjs/server";
-import { connectDB } from "@/lib/db/mongoose";
+import { tryConnectDB } from "@/lib/db/mongoose";
 import Project from "@/lib/models/Project";
 
-// PATCH /api/projects/[id] — partial update
-// Guests: return 200 no-op (client already updated localStorage)
+// PATCH /api/projects/[id]
 export async function PATCH(request, { params }) {
   try {
     const { userId } = await auth();
     const { id } = await params;
-
-    if (!userId) {
-      // Guest mode — client manages state via localStorage, just acknowledge
-      return Response.json({ ok: true });
-    }
-
     const body = await request.json();
+
     delete body.userId;
     delete body.id;
 
-    await connectDB();
-    const project = await Project.findOneAndUpdate(
-      { id, userId },
-      { $set: body },
-      { new: true, upsert: false }
-    );
-
-    if (!project) {
-      // Project may have been created while guest — upsert it now
-      const fullBody = await request.json().catch(() => body);
+    if (!userId) {
+      // Anonymous patch — update by sessionId if available
+      const sessionId = request.headers.get("X-Session-Id");
+      if (sessionId) {
+        const db = await tryConnectDB();
+        if (db) {
+          await Project.findOneAndUpdate(
+            { id, sessionId, isAnonymous: true },
+            { $set: body }
+          );
+        }
+      }
       return Response.json({ ok: true });
     }
 
-    const { _id, __v, ...clean } = project.toObject();
-    return Response.json({ project: clean });
+    const db = await tryConnectDB();
+    if (!db) return Response.json({ ok: true, warning: "DB unavailable" });
+
+    await Project.findOneAndUpdate({ id, userId }, { $set: body });
+    return Response.json({ ok: true });
   } catch (err) {
-    console.error("PATCH /api/projects/[id] error:", err);
-    return Response.json(
-      { error: "Failed to update project" },
-      { status: 500 }
-    );
+    console.error("PATCH /api/projects/[id]:", err.message);
+    return Response.json({ ok: true }); // never block client
   }
 }
 
 // DELETE /api/projects/[id]
-export async function DELETE(_, { params }) {
+export async function DELETE(request, { params }) {
   try {
     const { userId } = await auth();
     const { id } = await params;
 
-    if (!userId) {
-      return Response.json({ ok: true });
+    const db = await tryConnectDB();
+    if (!db) return Response.json({ ok: true });
+
+    if (userId) {
+      await Project.deleteOne({ id, userId });
+    } else {
+      const sessionId = request.headers.get("X-Session-Id");
+      if (sessionId) await Project.deleteOne({ id, sessionId });
     }
 
-    await connectDB();
-    await Project.deleteOne({ id, userId });
     return Response.json({ ok: true });
   } catch (err) {
-    return Response.json(
-      { error: "Failed to delete project" },
-      { status: 500 }
-    );
+    console.error("DELETE /api/projects/[id]:", err.message);
+    return Response.json({ ok: true });
   }
 }
 
 // GET /api/projects/[id]
-export async function GET(_, { params }) {
+export async function GET(request, { params }) {
   try {
     const { userId } = await auth();
     const { id } = await params;
 
-    if (!userId) {
-      return Response.json({ error: "Not found" }, { status: 404 });
-    }
+    if (!userId) return Response.json({ error: "Not found" }, { status: 404 });
 
-    await connectDB();
+    const db = await tryConnectDB();
+    if (!db) return Response.json({ error: "DB unavailable" }, { status: 503 });
+
     const project = await Project.findOne({ id, userId }).lean();
     if (!project) return Response.json({ error: "Not found" }, { status: 404 });
 
     const { _id, __v, ...clean } = project;
     return Response.json({ project: clean });
   } catch (err) {
-    return Response.json({ error: "Failed to fetch project" }, { status: 500 });
+    return Response.json({ error: "Failed" }, { status: 500 });
   }
 }

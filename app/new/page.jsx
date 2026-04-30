@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { StepCapture } from "@/components/intake/StepCapture";
 import { StepClarify } from "@/components/intake/StepClarify";
@@ -15,12 +15,12 @@ import { toast } from "@/lib/toast";
 
 const STEP_LABELS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
 
-// Which steps can be navigated back to (0-indexed)
-// Step 3 (Review) is only re-enterable if blueprint exists — shows cached result
-function canGoToStep(targetStep, currentStep, blueprint) {
-  if (targetStep >= currentStep) return false; // can't skip forward
-  if (targetStep < 0) return false;
-  return true;
+export default function NewProjectPage() {
+  return (
+    <DataProvider>
+      <NewProjectContent />
+    </DataProvider>
+  );
 }
 
 function NewProjectContent() {
@@ -28,25 +28,49 @@ function NewProjectContent() {
   const addProject = useProjectStore((s) => s.addProject);
 
   const [step, setStep] = useState(0);
+
+  // ── Persistent state — survives all navigation ──────────────────
   const [idea, setIdea] = useState("");
   const [clarifyAnswers, setClarifyAnswers] = useState({});
-  const [cachedQuestions, setCachedQuestions] = useState(null); // cache clarify questions
+  const [cachedQuestions, setCachedQuestions] = useState(null);
   const [scopeLevel, setScopeLevel] = useState("standard");
-  const [blueprint, setBlueprint] = useState(null); // cache generated blueprint
+  const [blueprint, setBlueprint] = useState(null);
 
-  const clarifications = Object.entries(clarifyAnswers)
-    .map(([i, answer]) => ({ question: `Q${parseInt(i) + 1}`, answer }))
-    .filter((c) => c.answer.trim());
+  // Track what was in place when the blueprint was generated
+  // so we know if something changed and regeneration is needed
+  const [blueprintSnapshot, setBlueprintSnapshot] = useState(null);
 
-  const goToStep = (target) => {
-    if (!canGoToStep(target, step, blueprint)) return;
-    setStep(target);
-  };
+  // ── Dirty detection ─────────────────────────────────────────────
+  const currentSnapshot = JSON.stringify({
+    idea,
+    clarifyAnswers,
+    scopeLevel,
+  });
 
-  const handleBlueprintReady = (bp) => {
-    setBlueprint(bp); // cache it — won't regenerate on back
-    setStep(4);
-  };
+  const blueprintIsStale =
+    blueprint !== null &&
+    blueprintSnapshot !== null &&
+    currentSnapshot !== blueprintSnapshot;
+
+  // ── Handlers ────────────────────────────────────────────────────
+  const handleIdeaChange = useCallback((val) => setIdea(val), []);
+
+  const handleClarifyChange = useCallback((index, value) => {
+    setClarifyAnswers((prev) => ({ ...prev, [index]: value }));
+  }, []);
+
+  const handleScopeChange = useCallback((val) => setScopeLevel(val), []);
+
+  const handleBlueprintReady = useCallback(
+    (bp) => {
+      setBlueprint(bp);
+      setBlueprintSnapshot(currentSnapshot);
+      setStep(4);
+      setMaxReached(4); // mark full progress reachable when blueprint exists
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [currentSnapshot]
+  );
 
   const handleCommit = async ({ deadline }) => {
     const toastId = toast.loading("Creating your project…");
@@ -60,33 +84,48 @@ function NewProjectContent() {
       toast.dismiss(toastId);
       toast.success("Project created! Let's get to work.");
       router.push(`/project/${id}`);
-    } catch (err) {
+    } catch {
       toast.dismiss(toastId);
       toast.error("Failed to create project. Please try again.");
     }
   };
 
-  const handleClarifyChange = (index, value) => {
-    setClarifyAnswers((prev) => ({ ...prev, [index]: value }));
+  // ── Navigation helpers ───────────────────────────────────────────
+  // Forward navigation — always allowed to visited+1 steps
+  // Backward — always allowed, never resets cached data
+  const [maxReached, setMaxReached] = useState(0);
+
+  // When a blueprint exists, the user can access the commit step (4)
+  const displayMax = blueprint !== null ? 4 : maxReached;
+  const clickableMax = blueprint !== null ? 4 : maxReached + 1;
+
+  const goTo = (target) => {
+    if (target < 0 || target > clickableMax) return;
+    setStep(target);
+    if (target > maxReached) setMaxReached(target);
   };
+
+  const clarifications = Object.entries(clarifyAnswers)
+    .map(([i, answer]) => ({ question: `Q${parseInt(i) + 1}`, answer }))
+    .filter((c) => c.answer?.trim());
 
   return (
     <div className="min-h-screen bg-[var(--bg-surface)] flex flex-col">
       <TopBar />
 
-      {/* Step progress — clickable dots for visited steps */}
+      {/* Step progress */}
       <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-4 sm:px-6 py-3 sm:py-4 sticky top-14 z-10">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-1.5 sm:gap-2">
             {STEP_LABELS.map((label, i) => {
               const isActive = i === step;
-              const isDone = i < step;
-              const isClickable = isDone; // can go back to completed steps
+              const isDone = i < step || (i <= displayMax && i !== step);
+              const isClickable = i <= clickableMax && i !== step;
 
               return (
                 <div key={i} className="flex items-center gap-1.5 sm:gap-2">
                   <button
-                    onClick={() => isClickable && goToStep(i)}
+                    onClick={() => isClickable && goTo(i)}
                     disabled={!isClickable}
                     className={[
                       "flex items-center gap-1.5 sm:gap-2 transition-all",
@@ -94,7 +133,7 @@ function NewProjectContent() {
                         ? "cursor-pointer hover:opacity-80"
                         : "cursor-default",
                     ].join(" ")}
-                    title={isClickable ? `Go back to ${label}` : undefined}
+                    title={isClickable ? `Go to ${label}` : undefined}
                   >
                     <div
                       className={[
@@ -130,6 +169,13 @@ function NewProjectContent() {
                 </div>
               );
             })}
+
+            {/* Stale warning badge */}
+            {blueprintIsStale && (
+              <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber)] whitespace-nowrap">
+                ⚠ Edited — regenerate
+              </span>
+            )}
           </div>
         </div>
       </div>
@@ -140,8 +186,8 @@ function NewProjectContent() {
           {step === 0 && (
             <StepCapture
               value={idea}
-              onChange={setIdea}
-              onNext={() => setStep(1)}
+              onChange={handleIdeaChange}
+              onNext={() => goTo(1)}
             />
           )}
 
@@ -150,19 +196,19 @@ function NewProjectContent() {
               idea={idea}
               answers={clarifyAnswers}
               onChange={handleClarifyChange}
-              onNext={() => setStep(2)}
-              onBack={() => setStep(0)}
+              onNext={() => goTo(2)}
+              onBack={() => goTo(0)}
               cachedQuestions={cachedQuestions}
-              onQuestionsLoaded={(qs) => setCachedQuestions(qs)}
+              onQuestionsLoaded={setCachedQuestions}
             />
           )}
 
           {step === 2 && (
             <StepScope
               value={scopeLevel}
-              onChange={setScopeLevel}
-              onNext={() => setStep(3)}
-              onBack={() => setStep(1)}
+              onChange={handleScopeChange}
+              onNext={() => goTo(3)}
+              onBack={() => goTo(1)}
             />
           )}
 
@@ -171,8 +217,9 @@ function NewProjectContent() {
               idea={idea}
               clarifications={clarifications}
               scopeLevel={scopeLevel}
-              cachedBlueprint={blueprint} // ← pass cache; skips re-generation if set
-              onBack={() => setStep(2)}
+              // Pass null if stale to force regeneration, else pass cache
+              cachedBlueprint={blueprintIsStale ? null : blueprint}
+              onBack={() => goTo(2)}
               onCommit={handleBlueprintReady}
             />
           )}
@@ -180,7 +227,7 @@ function NewProjectContent() {
           {step === 4 && blueprint && (
             <StepCommit
               blueprint={blueprint}
-              onBack={() => setStep(3)} // goes back to Review showing cached blueprint
+              onBack={() => goTo(3)}
               onConfirm={handleCommit}
             />
           )}
@@ -189,13 +236,5 @@ function NewProjectContent() {
 
       <SavePromptModal />
     </div>
-  );
-}
-
-export default function NewProjectPage() {
-  return (
-    <DataProvider>
-      <NewProjectContent />
-    </DataProvider>
   );
 }
