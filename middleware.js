@@ -12,6 +12,7 @@ const isPublicRoute = createRouteMatcher([
   "/new(.*)",
   "/project/(.*)",
   "/settings(.*)",
+  "/feedback(.*)",
 
   // Allow public access to project pages (adjust as needed)
 ]);

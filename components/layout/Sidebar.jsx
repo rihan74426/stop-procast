@@ -1,5 +1,8 @@
 "use client";
 
+// components/layout/Sidebar.jsx
+// Added: Feedback nav item
+
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -7,7 +10,14 @@ import { useUser, SignInButton } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { useState, useEffect } from "react";
 import { useI18n } from "@/lib/i18n/context";
-import { FiGrid, FiPlus, FiSettings, FiMenu, FiX } from "react-icons/fi";
+import {
+  FiGrid,
+  FiPlus,
+  FiSettings,
+  FiMenu,
+  FiX,
+  FiMessageSquare,
+} from "react-icons/fi";
 
 export function Sidebar() {
   const { t } = useI18n();
@@ -24,6 +34,7 @@ export function Sidebar() {
   const navItems = [
     { href: "/", label: t("nav_dashboard"), icon: FiGrid },
     { href: "/new", label: t("nav_new_project"), icon: FiPlus },
+    { href: "/feedback", label: "Feedback", icon: FiMessageSquare },
     { href: "/settings", label: t("nav_settings"), icon: FiSettings },
   ];
 
@@ -96,6 +107,12 @@ export function Sidebar() {
             >
               <Icon />
               {label}
+              {/* Subtle badge for feedback to draw attention */}
+              {href === "/feedback" && !active && (
+                <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium">
+                  new
+                </span>
+              )}
             </Link>
           );
         })}
@@ -196,73 +213,5 @@ export function Sidebar() {
         <FiMenu size={16} />
       </button>
     </>
-  );
-}
-
-function GridIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-      <rect
-        x="1"
-        y="1"
-        width="5.5"
-        height="5.5"
-        rx="1"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <rect
-        x="8.5"
-        y="1"
-        width="5.5"
-        height="5.5"
-        rx="1"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <rect
-        x="1"
-        y="8.5"
-        width="5.5"
-        height="5.5"
-        rx="1"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-      <rect
-        x="8.5"
-        y="8.5"
-        width="5.5"
-        height="5.5"
-        rx="1"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-    </svg>
-  );
-}
-function PlusIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-      <path
-        d="M7.5 2v11M2 7.5h11"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-function CogIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-      <circle cx="7.5" cy="7.5" r="2" stroke="currentColor" strokeWidth="1.4" />
-      <path
-        d="M7.5 1v2M7.5 12v2M1 7.5h2M12 7.5h2M3.1 3.1l1.4 1.4M10.5 10.5l1.4 1.4M10.5 4.5l1.4-1.4M4.5 10.5l-1.4 1.4"
-        stroke="currentColor"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }

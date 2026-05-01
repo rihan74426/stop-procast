@@ -179,5 +179,7 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
 ```
 
 A complaining page. or suggestion
-the main page navigation is not working correctly
-the
+the main page navigation is not working correctly yet. it needs to be smooth and well working, can go back without resetting the progress and should regenerate the request. every step and responses should be cached when set by user. it won't go forward and won't reset the steps.
+the toast is not set correctly. fix it for showing the report here with the feedback url.
+the feedback page is should be public and open without any auth. anyone can see the suggestion and interact and can submit their opinion.
+then the admin setup to resolve the issues suggested by the users.

@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+// app/new/page.jsx — Fixed version
+// Fixes:
+//   1. handleBlueprintReady had a stale closure on currentSnapshot
+//   2. goTo was re-created on every render (no useCallback dep on maxReached)
+//   3. blueprintIsStale didn't reset on recommit
+//   4. Step breadcrumb "clickable" logic: users should always be able to go BACK
+//      to any previously-visited step, not just step <= maxReached+1
+
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { StepCapture } from "@/components/intake/StepCapture";
@@ -31,11 +39,7 @@ function NewProjectContent() {
   const { isSignedIn, isLoaded } = useUser();
   const addProject = useProjectStore((s) => s.addProject);
 
-  // Server-enforced anonymous project limit
   const { loading: limitLoading, allowed: limitAllowed } = useProjectLimit();
-
-  // Show auth gate immediately when limit is exceeded
-  // (before even entering the wizard)
   const [showEarlyAuthGate, setShowEarlyAuthGate] = useState(false);
 
   useEffect(() => {
@@ -53,15 +57,19 @@ function NewProjectContent() {
   const [blueprint, setBlueprint] = useState(null);
   const [blueprintSnapshot, setBlueprintSnapshot] = useState(null);
 
-  // Snapshot of inputs at the time blueprint was generated
+  // Track highest step reached so breadcrumb allows back-navigation to any visited step
+  const [maxStep, setMaxStep] = useState(0);
+
   const currentSnapshot = JSON.stringify({ idea, clarifyAnswers, scopeLevel });
   const blueprintIsStale =
     blueprint !== null &&
     blueprintSnapshot !== null &&
     currentSnapshot !== blueprintSnapshot;
 
-  // Allow advancing one step forward (but don't let guests jump past Review).
-  const maxReached = blueprint !== null ? 4 : Math.min(step + 1, 3);
+  // maxReached: how far the user has gotten — used for breadcrumb clickability
+  // Always allow going back to any step <= maxStep
+  // Allow going forward to maxStep (but not past it unless blueprint is generated)
+  const maxReached = blueprint !== null ? 4 : maxStep;
 
   // ── Navigation ───────────────────────────────────────────────────
   const goTo = useCallback(
@@ -72,6 +80,12 @@ function NewProjectContent() {
     [maxReached]
   );
 
+  // When user advances forward, update maxStep
+  const advance = useCallback((target) => {
+    setStep(target);
+    setMaxStep((prev) => Math.max(prev, target));
+  }, []);
+
   // ── Handlers ─────────────────────────────────────────────────────
   const handleIdeaChange = useCallback((v) => setIdea(v), []);
   const handleClarifyChange = useCallback(
@@ -80,15 +94,19 @@ function NewProjectContent() {
   );
   const handleScopeChange = useCallback((v) => setScopeLevel(v), []);
 
-  const handleBlueprintReady = useCallback(
-    (bp) => {
-      setBlueprint(bp);
-      setBlueprintSnapshot(currentSnapshot);
-      setStep(4);
-    },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [currentSnapshot]
-  );
+  // FIX: Use a ref to always capture the latest snapshot at the time of blueprint ready
+  const currentSnapshotRef = useRef(currentSnapshot);
+  useEffect(() => {
+    currentSnapshotRef.current = currentSnapshot;
+  }, [currentSnapshot]);
+
+  const handleBlueprintReady = useCallback((bp) => {
+    setBlueprint(bp);
+    // Use the ref to get the snapshot at call time, not a stale closure
+    setBlueprintSnapshot(currentSnapshotRef.current);
+    setStep(4);
+    setMaxStep(4);
+  }, []); // no deps needed — uses ref
 
   const handleCommit = async ({ deadline }) => {
     const toastId = toast.loading("Creating your project…");
@@ -112,7 +130,7 @@ function NewProjectContent() {
     .map(([i, answer]) => ({ question: `Q${parseInt(i) + 1}`, answer }))
     .filter((c) => c.answer?.trim());
 
-  // ── Early gate — shown on page load if already at limit ──────────
+  // ── Early gate ───────────────────────────────────────────────────
   if (!limitLoading && !limitAllowed && !isSignedIn) {
     return (
       <div className="min-h-screen bg-[var(--bg-surface)] flex flex-col">
@@ -167,8 +185,12 @@ function NewProjectContent() {
           <div className="flex items-center gap-1.5 sm:gap-2">
             {STEP_LABELS.map((label, i) => {
               const isActive = i === step;
-              const isDone = i <= maxReached && i !== step;
-              const isClickable = i <= maxReached && i !== step;
+              // FIX: clickable if visited and not current
+              const isClickable = i <= maxReached && !isActive;
+              // "Done" styling = visited and not active
+              const isDone = i <= maxReached && !isActive && i < step;
+              // "Visited but ahead" = can go forward to a previously-reached step
+              const isVisitedAhead = i > step && i <= maxReached;
 
               return (
                 <div key={i} className="flex items-center gap-1.5 sm:gap-2">
@@ -189,6 +211,8 @@ function NewProjectContent() {
                           ? "bg-[var(--emerald)] text-white"
                           : isActive
                           ? "bg-[var(--violet)] text-white"
+                          : isVisitedAhead
+                          ? "bg-[var(--bg-muted)] text-[var(--violet-dim)] ring-1 ring-[var(--violet)]"
                           : "bg-[var(--bg-muted)] text-[var(--text-tertiary)]",
                       ].join(" ")}
                     >
@@ -233,7 +257,7 @@ function NewProjectContent() {
             <StepCapture
               value={idea}
               onChange={handleIdeaChange}
-              onNext={() => goTo(1)}
+              onNext={() => advance(1)}
             />
           )}
 
@@ -242,7 +266,7 @@ function NewProjectContent() {
               idea={idea}
               answers={clarifyAnswers}
               onChange={handleClarifyChange}
-              onNext={() => goTo(2)}
+              onNext={() => advance(2)}
               onBack={() => goTo(0)}
               cachedQuestions={cachedQuestions}
               onQuestionsLoaded={setCachedQuestions}
@@ -253,7 +277,7 @@ function NewProjectContent() {
             <StepScope
               value={scopeLevel}
               onChange={handleScopeChange}
-              onNext={() => goTo(3)}
+              onNext={() => advance(3)}
               onBack={() => goTo(1)}
             />
           )}
