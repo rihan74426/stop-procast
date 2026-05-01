@@ -3,15 +3,13 @@
 
 # Momentum — Project Intelligence File
 
-Single source of truth for all development. Read before writing any code.
+Single source of truth. Read before writing any code.
 
 ---
 
 ## What this app is
 
-**Momentum** is a _Project Execution OS_ — not a task manager.
-User drops a raw idea → AI converts it into a structured project contract → app keeps dragging it forward until it ships.
-Core differentiator: **anti-procrastination pressure** — streaks, idle warnings, missed milestone alerts, next-action focus.
+**Momentum** is a _Project Execution OS_. User drops a raw idea → AI builds a structured plan → app holds them accountable until it ships. Core: anti-procrastination pressure, streaks, next-action focus.
 
 ---
 
@@ -26,179 +24,160 @@ Core differentiator: **anti-procrastination pressure** — streaks, idle warning
 | 5     | Completion, Postmortem, Polish | ✅ Done |
 | 6     | Auth, DB, AI Integration       | ✅ Done |
 | 7     | i18n, Model Picker, PDF Export | ✅ Done |
-| 8     | Bug fixes, Caching, Anonymous  | ✅ Done |
+| 8     | Puter.js, Anon Limit, Import   | ✅ Done |
 
 ---
 
-## Tech stack
+## AI Architecture — CRITICAL
 
-| Layer      | Technology                          | Notes                              |
-| ---------- | ----------------------------------- | ---------------------------------- |
-| Framework  | Next.js 15 (App Router)             |                                    |
-| Styling    | Tailwind CSS v4 + CSS custom props  | All tokens in `app/globals.css`    |
-| State      | Zustand + Immer                     | Dual-layer persistence             |
-| Auth       | Clerk                               | Optional — guests use localStorage |
-| Database   | MongoDB via Mongoose                | Free M0 cluster on Atlas           |
-| AI         | Abstracted via `lib/ai/client.js`   | Provider not exposed in UI         |
-| i18n       | Custom context + translations       | 6 languages: en/es/fr/de/zh/ar     |
-| PDF export | jsPDF (client-side, dynamic import) |                                    |
-| Motion     | Framer Motion                       |                                    |
+### Two-tier AI system
 
----
+| Scope     | Provider         | Location        | Cost         |
+| --------- | ---------------- | --------------- | ------------ |
+| lean      | puter.js         | **client-side** | Free ∞       |
+| standard  | puter.js         | **client-side** | Free ∞       |
+| ambitious | OpenRouter (API) | **server-side** | Rate limited |
 
-## AI provider system
+**Puter.js is a browser SDK — it CANNOT run in Next.js API routes.**
+All puter calls happen in `lib/ai/clientGenerate.js` (client-only) or component files.
 
-**Provider details are hidden from users.** Never mention OpenRouter, model names, or API keys in the UI.
-`lib/ai/client.js` is the ONLY file that knows the provider.
+### Entry point: `lib/ai/clientGenerate.js`
 
-### OpenRouter caching (IMPORTANT)
+- `generateBlueprint()` → puter for lean/standard, API route for ambitious
+- `generateClarifyQuestions()` → puter first, API fallback
+- `generateReengage()` → puter first, API fallback
 
-`X-OpenRouter-Cache: true` header is set on all **non-streaming** calls (clarify, reengage).
+### `lib/ai/puter.js`
 
-- Cache hits cost **zero tokens**
-- Blueprint generation (streaming) does NOT use cache — each is unique
-- This header is already set in `lib/ai/client.js` — do not remove it
+- `puterGenerate(prompt)` — non-streaming, returns string
+- `puterStream(system, user)` — simulates streaming via chunked ReadableStream
+- `isPuterAvailable()` — checks `window.puter` global
 
-### Token budget
+### `app/api/generate/route.js`
 
-- `aiGenerate` (clarify/reengage): `max_tokens: 350`
-- `aiStream` (blueprint): `max_tokens: 2500`
-- System prompt trimmed to ~400 tokens (was ~800)
+Only called for: ambitious scope OR puter failure fallback. Uses OpenRouter via `lib/ai/client.js`.
 
-### Models via `.env.local`
+### `app/layout.js`
 
-```
-OPENROUTER_API_KEY=sk-or-v1-...
-OPENROUTER_MODEL=z-ai/glm-4.5-air:free           # primary
-OPENROUTER_MODEL1=meta-llama/llama-3.2-3b-instruct:free  # fallback
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-MONGODB_URI=mongodb+srv://...
+```html
+<script src="https://js.puter.com/v2/" async />
 ```
 
+This is the ONLY way puter is loaded. Do not import it as a module.
+
 ---
 
-## MongoDB — Anonymous → Authenticated project flow
+## Anonymous project limit — CRITICAL
 
-**This is the correct flow:**
+### Rule: 1 project per anonymous session. Cannot be bypassed.
 
-1. Guest creates a project → saved to MongoDB with `sessionId`, `isAnonymous: true`, `userId: null`
-2. Guest signs in → `DataProvider` calls `claimAnonymousProjects()` → `POST /api/projects/claim`
-3. Claim route updates all matching `sessionId` documents: sets `userId`, `isAnonymous: false`
-4. `hydrateFromServer()` loads the full merged set
+**Enforcement is server-side** — client checks are UX hints only.
 
-### Critical files
+Flow:
 
-- `lib/sessionId.js` — generates/retrieves anonymous session ID from localStorage
-- `lib/persistence.js` — `claimAnonymousProjects()` sends sessionId to claim route
-- `app/api/projects/claim/route.js` — ✅ **now exists** (was missing)
-- `components/providers/DataProvider.jsx` — triggers claim BEFORE hydrate
+1. `GET /api/projects/check-limit` — counts MongoDB docs for this sessionId
+2. `lib/ai/useProjectLimit.js` hook — fetches the check on mount
+3. `app/new/page.jsx` — shows gate UI before wizard even starts if limit exceeded
+4. `StepReview` — receives `limitAllowed` + `limitLoading` props, shows gate there too
+5. `POST /api/projects` — saves every new project with `sessionId` immediately (anon or authed)
 
-### SSL / TLS error fix
+### On sign-in:
 
-The `ERR_SSL_TLSV1_ALERT_INTERNAL_ERROR` on Windows is caused by IPv6 conflicts.
-Fix: `family: 4` in mongoose options forces IPv4. Already set in `lib/db/mongoose.js`.
+1. `DataProvider` calls `claimAnonymousProjects()` first
+2. `POST /api/projects/claim` bulk-updates `{ sessionId, userId: null }` → `{ userId }`
+3. `hydrateFromServer()` merges everything
 
-### Graceful degradation
+### Key files:
+
+- `lib/sessionId.js` — generates persistent anonymous session ID
+- `lib/ai/useProjectLimit.js` — React hook, checks limit on mount
+- `app/api/projects/check-limit/route.js` — server count query
+- `app/api/projects/claim/route.js` — transfers anon → user on login
+
+---
+
+## MongoDB: graceful degradation
 
 `tryConnectDB()` (in `lib/db/mongoose.js`) returns `null` instead of throwing.
-All API routes use this — MongoDB failure degrades to localStorage-only, never crashes the app.
+All API routes use it — DB outage degrades to localStorage-only, never 500s the client.
+
+SSL fix: `family: 4` in mongoose options forces IPv4, resolves Windows TLS error.
 
 ---
 
-## CRITICAL: Server/Client boundary for AI
+## Server/Client boundary rules
 
-❌ WRONG:
+**NEVER** import or call in server files (`app/api/`, `lib/db/`, `lib/models/`):
 
-```js
-// app/api/generate/route.js
-import { buildProfileContext } from "@/lib/userProfile"; // crashes if "use client"
-```
+- `puter` — browser SDK only
+- `lib/ai/clientGenerate.js` — client only
+- `lib/ai/puter.js` — client only
+- `lib/ai/rateLimit.js` — client only (localStorage)
+- `lib/userProfile.js` — pure utility, no "use client" directive
 
-✅ CORRECT: build profile context on client, send as plain string in POST body.
-
-`lib/userProfile.js` must NEVER have `"use client"`. It's a pure utility.
+**NEVER** call OpenRouter directly from client components — always via `lib/ai/clientGenerate.js` which routes through the API.
 
 ---
 
 ## Auth model
 
-Auth is **optional**. Every feature works without signing in.
+Auth is **optional** — every feature works without signing in.
 
-- Guests: localStorage + anonymous MongoDB (sessionId-keyed)
-- Signed-in: data merged to userId in MongoDB
-- Auth gate: shown after blueprint generation in `StepReview` — friendly modal, not a hard block
-- Never use `auth.protect()` anywhere
+- Anonymous: 1 project limit, sessionId-keyed MongoDB + localStorage
+- Signed-in: unlimited, userId-keyed MongoDB, full sync
+- Auth gate: shown after blueprint in StepReview (friendly, not a hard block for commit)
+- Project limit gate: hard block on `/new` if limit exceeded — sign up required
 
 ---
 
-## Code conventions
+## Tech stack
 
-- Components: functional only, PascalCase `.jsx`
-- Imports: always `@/` path aliases
-- Styles: Tailwind + CSS custom props from `globals.css`. No inline style objects except dynamic values.
-- State: read/write only through Zustand actions in `projectStore.js`
-- AI calls: only in `app/api/` routes. Never in client components.
-- Async: every async component needs `<Suspense>` with skeleton fallback
-- DataProvider: every page reading project data must be wrapped
+| Layer      | Technology                         |
+| ---------- | ---------------------------------- |
+| Framework  | Next.js 15 (App Router)            |
+| Styling    | Tailwind CSS v4 + CSS custom props |
+| State      | Zustand + Immer                    |
+| Auth       | Clerk (optional)                   |
+| Database   | MongoDB via Mongoose               |
+| AI Primary | Puter.js (client-side, free)       |
+| AI Deep    | OpenRouter via API route           |
+| i18n       | Custom context, 6 languages        |
+| PDF export | jsPDF (client-side)                |
+
+---
+
+## Import feature
+
+`components/project/ImportProjectModal.jsx` — accepts `.json` exports.
+Supports single project objects and the Settings bulk-backup format.
+Re-hydrates as fresh project (new ID, tasks reset to todo).
+Triggered from Dashboard header Import button.
+
+---
 
 ## What NOT to do
 
-- Do NOT call `auth.protect()` — auth is optional
-- Do NOT add packages without updating install command here
-- Do NOT hardcode colors — use CSS custom properties
-- Do NOT call AI from client components
-- Do NOT create new localStorage keys outside `lib/persistence.js`
-- Do NOT skip skeleton loaders on async boundaries
-- Do NOT remove `X-OpenRouter-Cache` header from `aiGenerate` calls
-- Do NOT use `lib/ai/openrouter.js` — use `lib/ai/client.js` exclusively
+- Do NOT use `lib/ai/openrouter.js` — use `lib/ai/client.js` (server) or `lib/ai/clientGenerate.js` (client)
+- Do NOT call puter from API routes
+- Do NOT skip the server-side limit check — client rateLimit.js is bypassable
+- Do NOT call `auth.protect()` anywhere
+- Do NOT add new localStorage keys outside `lib/persistence.js`
+- Do NOT remove `X-OpenRouter-Cache` header from `aiGenerate` calls in `lib/ai/client.js`
 
 ---
 
-## Naming
+## .env.local required keys
 
-App is **Momentum** everywhere. "StopProcast" is retired.
+```
+OPENROUTER_API_KEY=sk-or-v1-...
+OPENROUTER_MODEL=           # primary model (e.g. z-ai/glm-4.5-air:free)
+OPENROUTER_MODEL1=          # fallback model
+NEXT_PUBLIC_APP_URL=http://localhost:3000
+MONGODB_URI=mongodb+srv://...
+CLERK_SECRET_KEY=...
+NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
+```
 
-- Page title: "Momentum — Finish What You Start"
-- Logo: `/public/logo.png`
-
----
-
-## Key files
-
-| File                                    | Purpose                                       |
-| --------------------------------------- | --------------------------------------------- |
-| `lib/ai/client.js`                      | Server-only AI wrapper with caching           |
-| `lib/ai/prompts.js`                     | Trimmed prompts (~400 token system prompt)    |
-| `lib/db/mongoose.js`                    | MongoDB + `tryConnectDB` graceful fallback    |
-| `app/api/projects/claim/route.js`       | Claims anonymous projects on login            |
-| `lib/sessionId.js`                      | Anonymous session tracking                    |
-| `lib/persistence.js`                    | `claimAnonymousProjects()` + all remote calls |
-| `components/providers/DataProvider.jsx` | Claims then hydrates on sign-in               |
-| `middleware.js`                         | Clerk middleware, all routes public           |
-
----
-
-## Post-MVP backlog
-
-- [ ] Recurring check-ins / deadline reminders (cron)
-- [ ] Timeline / Gantt visualization
-- [ ] Task dependency mapping
-- [ ] AI weekly status summary
-- [ ] Rich text notes per phase (Tiptap)
-- [ ] Export to Notion / CSV
-- [ ] Team collaboration
-- [ ] Analytics dashboard
-- [ ] More languages (Japanese, Portuguese, Hindi, Russian)
-- [ ] Mobile app (React Native / Expo)
-- [ ] Replace in-memory rate limiter with Redis/Upstash for production
-
-the input text auto completion.
-The user can auto-complete the example response in the placeholder by pressing the Tab button or something on the phone, or by completing the suggested text by typing. Like when typing similar to the suggestion, it'll appear right beside it. or a side button to complete the suggestion.
-the clarify scope didn't appeared.
-
-the navigation is reseting the generated data.
-the free user will have a free credit of using ai to generate one project.
-to generate more, they'll need to login to save this and come tomorrow.
-also improve the building plan ai page with much updates about what the ai is doing.
-we can also import projects like we're exporting them.
-check if the sync and saving cycle is working fine.
+A complaining page. or suggestion
+the main page navigation is not working correctly
+the

@@ -6,11 +6,10 @@ import {
 } from "@/lib/ai/prompts";
 import { aiGenerate, aiStream } from "@/lib/ai/client";
 
-// In-memory rate limiter (per IP) — resets on server restart
-// For production: replace with Redis/Upstash
+// Per-IP rate limiter (resets on server restart — use Redis in production)
 const ipUsage = new Map();
 const WINDOW_MS = 60_000;
-const MAX_PER_MINUTE = 5; // slightly more generous than before
+const MAX_PER_MINUTE = 5;
 
 function checkRateLimit(ip) {
   const now = Date.now();
@@ -21,8 +20,6 @@ function checkRateLimit(ip) {
   }
   entry.count++;
   ipUsage.set(ip, entry);
-
-  // Cleanup stale entries
   if (ipUsage.size > 500) {
     for (const [k, v] of ipUsage) {
       if (now - v.windowStart > WINDOW_MS * 5) ipUsage.delete(k);
@@ -31,17 +28,17 @@ function checkRateLimit(ip) {
   return entry.count <= MAX_PER_MINUTE;
 }
 
-function getClientIP(request) {
+function getIP(req) {
   return (
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    request.headers.get("x-real-ip") ||
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
     "unknown"
   );
 }
 
 export async function POST(request) {
   try {
-    const ip = getClientIP(request);
+    const ip = getIP(request);
     if (!checkRateLimit(ip)) {
       return Response.json(
         { error: "Too many requests. Wait a moment.", code: "RATE_LIMITED" },
@@ -53,10 +50,10 @@ export async function POST(request) {
     const { type, idea, clarifications, scopeLevel, project, profileContext } =
       body;
 
-    if (!type) {
+    if (!type)
       return Response.json({ error: "Missing type." }, { status: 400 });
-    }
 
+    // clarify & reengage — fallback only (puter handles these client-side first)
     if (type === "clarify") {
       if (!idea)
         return Response.json({ error: "Missing idea." }, { status: 400 });
@@ -71,6 +68,7 @@ export async function POST(request) {
       return Response.json({ suggestion: text });
     }
 
+    // generate — called for ambitious/deep mode OR when puter fails
     if (type === "generate") {
       if (!idea)
         return Response.json({ error: "Missing idea." }, { status: 400 });
@@ -89,7 +87,7 @@ export async function POST(request) {
 
     return Response.json({ error: `Unknown type: ${type}` }, { status: 400 });
   } catch (err) {
-    console.error("[generate] error:", err.message);
+    console.error("[generate]", err.message);
     const status = err.status ?? 500;
     const code =
       status === 429
@@ -99,10 +97,10 @@ export async function POST(request) {
         : "AI_ERROR";
     const message =
       status === 429
-        ? "Rate limit reached. Wait 30s and retry."
+        ? "Rate limit hit. Wait 30s and retry."
         : status === 402
         ? "AI quota exceeded. Try again tomorrow."
-        : "Plan generation failed. Please try again.";
+        : "Generation failed. Please try again.";
     return Response.json({ error: message, code }, { status });
   }
 }

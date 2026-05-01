@@ -1,11 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Button } from "@/components/ui/Button";
 
 export function StepCommit({ blueprint, onBack, onConfirm }) {
   const [deadline, setDeadline] = useState("");
   const [committed, setCommitted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [progress, setProgress] = useState(0); // 0-100
+  const [statusMessage, setStatusMessage] = useState("");
+  const [error, setError] = useState(null);
+  const progressRef = useRef(null);
 
   // Suggest a deadline based on blueprint timeline
   const suggestDeadline = () => {
@@ -15,8 +20,55 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
     setDeadline(d.toISOString().split("T")[0]);
   };
 
-  const handleConfirm = () => {
-    onConfirm({ deadline: deadline || null });
+  // Start a gentle progress animation while the commit runs
+  const startProgress = () => {
+    setProgress((p) => Math.max(p, 8));
+    if (progressRef.current) clearInterval(progressRef.current);
+    progressRef.current = setInterval(() => {
+      setProgress((p) => {
+        // advance quickly at first then slow down, cap before completion
+        const delta = p < 40 ? 6 : p < 80 ? 3 : 1;
+        return Math.min(96, p + delta);
+      });
+    }, 700);
+  };
+
+  const stopProgress = () => {
+    if (progressRef.current) {
+      clearInterval(progressRef.current);
+      progressRef.current = null;
+    }
+  };
+
+  useEffect(() => {
+    return () => stopProgress();
+  }, []);
+
+  const handleConfirm = async () => {
+    if (!committed || submitting) return;
+    setError(null);
+    setSubmitting(true);
+    setStatusMessage("Creating your project…");
+    startProgress();
+
+    try {
+      // Await parent's async handler so we can show progress until navigation finishes
+      await onConfirm({ deadline: deadline || null });
+      // If the parent navigates away, this component will unmount.
+      // If it doesn't, finish the UI flow gracefully.
+      stopProgress();
+      setProgress(100);
+      setStatusMessage("Project created — redirecting…");
+      // small pause to show final state if not navigated
+      setTimeout(() => {
+        setSubmitting(false);
+      }, 500);
+    } catch (e) {
+      stopProgress();
+      setSubmitting(false);
+      setStatusMessage("");
+      setError(e?.message ?? "Failed to create project. Please try again.");
+    }
   };
 
   return (
@@ -59,8 +111,14 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
             onChange={(e) => setDeadline(e.target.value)}
             min={new Date().toISOString().split("T")[0]}
             className="flex-1 h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)]"
+            disabled={submitting}
           />
-          <Button variant="ghost" onClick={suggestDeadline} size="md">
+          <Button
+            variant="ghost"
+            onClick={suggestDeadline}
+            size="md"
+            disabled={submitting}
+          >
             Suggest
           </Button>
         </div>
@@ -75,7 +133,7 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
       {/* Commitment checkbox */}
       <label className="flex items-start gap-3 cursor-pointer group">
         <div
-          onClick={() => setCommitted((c) => !c)}
+          onClick={() => !submitting && setCommitted((c) => !c)}
           className={[
             "mt-0.5 w-5 h-5 rounded-[var(--r-sm)] border-2 flex items-center justify-center shrink-0 transition-all",
             committed
@@ -102,17 +160,47 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
         </p>
       </label>
 
+      {/* Inline status / progress */}
+      {submitting && (
+        <div className="rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-subtle)] px-4 py-3 text-sm flex items-center gap-3">
+          <div className="w-6 h-6 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin" />
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-[var(--text-primary)]">
+              {statusMessage}
+            </div>
+            <div className="mt-2 h-2 rounded-full bg-[var(--bg-muted)] overflow-hidden">
+              <div
+                className="h-full rounded-full transition-all duration-700"
+                style={{
+                  width: `${progress}%`,
+                  background: "var(--violet)",
+                }}
+              />
+            </div>
+          </div>
+          <div className="text-xs text-[var(--text-tertiary)] tabular-nums">
+            {Math.min(99, progress)}%
+          </div>
+        </div>
+      )}
+
+      {error && (
+        <div className="rounded-[var(--r-md)] border border-[var(--coral)] bg-[var(--coral-bg)] px-4 py-3 text-sm text-[var(--coral)]">
+          {error}
+        </div>
+      )}
+
       <div className="flex items-center justify-between">
-        <Button variant="ghost" onClick={onBack}>
+        <Button variant="ghost" onClick={onBack} disabled={submitting}>
           ← Review plan
         </Button>
         <Button
           variant="emerald"
           size="lg"
-          disabled={!committed}
+          disabled={!committed || submitting}
           onClick={handleConfirm}
         >
-          Start project 🚀
+          {submitting ? "Starting… 🚀" : "Start project 🚀"}
         </Button>
       </div>
     </div>

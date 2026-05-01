@@ -1,6 +1,13 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import React, {
+  useEffect,
+  useRef,
+  useState,
+  useCallback,
+  useMemo,
+  memo,
+} from "react";
 import { useUser } from "@clerk/nextjs";
 import { parseBlueprint } from "@/lib/ai/parser";
 import { Badge } from "@/components/ui/Badge";
@@ -8,12 +15,9 @@ import { Button } from "@/components/ui/Button";
 import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { useI18n } from "@/lib/i18n";
 import { loadUserProfile, buildProfileContext } from "@/lib/userProfile";
-import {
-  canMakeRequest,
-  recordRequest,
-  getRemainingRequests,
-} from "@/lib/ai/rateLimit";
+import { generateBlueprint } from "@/lib/ai/clientGenerate";
 import { toast } from "@/lib/toast";
+
 import {
   FiCpu,
   FiMap,
@@ -39,27 +43,70 @@ const STREAM_STAGES = [
   { at: 3200, icon: FiStar, text: "Finalising your blueprint…" },
 ];
 
-function StreamingProgress({ charCount }) {
+const SCOPE_META = {
+  lean: {
+    label: "Lean",
+    badge: "emerald",
+    hint: "2 phases · fast start",
+    color: "var(--emerald)",
+  },
+  standard: {
+    label: "Standard",
+    badge: "violet",
+    hint: "3 phases · balanced",
+    color: "var(--violet)",
+  },
+  ambitious: {
+    label: "Ambitious",
+    badge: "amber",
+    hint: "4–5 phases · deep mode",
+    color: "var(--amber)",
+  },
+};
+
+const StreamingProgress = memo(function StreamingProgress({
+  charCount,
+  scopeLevel,
+}) {
+  const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
+  const isDeep = scopeLevel === "ambitious";
   const stage =
     [...STREAM_STAGES].reverse().find((s) => charCount >= s.at) ??
     STREAM_STAGES[0];
-  const pct = Math.min(100, Math.round((charCount / 3500) * 100));
+  const Icon = stage.icon; // render as component
+  const pct = Math.min(98, Math.round((charCount / 3200) * 100));
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Stage indicator */}
+      {/* Header */}
+      <div>
+        <div className="flex items-center gap-3 mb-1">
+          <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)]">
+            Building your blueprint…
+          </h1>
+          <Badge variant={scopeInfo.badge}>{scopeInfo.label}</Badge>
+          {isDeep && <Badge variant="amber">🔬 Deep mode</Badge>}
+        </div>
+        <p className="text-sm text-[var(--text-secondary)]">
+          {isDeep
+            ? "Using advanced AI for your ambitious plan — this takes a little longer"
+            : scopeInfo.hint}
+        </p>
+      </div>
+
+      {/* Active stage banner */}
       <div className="flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--violet)] bg-[var(--violet-bg)] px-4 py-3">
         <span className="text-xl">
-          <stage.icon />
+          <Icon />
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-[var(--violet-dim)]">
-            {stage.text}
+            {stage.text}…
           </p>
           <div className="mt-1.5 h-1.5 rounded-full bg-[var(--bg-muted)] overflow-hidden">
             <div
-              className="h-full rounded-full bg-[var(--violet)] transition-all duration-500"
-              style={{ width: `${pct}%` }}
+              className="h-full rounded-full transition-all duration-700"
+              style={{ width: `${pct}%`, background: "var(--violet)" }}
             />
           </div>
         </div>
@@ -77,57 +124,31 @@ function StreamingProgress({ charCount }) {
             <div
               key={s.at}
               className={[
-                "flex items-center gap-2 px-3 py-2 rounded-[var(--r-md)] text-xs transition-all",
+                "flex items-center gap-2 px-3 py-2 rounded-[var(--r-md)] text-xs transition-all duration-300",
                 done
                   ? active
                     ? "bg-[var(--violet-bg)] text-[var(--violet-dim)] border border-[var(--violet)]"
-                    : "text-[var(--emerald)] opacity-70"
+                    : "text-[var(--emerald)] opacity-75"
                   : "text-[var(--text-tertiary)] opacity-40",
               ].join(" ")}
             >
-              <span>
-                {done ? active ? <FiRefreshCw /> : <FiCheck /> : <FiCircle />}
+              <span className="shrink-0 text-sm">
+                {done ? (active ? "⟳" : "✓") : "○"}
               </span>
-              <span>{s.text.replace("…", "")}</span>
+              <span className="truncate">{s.text}</span>
             </div>
           );
         })}
       </div>
 
-      {/* Live token stream preview */}
-      <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-surface)] p-4 font-mono text-[11px] text-[var(--text-tertiary)] max-h-32 overflow-hidden leading-relaxed relative">
-        <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-[var(--bg-surface)] to-transparent pointer-events-none" />
-        <span className="animate-pulse">Streaming blueprint</span>
-        <span className="inline-block w-0.5 h-3 bg-[var(--violet)] ml-1 animate-pulse align-middle" />
-      </div>
-
       <p className="text-xs text-center text-[var(--text-tertiary)]">
-        This usually takes 20–60 seconds depending on scope
+        {isDeep
+          ? "Deep plans usually take 30–90 seconds"
+          : "Usually takes 15–40 seconds"}
       </p>
     </div>
   );
-}
-
-const SCOPE_META = {
-  lean: {
-    label: "Lean",
-    color: "var(--emerald)",
-    badge: "emerald",
-    hint: "2 phases · fast start",
-  },
-  standard: {
-    label: "Standard",
-    color: "var(--violet)",
-    badge: "violet",
-    hint: "3 phases · balanced",
-  },
-  ambitious: {
-    label: "Ambitious",
-    color: "var(--amber)",
-    badge: "amber",
-    hint: "4–5 phases · full vision",
-  },
-};
+});
 
 export function StepReview({
   idea,
@@ -136,6 +157,9 @@ export function StepReview({
   cachedBlueprint,
   onBack,
   onCommit,
+  // Passed from parent — result of useProjectLimit()
+  limitAllowed,
+  limitLoading,
 }) {
   const { isSignedIn } = useUser();
   const { t } = useI18n();
@@ -145,129 +169,170 @@ export function StepReview({
   const [status, setStatus] = useState(cachedBlueprint ? "done" : "idle");
   const [error, setError] = useState(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
-  const [creditGate, setCreditGate] = useState(false); // out of free credits
   const rawRef = useRef("");
+  const readerRef = useRef(null);
+  const rafRef = useRef(null);
   const hasStarted = useRef(false);
+  const mountedRef = useRef(true);
   const loadingToastId = useRef(null);
+
+  // Show auth gate immediately if limit exceeded on mount
+  useEffect(() => {
+    if (!limitLoading && !limitAllowed && !cachedBlueprint) {
+      setStatus("limited");
+    }
+  }, [limitLoading, limitAllowed, cachedBlueprint]);
 
   useEffect(() => {
     if (cachedBlueprint) return;
     if (hasStarted.current) return;
+    if (status === "limited") return;
+    if (limitLoading) return; // wait for limit check
+    if (!limitAllowed) {
+      setStatus("limited");
+      return;
+    }
     hasStarted.current = true;
     runGeneration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cachedBlueprint, limitLoading, limitAllowed]);
+
+  // cleanup on unmount: cancel reader and prevent state updates
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (readerRef.current?.cancel) {
+        try {
+          readerRef.current.cancel();
+        } catch {}
+      }
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
   }, []);
 
   async function runGeneration() {
-    const remaining = getRemainingRequests("generate");
-
-    if (remaining <= 0) {
-      setCreditGate(true);
-      setStatus("error");
-      return;
-    }
-
     setStatus("streaming");
     setCharCount(0);
     setError(null);
     rawRef.current = "";
-    loadingToastId.current = toast.loading("Building your plan…");
+    loadingToastId.current = toast.loading(
+      scopeLevel === "ambitious"
+        ? "Starting deep analysis…"
+        : "Building your plan…"
+    );
 
     try {
       const profile = loadUserProfile();
       const profileContext = buildProfileContext(profile);
 
-      const res = await fetch("/api/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          type: "generate",
-          idea,
-          clarifications,
-          scopeLevel,
-          profileContext,
-        }),
+      const stream = await generateBlueprint({
+        idea,
+        clarifications,
+        scopeLevel,
+        profileContext,
       });
 
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        toast.dismiss(loadingToastId.current);
-        if (errData.code === "RATE_LIMITED") {
-          toast.warn("Rate limited — retrying in 3s…");
-          await new Promise((r) => setTimeout(r, 3000));
-          hasStarted.current = false;
-          return runGeneration();
-        }
-        if (errData.code === "QUOTA_EXCEEDED") {
-          setCreditGate(true);
-          setStatus("error");
-          return;
-        }
-        throw new Error(errData.error ?? "Generation failed");
-      }
-
-      recordRequest("generate");
-
-      const reader = res.body.getReader();
+      // keep reader ref for cancellation on unmount/retry
+      const reader = stream.getReader();
+      readerRef.current = reader;
       const decoder = new TextDecoder();
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        rawRef.current += decoder.decode(value);
-        setCharCount(rawRef.current.length);
+        const chunk = typeof value === "string" ? value : decoder.decode(value);
+        rawRef.current += chunk;
+        // batch UI updates with requestAnimationFrame to reduce re-renders
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        rafRef.current = requestAnimationFrame(() => {
+          if (mountedRef.current) setCharCount(rawRef.current.length);
+        });
       }
+      rafRef.current = null;
 
       const parsed = parseBlueprint(rawRef.current);
+      if (!mountedRef.current) return;
       setBlueprint(parsed);
       setStatus("done");
       toast.dismiss(loadingToastId.current);
       toast.success("Your plan is ready!");
     } catch (e) {
       toast.dismiss(loadingToastId.current);
-      setError(e.message);
-      setStatus("error");
+
+      // Rate limit / quota from OpenRouter path
+      if (e.code === "RATE_LIMITED") {
+        toast.warn("Rate limited — retrying in 3s…");
+        await new Promise((r) => setTimeout(r, 3000));
+        hasStarted.current = false;
+        // ensure reader is cleaned up before retrying
+        if (readerRef.current?.cancel) {
+          try {
+            await readerRef.current.cancel();
+          } catch {}
+        }
+        return runGeneration();
+      }
+
+      if (mountedRef.current) {
+        setError(e?.message ?? "Generation failed");
+        setStatus("error");
+      }
     }
   }
 
-  const handleCommitClick = () => {
+  const handleCommitClick = useCallback(() => {
     if (!isSignedIn) {
       setShowAuthGate(true);
     } else {
       onCommit(blueprint);
     }
-  };
+  }, [isSignedIn, onCommit, blueprint]);
 
-  // ── Credit gate — out of free generations ──────────────────────
-  if (creditGate) {
+  // Ensure the continue-anyway callback is a stable hook (not created conditionally)
+  const handleContinueAnyway = useCallback(() => {
+    setShowAuthGate(false);
+    onCommit(blueprint);
+  }, [onCommit, blueprint]);
+
+  // ── Limit gate ───────────────────────────────────────────────────
+  if (status === "limited") {
     return (
-      <div className="flex flex-col gap-6">
-        <div className="rounded-[var(--r-xl)] border-2 border-[var(--violet)] bg-[var(--violet-bg)] p-6 text-center">
-          <div className="text-4xl mb-3">
-            <FiTarget />
+      <>
+        <div className="flex flex-col gap-6">
+          <div className="rounded-[var(--r-xl)] border-2 border-[var(--violet)] bg-[var(--violet-bg)] p-6 text-center">
+            <div className="text-5xl mb-4">🎯</div>
+            <h2 className="font-display font-semibold text-2xl text-[var(--text-primary)] mb-2">
+              You've used your free project
+            </h2>
+            <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-sm mx-auto mb-5">
+              Sign up free to create unlimited projects, save your work across
+              devices, and access deeper AI planning.
+            </p>
+            <div className="flex flex-col gap-2 max-w-xs mx-auto">
+              <Button
+                variant="primary"
+                size="lg"
+                className="w-full justify-center"
+                onClick={() => setShowAuthGate(true)}
+              >
+                Create free account
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full justify-center"
+                onClick={onBack}
+              >
+                ← Edit my idea
+              </Button>
+            </div>
           </div>
-          <h2 className="font-display font-semibold text-xl text-[var(--text-primary)] mb-2">
-            You've used your free plan today
-          </h2>
-          <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-sm mx-auto mb-4">
-            Sign in for free to get more daily generations and never lose your
-            work. Or come back tomorrow — your idea will still be here.
-          </p>
-          <div className="flex flex-col gap-2 max-w-xs mx-auto">
-            <Button
-              variant="primary"
-              className="w-full justify-center"
-              onClick={() => setShowAuthGate(true)}
-            >
-              Sign in for more plans
-            </Button>
-            <Button
-              variant="ghost"
-              className="w-full justify-center"
-              onClick={onBack}
-            >
-              ← Edit my idea
-            </Button>
+          <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3">
+            <p className="text-xs text-[var(--text-secondary)] text-center">
+              Free account · No credit card · Unlimited projects
+            </p>
           </div>
         </div>
         <AuthGateModal
@@ -275,11 +340,21 @@ export function StepReview({
           onClose={() => setShowAuthGate(false)}
           onContinueAnyway={() => setShowAuthGate(false)}
         />
+      </>
+    );
+  }
+
+  // ── Loading limit check ──────────────────────────────────────────
+  if (limitLoading && status === "idle") {
+    return (
+      <div className="flex flex-col gap-4 items-center py-12">
+        <div className="w-8 h-8 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin" />
+        <p className="text-sm text-[var(--text-secondary)]">Checking access…</p>
       </div>
     );
   }
 
-  // ── Error ───────────────────────────────────────────────────────
+  // ── Error ────────────────────────────────────────────────────────
   if (status === "error") {
     return (
       <div className="flex flex-col gap-6">
@@ -304,43 +379,28 @@ export function StepReview({
     );
   }
 
-  // ── Streaming ───────────────────────────────────────────────────
+  // ── Streaming ────────────────────────────────────────────────────
   if (status === "streaming" || status === "idle") {
-    const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
-    return (
-      <div className="flex flex-col gap-6">
-        <div>
-          <div className="flex items-center gap-3 mb-3">
-            <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)]">
-              Building your blueprint…
-            </h1>
-            <Badge variant={scopeInfo.badge}>{scopeInfo.label}</Badge>
-          </div>
-          <p className="text-sm text-[var(--text-secondary)]">
-            {scopeInfo.hint}
-          </p>
-        </div>
-        <StreamingProgress charCount={charCount} />
-      </div>
-    );
+    return <StreamingProgress charCount={charCount} scopeLevel={scopeLevel} />;
   }
 
-  // ── Done ────────────────────────────────────────────────────────
+  // ── Done ─────────────────────────────────────────────────────────
   const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
-  const remaining = getRemainingRequests("generate");
 
   return (
     <>
       <div className="flex flex-col gap-6 sm:gap-8">
+        {/* Header */}
         <div>
-          <div className="flex items-center gap-2 mb-2">
-            <span className="w-2 h-2 rounded-full bg-[var(--emerald)]" />
+          <div className="flex items-center gap-2 mb-2 flex-wrap">
+            <span className="w-2 h-2 rounded-full bg-[var(--emerald)] shrink-0" />
             <span className="text-sm text-[var(--emerald)] font-medium">
               Blueprint ready
             </span>
-            <Badge variant={scopeInfo.badge} className="ml-1">
-              {scopeInfo.label}
-            </Badge>
+            <Badge variant={scopeInfo.badge}>{scopeInfo.label}</Badge>
+            {scopeLevel === "ambitious" && (
+              <Badge variant="amber">🔬 Deep</Badge>
+            )}
           </div>
           <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)] mb-1">
             {blueprint.projectTitle}
@@ -350,15 +410,15 @@ export function StepReview({
           </p>
         </div>
 
-        {/* Scope summary */}
+        {/* Scope summary bar */}
         <div
-          className="rounded-[var(--r-lg)] border px-4 py-3 flex flex-wrap gap-4 text-sm"
+          className="rounded-[var(--r-lg)] border px-4 py-3 flex flex-wrap gap-x-5 gap-y-2 text-sm"
           style={{
             borderColor: scopeInfo.color,
             background: `color-mix(in srgb, ${scopeInfo.color} 8%, transparent)`,
           }}
         >
-          <span style={{ color: scopeInfo.color }} className="font-medium">
+          <span style={{ color: scopeInfo.color }} className="font-semibold">
             {scopeInfo.label} scope
           </span>
           <span className="text-[var(--text-secondary)]">
@@ -367,12 +427,16 @@ export function StepReview({
           <span className="text-[var(--text-secondary)]">
             {blueprint.tasks.length} tasks
           </span>
-          <span className="text-[var(--text-secondary)]">
-            {blueprint.timeline}
-          </span>
-          <span className="text-[var(--text-secondary)]">
-            {blueprint.estimatedEffort}
-          </span>
+          {blueprint.timeline && (
+            <span className="text-[var(--text-secondary)]">
+              {blueprint.timeline}
+            </span>
+          )}
+          {blueprint.estimatedEffort && (
+            <span className="text-[var(--text-secondary)]">
+              {blueprint.estimatedEffort}
+            </span>
+          )}
         </div>
 
         {/* Phases */}
@@ -412,19 +476,19 @@ export function StepReview({
         </div>
 
         {/* Success criteria */}
-        {blueprint.successCriteria.length > 0 && (
+        {blueprint.successCriteria?.length > 0 && (
           <div>
             <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
               Success criteria
             </p>
-            <ul className="flex flex-col gap-1.5 sm:gap-2">
+            <ul className="flex flex-col gap-1.5">
               {blueprint.successCriteria.map((c, i) => (
                 <li
                   key={i}
                   className="flex items-start gap-2 text-xs sm:text-sm text-[var(--text-secondary)]"
                 >
                   <span className="text-[var(--emerald)] mt-0.5 shrink-0">
-                    <FiCheck />
+                    ✓
                   </span>
                   {c}
                 </li>
@@ -437,7 +501,7 @@ export function StepReview({
         {blueprint.blockers?.length > 0 && (
           <div>
             <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
-              Anticipated blockers
+              Anticipated challenges
             </p>
             <ul className="flex flex-col gap-1.5">
               {blueprint.blockers.map((b, i) => (
@@ -445,9 +509,7 @@ export function StepReview({
                   key={i}
                   className="flex items-start gap-2 text-xs sm:text-sm text-[var(--text-secondary)]"
                 >
-                  <span className="text-[var(--coral)] mt-0.5 shrink-0">
-                    <FiAlertTriangle />
-                  </span>
+                  <span className="text-[var(--amber)] mt-0.5 shrink-0">⚠</span>
                   {typeof b === "string" ? b : b.description}
                 </li>
               ))}
@@ -455,25 +517,25 @@ export function StepReview({
           </div>
         )}
 
-        {/* Daily credits hint */}
+        {/* Sign-in nudge for anonymous users */}
         {!isSignedIn && (
-          <div className="rounded-[var(--r-md)] bg-[var(--bg-subtle)] border border-[var(--border)] px-4 py-3 flex items-center gap-3">
-            <span className="text-lg">
-              <FiZap />
-            </span>
-            <p className="text-xs text-[var(--text-secondary)]">
-              {remaining > 0
-                ? `${remaining} free plan${
-                    remaining !== 1 ? "s" : ""
-                  } remaining today. `
-                : "No free plans remaining today. "}
-              <button
-                onClick={() => setShowAuthGate(true)}
-                className="text-[var(--violet)] hover:underline"
-              >
-                Sign in for unlimited access
-              </button>
-            </p>
+          <div className="rounded-[var(--r-md)] bg-[var(--violet-bg)] border border-[var(--violet)] px-4 py-3 flex items-start gap-3">
+            <span className="text-lg shrink-0">💡</span>
+            <div>
+              <p className="text-xs font-medium text-[var(--violet-dim)]">
+                Sign in to save this project
+              </p>
+              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+                This is your free project. Create a free account to build
+                unlimited projects and never lose your work.{" "}
+                <button
+                  onClick={() => setShowAuthGate(true)}
+                  className="text-[var(--violet)] hover:underline font-medium"
+                >
+                  Sign up free →
+                </button>
+              </p>
+            </div>
           </div>
         )}
 
@@ -490,10 +552,7 @@ export function StepReview({
       <AuthGateModal
         open={showAuthGate}
         onClose={() => setShowAuthGate(false)}
-        onContinueAnyway={() => {
-          setShowAuthGate(false);
-          onCommit(blueprint);
-        }}
+        onContinueAnyway={handleContinueAnyway}
       />
     </>
   );

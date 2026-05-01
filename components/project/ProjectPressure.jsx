@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { getPressure, PRESSURE_LABELS } from "@/lib/pressure";
+import { generateReengage } from "@/lib/ai/clientGenerate";
 
 export function ProjectPressure({ project }) {
   const [suggestion, setSuggestion] = useState(null);
@@ -9,23 +10,15 @@ export function ProjectPressure({ project }) {
 
   const pressure = getPressure(project);
 
-  // Only fire once per project when it reaches critical level
-  // Stable dependency: project.id + pressure.level prevents re-fetch loops
   useEffect(() => {
     if (pressure.level !== "critical") return;
     if (fetched) return;
-
     let cancelled = false;
     setFetched(true);
 
-    fetch("/api/reengage", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ project }),
-    })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => {
-        if (!cancelled && d?.suggestion) setSuggestion(d.suggestion);
+    generateReengage(project)
+      .then((text) => {
+        if (!cancelled && text) setSuggestion(text);
       })
       .catch(() => {});
 

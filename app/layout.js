@@ -23,6 +23,8 @@ export default function RootLayout({ children }) {
             href="https://fonts.gstatic.com"
             crossOrigin="anonymous"
           />
+          {/* Puter.js — free unlimited AI, loaded globally */}
+          <script src="https://js.puter.com/v2/" async />
         </head>
         <body>
           <ThemeProvider>
