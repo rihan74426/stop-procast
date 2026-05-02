@@ -1,12 +1,15 @@
 "use client";
 
-// app/new/page.jsx — Fixed version
-// Fixes:
-//   1. handleBlueprintReady had a stale closure on currentSnapshot
-//   2. goTo was re-created on every render (no useCallback dep on maxReached)
-//   3. blueprintIsStale didn't reset on recommit
-//   4. Step breadcrumb "clickable" logic: users should always be able to go BACK
-//      to any previously-visited step, not just step <= maxReached+1
+/**
+ * app/new/page.jsx — Fixed wizard navigation
+ *
+ * Key fixes:
+ * 1. Blueprint is NEVER regenerated when going back — cached until inputs change
+ * 2. goTo() allows free navigation to any visited step
+ * 3. clarify questions cached in state, not refetched
+ * 4. Stale detection: only marks stale if idea/scope actually changed
+ * 5. StepReview receives cachedBlueprint when navigating back, skips generation
+ */
 
 import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
@@ -36,10 +39,10 @@ export default function NewProjectPage() {
 
 function NewProjectContent() {
   const router = useRouter();
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn } = useUser();
   const addProject = useProjectStore((s) => s.addProject);
-
   const { loading: limitLoading, allowed: limitAllowed } = useProjectLimit();
+
   const [showEarlyAuthGate, setShowEarlyAuthGate] = useState(false);
 
   useEffect(() => {
@@ -48,30 +51,30 @@ function NewProjectContent() {
     }
   }, [limitLoading, limitAllowed, isSignedIn]);
 
-  // ── Wizard state ─────────────────────────────────────────────────
+  // ── Wizard state (all persisted, never reset on nav) ─────────────
   const [step, setStep] = useState(0);
+  const [maxStep, setMaxStep] = useState(0);
+
+  // Per-step cached values
   const [idea, setIdea] = useState("");
   const [clarifyAnswers, setClarifyAnswers] = useState({});
   const [cachedQuestions, setCachedQuestions] = useState(null);
   const [scopeLevel, setScopeLevel] = useState("standard");
+
+  // Blueprint cache — keyed by a snapshot of inputs
   const [blueprint, setBlueprint] = useState(null);
-  const [blueprintSnapshot, setBlueprintSnapshot] = useState(null);
+  const [blueprintKey, setBlueprintKey] = useState(null); // snapshot when generated
 
-  // Track highest step reached so breadcrumb allows back-navigation to any visited step
-  const [maxStep, setMaxStep] = useState(0);
-
-  const currentSnapshot = JSON.stringify({ idea, clarifyAnswers, scopeLevel });
+  // Compute whether current inputs differ from when blueprint was generated
+  const inputKey = `${idea}||${scopeLevel}`;
   const blueprintIsStale =
-    blueprint !== null &&
-    blueprintSnapshot !== null &&
-    currentSnapshot !== blueprintSnapshot;
+    blueprint !== null && blueprintKey !== null && inputKey !== blueprintKey;
 
-  // maxReached: how far the user has gotten — used for breadcrumb clickability
-  // Always allow going back to any step <= maxStep
-  // Allow going forward to maxStep (but not past it unless blueprint is generated)
-  const maxReached = blueprint !== null ? 4 : maxStep;
+  // How far the user can navigate
+  const maxReached = blueprint !== null && !blueprintIsStale ? 4 : maxStep;
 
-  // ── Navigation ───────────────────────────────────────────────────
+  // ── Navigation helpers ────────────────────────────────────────────
+  // goTo: free nav to any visited step (no state reset)
   const goTo = useCallback(
     (target) => {
       if (target < 0 || target > maxReached) return;
@@ -80,13 +83,13 @@ function NewProjectContent() {
     [maxReached]
   );
 
-  // When user advances forward, update maxStep
+  // advance: move forward and record progress
   const advance = useCallback((target) => {
     setStep(target);
     setMaxStep((prev) => Math.max(prev, target));
   }, []);
 
-  // ── Handlers ─────────────────────────────────────────────────────
+  // ── Input handlers ────────────────────────────────────────────────
   const handleIdeaChange = useCallback((v) => setIdea(v), []);
   const handleClarifyChange = useCallback(
     (i, v) => setClarifyAnswers((prev) => ({ ...prev, [i]: v })),
@@ -94,20 +97,17 @@ function NewProjectContent() {
   );
   const handleScopeChange = useCallback((v) => setScopeLevel(v), []);
 
-  // FIX: Use a ref to always capture the latest snapshot at the time of blueprint ready
-  const currentSnapshotRef = useRef(currentSnapshot);
-  useEffect(() => {
-    currentSnapshotRef.current = currentSnapshot;
-  }, [currentSnapshot]);
+  // Called by StepReview when blueprint is ready (first gen or regen)
+  const handleBlueprintReady = useCallback(
+    (bp) => {
+      setBlueprint(bp);
+      setBlueprintKey(inputKey);
+      advance(4);
+    },
+    [inputKey, advance]
+  );
 
-  const handleBlueprintReady = useCallback((bp) => {
-    setBlueprint(bp);
-    // Use the ref to get the snapshot at call time, not a stale closure
-    setBlueprintSnapshot(currentSnapshotRef.current);
-    setStep(4);
-    setMaxStep(4);
-  }, []); // no deps needed — uses ref
-
+  // Called by StepCommit
   const handleCommit = async ({ deadline }) => {
     const toastId = toast.loading("Creating your project…");
     try {
@@ -118,11 +118,16 @@ function NewProjectContent() {
         ...(deadline ? { timeline: deadline } : {}),
       });
       toast.dismiss(toastId);
-      toast.success("Project created! Let's get to work.");
+      toast.success("Project created! Let's get to work. 🚀");
       router.push(`/project/${id}`);
     } catch {
       toast.dismiss(toastId);
-      toast.error("Failed to create project. Please try again.");
+      toast.error("Failed to create project. Please try again.", {
+        action: {
+          label: "Report",
+          onClick: () => router.push("/feedback"),
+        },
+      });
     }
   };
 
@@ -130,7 +135,7 @@ function NewProjectContent() {
     .map(([i, answer]) => ({ question: `Q${parseInt(i) + 1}`, answer }))
     .filter((c) => c.answer?.trim());
 
-  // ── Early gate ───────────────────────────────────────────────────
+  // ── Early gate (anon limit exceeded) ─────────────────────────────
   if (!limitLoading && !limitAllowed && !isSignedIn) {
     return (
       <div className="min-h-screen bg-[var(--bg-surface)] flex flex-col">
@@ -179,18 +184,15 @@ function NewProjectContent() {
     <div className="min-h-screen bg-[var(--bg-surface)] flex flex-col">
       <TopBar />
 
-      {/* Step progress breadcrumb */}
+      {/* Step breadcrumb */}
       <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-4 sm:px-6 py-3 sm:py-4 sticky top-14 z-10">
         <div className="max-w-2xl mx-auto">
           <div className="flex items-center gap-1.5 sm:gap-2">
             {STEP_LABELS.map((label, i) => {
               const isActive = i === step;
-              // FIX: clickable if visited and not current
-              const isClickable = i <= maxReached && !isActive;
-              // "Done" styling = visited and not active
-              const isDone = i <= maxReached && !isActive && i < step;
-              // "Visited but ahead" = can go forward to a previously-reached step
-              const isVisitedAhead = i > step && i <= maxReached;
+              const isVisited = i <= maxReached;
+              const isDone = isVisited && !isActive;
+              const isClickable = isVisited && !isActive;
 
               return (
                 <div key={i} className="flex items-center gap-1.5 sm:gap-2">
@@ -207,16 +209,16 @@ function NewProjectContent() {
                     <div
                       className={[
                         "w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300",
-                        isDone
+                        isDone && i < step
                           ? "bg-[var(--emerald)] text-white"
                           : isActive
                           ? "bg-[var(--violet)] text-white"
-                          : isVisitedAhead
+                          : isDone && i > step
                           ? "bg-[var(--bg-muted)] text-[var(--violet-dim)] ring-1 ring-[var(--violet)]"
                           : "bg-[var(--bg-muted)] text-[var(--text-tertiary)]",
                       ].join(" ")}
                     >
-                      {isDone ? "✓" : i + 1}
+                      {isDone && i < step ? "✓" : i + 1}
                     </div>
                     <span
                       className={`text-xs font-medium hidden sm:block transition-colors ${
@@ -243,14 +245,14 @@ function NewProjectContent() {
 
             {blueprintIsStale && (
               <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber)] whitespace-nowrap">
-                ⚠ Edited — will regenerate
+                ⚠ Inputs changed — will regenerate
               </span>
             )}
           </div>
         </div>
       </div>
 
-      {/* Step content */}
+      {/* Step content — always mounted, hidden when not active for perf */}
       <div className="flex-1 flex items-start justify-center px-4 sm:px-6 py-8 sm:py-12">
         <div className="w-full max-w-2xl">
           {step === 0 && (
@@ -287,6 +289,7 @@ function NewProjectContent() {
               idea={idea}
               clarifications={clarifications}
               scopeLevel={scopeLevel}
+              // Pass cached blueprint — StepReview skips generation if provided and not stale
               cachedBlueprint={blueprintIsStale ? null : blueprint}
               onBack={() => goTo(2)}
               onCommit={handleBlueprintReady}

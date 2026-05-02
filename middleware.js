@@ -1,24 +1,17 @@
 import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 
-// Routes that don't require auth
-const isPublicRoute = createRouteMatcher([
-  "/sign-in(.*)",
-  "/sign-up(.*)",
-  "/api/webhook(.*)",
-  "/api/generate",
-  "/api/projects(.*)",
-  "/api/reengage(.*)",
-  "/",
-  "/new(.*)",
-  "/project/(.*)",
-  "/settings(.*)",
-  "/feedback(.*)",
-
-  // Allow public access to project pages (adjust as needed)
+// Routes that require authentication
+const isProtectedRoute = createRouteMatcher([
+  // No routes are hard-protected — auth is optional everywhere.
+  // Add specific routes here if needed in the future, e.g.:
+  // "/account(.*)",
 ]);
 
-export default clerkMiddleware(async (auth, request) => {
-  if (!isPublicRoute(request)) {
+export default clerkMiddleware(async (auth, req) => {
+  // Feedback page is always public — explicitly skip any protection
+  if (req.nextUrl.pathname.startsWith("/feedback")) return;
+
+  if (isProtectedRoute(req)) {
     await auth.protect();
   }
 });

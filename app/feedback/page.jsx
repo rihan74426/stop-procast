@@ -1,7 +1,14 @@
 "use client";
 
+/**
+ * app/feedback/page.jsx
+ *
+ * Fully public — no auth required to view, vote, or submit.
+ * Admin panel visible only when user has { publicMetadata: { role: "admin" } } in Clerk.
+ */
+
 import { useState, useEffect, useCallback } from "react";
-import { useRouter } from "next/navigation";
+import { useUser } from "@clerk/nextjs";
 import { TopBar } from "@/components/layout/Topbar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Footer } from "@/components/layout/Footer";
@@ -10,21 +17,17 @@ import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { getSessionId } from "@/lib/sessionId";
-
-// Add react-icons imports (replaces emojis)
 import { BiBug, BiBulb, BiStar } from "react-icons/bi";
 import {
-  FiLightbulb,
   FiHelpCircle,
   FiCheckCircle,
   FiMail,
   FiMapPin,
+  FiShield,
 } from "react-icons/fi";
-import { AiFillBulb, AiFillStar } from "react-icons/ai";
 
 // ─── Config ───────────────────────────────────────────────────────────
 
-// Replace emoji strings with icon component references
 const TYPE_META = {
   bug: { label: "Bug", icon: BiBug, color: "coral" },
   suggestion: { label: "Idea", icon: BiBulb, color: "violet" },
@@ -33,12 +36,20 @@ const TYPE_META = {
 };
 
 const STATUS_META = {
-  open: { label: "Open", color: "slate" },
+  open: { label: "Open", color: "violet" },
   in_progress: { label: "In Progress", color: "amber" },
-  resolved: { label: "Resolved", color: "emerald" }, // removed checkmark char
+  resolved: { label: "Resolved", color: "emerald" },
   wont_fix: { label: "Won't Fix", color: "coral" },
   duplicate: { label: "Duplicate", color: "slate" },
 };
+
+const STATUS_OPTIONS = [
+  { id: "open", label: "Open" },
+  { id: "in_progress", label: "In Progress" },
+  { id: "resolved", label: "Resolved" },
+  { id: "wont_fix", label: "Won't Fix" },
+  { id: "duplicate", label: "Duplicate" },
+];
 
 const FILTERS = [
   { id: "all", label: "All" },
@@ -46,8 +57,6 @@ const FILTERS = [
   { id: "in_progress", label: "In Progress" },
   { id: "resolved", label: "Resolved" },
 ];
-
-// ─── Helpers ──────────────────────────────────────────────────────────
 
 function timeAgo(iso) {
   if (!iso) return "";
@@ -58,13 +67,90 @@ function timeAgo(iso) {
   return `${Math.floor(secs / 86400)}d ago`;
 }
 
+// ─── Admin Panel Modal ────────────────────────────────────────────────
+
+function AdminPanel({ item, onClose, onUpdated }) {
+  const [status, setStatus] = useState(item.status);
+  const [adminNote, setAdminNote] = useState(item.adminNote ?? "");
+  const [saving, setSaving] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/feedback", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: item.id, status, adminNote }),
+      });
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      onUpdated(data.item);
+      onClose();
+    } catch {
+      // silent — keep modal open
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Admin: Update Report" size="sm">
+      <div className="flex flex-col gap-4">
+        <div>
+          <p className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
+            Status
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {STATUS_OPTIONS.map((opt) => (
+              <button
+                key={opt.id}
+                onClick={() => setStatus(opt.id)}
+                className={[
+                  "py-2 px-3 text-xs font-medium rounded-[var(--r-md)] border transition-all text-left",
+                  status === opt.id
+                    ? "bg-[var(--violet)] text-white border-[var(--violet)]"
+                    : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--violet)]",
+                ].join(" ")}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
+            Team note (visible to users)
+          </label>
+          <textarea
+            rows={3}
+            value={adminNote}
+            onChange={(e) => setAdminNote(e.target.value)}
+            placeholder="Optional note for the community…"
+            className="w-full px-3 py-2.5 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--violet)]"
+          />
+        </div>
+
+        <div className="flex gap-2 justify-end">
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button size="sm" loading={saving} onClick={handleSave}>
+            Save changes
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ─── Submit Modal ─────────────────────────────────────────────────────
 
 function SubmitModal({ open, onClose, onSuccess }) {
   const [type, setType] = useState("suggestion");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
-  const [status, setStatus] = useState("idle"); // idle | submitting | done | error
+  const [status, setStatus] = useState("idle");
 
   const reset = () => {
     setType("suggestion");
@@ -72,7 +158,6 @@ function SubmitModal({ open, onClose, onSuccess }) {
     setBody("");
     setStatus("idle");
   };
-
   const handleClose = () => {
     reset();
     onClose();
@@ -93,7 +178,7 @@ function SubmitModal({ open, onClose, onSuccess }) {
           sessionId,
         }),
       });
-      if (!res.ok) throw new Error("Failed");
+      if (!res.ok) throw new Error();
       const data = await res.json();
       setStatus("done");
       onSuccess(data.item);
@@ -110,8 +195,7 @@ function SubmitModal({ open, onClose, onSuccess }) {
       <div className="flex flex-col gap-5">
         {status === "done" ? (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
-            {/* Success icon (react-icon) */}
-            <FiCheckCircle className="w-12 h-12 text-[var(--emerald-dim)]" />
+            <FiCheckCircle className="text-5xl text-[var(--emerald)]" />
             <p className="font-semibold text-[var(--text-primary)]">
               Thanks for your feedback!
             </p>
@@ -121,7 +205,7 @@ function SubmitModal({ open, onClose, onSuccess }) {
           </div>
         ) : (
           <>
-            {/* Type selector */}
+            {/* Type picker */}
             <div>
               <p className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">
                 Type
@@ -137,7 +221,7 @@ function SubmitModal({ open, onClose, onSuccess }) {
                         "flex flex-col items-center gap-1.5 py-3 rounded-[var(--r-lg)] border-2 text-xs font-medium transition-all",
                         type === key
                           ? "border-[var(--violet)] bg-[var(--violet-bg)] text-[var(--violet-dim)]"
-                          : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--slate-4)] hover:bg-[var(--bg-subtle)]",
+                          : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--slate-4)]",
                       ].join(" ")}
                     >
                       <span className="text-lg">
@@ -162,14 +246,14 @@ function SubmitModal({ open, onClose, onSuccess }) {
                 maxLength={120}
                 placeholder={
                   type === "bug"
-                    ? "What broke? e.g. 'Navigation breaks after blueprint generation'"
+                    ? "What broke? e.g. 'Navigation resets on back'"
                     : type === "suggestion"
-                    ? "What would make this better? e.g. 'Add drag-to-reorder tasks'"
+                    ? "What would improve this? e.g. 'Drag to reorder tasks'"
                     : type === "praise"
-                    ? "What do you love? e.g. 'The AI planning step is incredible'"
+                    ? "What do you love?"
                     : "What's your question?"
                 }
-                className="w-full h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)] transition-all"
+                className="w-full h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)]"
               />
               <p className="text-xs text-[var(--text-tertiary)] mt-1 text-right">
                 {title.length}/120
@@ -189,10 +273,10 @@ function SubmitModal({ open, onClose, onSuccess }) {
                 maxLength={2000}
                 placeholder={
                   type === "bug"
-                    ? "Steps to reproduce, what you expected vs what happened…"
-                    : "Any extra context, screenshots description, or examples…"
+                    ? "Steps to reproduce, expected vs actual…"
+                    : "Extra context…"
                 }
-                className="w-full px-3 py-2.5 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)] transition-all"
+                className="w-full px-3 py-2.5 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--violet)]"
               />
               <p className="text-xs text-[var(--text-tertiary)] mt-1 text-right">
                 {body.length}/2000
@@ -216,11 +300,13 @@ function SubmitModal({ open, onClose, onSuccess }) {
               <Button
                 onClick={handleSubmit}
                 loading={status === "submitting"}
-                disabled={title.trim().length < 5 || status === "submitting"}
+                disabled={title.trim().length < 5}
               >
-                Submit {/* render selected type icon */}
+                Submit{" "}
                 {SelectedIcon && (
-                  <SelectedIcon className="inline -mt-0.5 ml-1" />
+                  <span className="ml-1">
+                    <SelectedIcon />
+                  </span>
                 )}
               </Button>
             </div>
@@ -231,9 +317,9 @@ function SubmitModal({ open, onClose, onSuccess }) {
   );
 }
 
-// ─── Single feedback card ─────────────────────────────────────────────
+// ─── Feedback card ────────────────────────────────────────────────────
 
-function FeedbackCard({ item, sessionId, onUpvote }) {
+function FeedbackCard({ item, sessionId, isAdmin, onUpvote, onAdminEdit }) {
   const typeMeta = TYPE_META[item.type] ?? TYPE_META.suggestion;
   const statusMeta = STATUS_META[item.status] ?? STATUS_META.open;
   const hasVoted = item.upvotedBy?.includes(sessionId);
@@ -250,7 +336,7 @@ function FeedbackCard({ item, sessionId, onUpvote }) {
       ].join(" ")}
     >
       <div className="flex items-start gap-3">
-        {/* Upvote column */}
+        {/* Upvote */}
         <button
           onClick={() => !hasVoted && onUpvote(item.id)}
           disabled={hasVoted}
@@ -258,7 +344,7 @@ function FeedbackCard({ item, sessionId, onUpvote }) {
             "flex flex-col items-center gap-0.5 min-w-[40px] py-1.5 rounded-[var(--r-md)] border transition-all",
             hasVoted
               ? "border-[var(--violet)] bg-[var(--violet-bg)] text-[var(--violet-dim)] cursor-default"
-              : "border-[var(--border)] text-[var(--text-tertiary)] hover:border-[var(--violet)] hover:text-[var(--violet-dim)] hover:bg-[var(--violet-bg)] cursor-pointer",
+              : "border-[var(--border)] text-[var(--text-tertiary)] hover:border-[var(--violet)] hover:text-[var(--violet-dim)] hover:bg-[var(--violet-bg)]",
           ].join(" ")}
           title={hasVoted ? "Already upvoted" : "Upvote"}
         >
@@ -279,7 +365,6 @@ function FeedbackCard({ item, sessionId, onUpvote }) {
         {/* Content */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap mb-1.5">
-            {/* render icon component */}
             <span className="text-sm">
               <TypeIcon />
             </span>
@@ -291,6 +376,15 @@ function FeedbackCard({ item, sessionId, onUpvote }) {
             >
               {item.title}
             </p>
+            {/* Admin edit button */}
+            {isAdmin && (
+              <button
+                onClick={() => onAdminEdit(item)}
+                className="ml-auto flex items-center gap-1 text-xs px-2 py-0.5 rounded-[var(--r-full)] bg-[var(--violet-bg)] text-[var(--violet-dim)] border border-[var(--violet)] hover:bg-[var(--violet)] hover:text-white transition-all shrink-0"
+              >
+                <FiShield size={10} /> Edit
+              </button>
+            )}
           </div>
 
           {item.body && (
@@ -299,13 +393,10 @@ function FeedbackCard({ item, sessionId, onUpvote }) {
             </p>
           )}
 
-          {/* Admin note */}
           {item.adminNote && (
             <div className="rounded-[var(--r-md)] bg-[var(--violet-bg)] border border-[var(--violet)] px-3 py-2 mb-2.5">
-              <p className="text-xs font-medium text-[var(--violet-dim)] mb-0.5">
-                {/* pin icon instead of emoji */}
-                <FiMapPin className="inline mr-1" />
-                Team note
+              <p className="text-xs font-medium text-[var(--violet-dim)] mb-0.5 flex items-center gap-1">
+                <FiMapPin size={10} /> Team note
               </p>
               <p className="text-xs text-[var(--text-secondary)]">
                 {item.adminNote}
@@ -313,7 +404,6 @@ function FeedbackCard({ item, sessionId, onUpvote }) {
             </div>
           )}
 
-          {/* Footer */}
           <div className="flex items-center gap-2 flex-wrap">
             <Badge variant={typeMeta.color}>{typeMeta.label}</Badge>
             <Badge variant={statusMeta.color}>{statusMeta.label}</Badge>
@@ -330,11 +420,16 @@ function FeedbackCard({ item, sessionId, onUpvote }) {
 // ─── Main page ────────────────────────────────────────────────────────
 
 function FeedbackContent() {
+  const { user, isLoaded } = useUser();
+  // Admin = Clerk publicMetadata.role === "admin"
+  const isAdmin = isLoaded && user?.publicMetadata?.role === "admin";
+
   const [items, setItems] = useState([]);
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [showModal, setShowModal] = useState(false);
+  const [adminItem, setAdminItem] = useState(null); // item being edited by admin
   const [sessionId, setSessionId] = useState(null);
 
   useEffect(() => {
@@ -362,7 +457,6 @@ function FeedbackContent() {
 
   const handleUpvote = async (id) => {
     if (!sessionId) return;
-    // Optimistic update
     setItems((prev) =>
       prev.map((item) =>
         item.id === id
@@ -381,13 +475,17 @@ function FeedbackContent() {
         body: JSON.stringify({ id, action: "upvote", sessionId }),
       });
     } catch {
-      fetchItems(filter); // revert on error
+      fetchItems(filter);
     }
   };
 
   const handleSuccess = (newItem) => {
     setItems((prev) => [newItem, ...prev]);
     setTotal((t) => t + 1);
+  };
+
+  const handleAdminUpdated = (updated) => {
+    setItems((prev) => prev.map((i) => (i.id === updated.id ? updated : i)));
   };
 
   const openCount = items.filter((i) => i.status === "open").length;
@@ -403,9 +501,16 @@ function FeedbackContent() {
             {/* Header */}
             <div className="flex items-start justify-between gap-4 mb-6 sm:mb-8">
               <div>
-                <h1 className="font-display font-semibold text-xl sm:text-2xl text-[var(--text-primary)] mb-1">
-                  Feedback & Bug Reports
-                </h1>
+                <div className="flex items-center gap-2 mb-1">
+                  <h1 className="font-display font-semibold text-xl sm:text-2xl text-[var(--text-primary)]">
+                    Feedback & Bug Reports
+                  </h1>
+                  {isAdmin && (
+                    <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[var(--violet-bg)] text-[var(--violet-dim)] border border-[var(--violet)] font-medium">
+                      <FiShield size={10} /> Admin
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
                   Public board · {total} report{total !== 1 ? "s" : ""} ·{" "}
                   {resolvedCount} resolved
@@ -429,15 +534,11 @@ function FeedbackContent() {
               </Button>
             </div>
 
-            {/* Stats bar */}
+            {/* Stats */}
             <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
               {[
                 { label: "Total", value: total, color: "var(--text-primary)" },
-                {
-                  label: "Open",
-                  value: items.filter((i) => i.status === "open").length,
-                  color: "var(--violet)",
-                },
+                { label: "Open", value: openCount, color: "var(--violet)" },
                 {
                   label: "In Progress",
                   value: items.filter((i) => i.status === "in_progress").length,
@@ -520,8 +621,7 @@ function FeedbackContent() {
               </div>
             ) : items.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-center">
-                {/* mailbox icon instead of emoji */}
-                <FiMail className="text-5xl mb-4" />
+                <FiMail className="text-5xl mb-4 text-[var(--text-tertiary)]" />
                 <p className="font-display font-semibold text-lg text-[var(--text-primary)] mb-2">
                   {filter === "all"
                     ? "No reports yet"
@@ -545,13 +645,14 @@ function FeedbackContent() {
                     key={item.id}
                     item={item}
                     sessionId={sessionId}
+                    isAdmin={isAdmin}
                     onUpvote={handleUpvote}
+                    onAdminEdit={setAdminItem}
                   />
                 ))}
               </div>
             )}
 
-            {/* CTA at bottom for non-empty lists */}
             {!loading && items.length > 0 && (
               <div className="mt-8 rounded-[var(--r-xl)] border-2 border-dashed border-[var(--border)] p-6 text-center">
                 <p className="text-sm font-medium text-[var(--text-primary)] mb-1">
@@ -579,6 +680,17 @@ function FeedbackContent() {
         onClose={() => setShowModal(false)}
         onSuccess={handleSuccess}
       />
+
+      {adminItem && (
+        <AdminPanel
+          item={adminItem}
+          onClose={() => setAdminItem(null)}
+          onUpdated={(updated) => {
+            handleAdminUpdated(updated);
+            setAdminItem(null);
+          }}
+        />
+      )}
     </div>
   );
 }

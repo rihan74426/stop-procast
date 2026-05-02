@@ -115,7 +115,7 @@ export function ToastContainer() {
     <div
       aria-live="polite"
       className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"
-      style={{ maxWidth: "min(360px, calc(100vw - 32px))" }}
+      style={{ maxWidth: "min(380px, calc(100vw - 32px))" }}
     >
       {toasts.map((t) => (
         <div
@@ -128,20 +128,36 @@ export function ToastContainer() {
           ].join(" ")}
         >
           <span className="shrink-0 mt-0.5">{ICONS[t.type]}</span>
-          <p className="flex-1 text-sm text-[var(--text-primary)] leading-snug">
-            {t.message}
-          </p>
-          {t.action && (
-            <button
-              onClick={() => {
-                t.action.onClick();
-                dismiss(t.id);
-              }}
-              className="shrink-0 text-xs font-medium text-[var(--violet)] hover:underline"
-            >
-              {t.action.label}
-            </button>
-          )}
+
+          <div className="flex-1 min-w-0">
+            <p className="text-sm text-[var(--text-primary)] leading-snug">
+              {t.message}
+            </p>
+
+            {/* Feedback link — shown on error toasts automatically */}
+            {t.type === "error" && !t.action && (
+              <a
+                href="/feedback"
+                className="inline-flex items-center gap-1 mt-1 text-xs text-[var(--violet)] hover:underline"
+              >
+                Report this issue →
+              </a>
+            )}
+
+            {/* Optional explicit action */}
+            {t.action && (
+              <button
+                onClick={() => {
+                  t.action.onClick();
+                  dismiss(t.id);
+                }}
+                className="mt-1 text-xs font-medium text-[var(--violet)] hover:underline"
+              >
+                {t.action.label} →
+              </button>
+            )}
+          </div>
+
           <button
             onClick={() => dismiss(t.id)}
             className="shrink-0 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors mt-0.5"
