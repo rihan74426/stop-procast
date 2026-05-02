@@ -275,4 +275,6 @@ the limit is one project for the anonymous and 4 for the users.
 make this universal and well managed in everywhere.
 we also need a reminder push notification from this app to remind user to complete their daily task in the morning.
 
-make this pages and tool open for every aspects of plan, ideas, thinking, project on table, preparation, works, learning etc, not limitting to building anything. greet the user with their names and as stranger when not logged in. greet them in different words and ways. inspire them, motivate them to move forward.
+make these pages and tool open for every aspects of plan, ideas, thinking, project on table, preparation, works, learning etc, not limitting to building anything. greet the user with their names and as stranger when not logged in. greet them in different words and ways. inspire them, motivate them to move forward.
+
+we need to add the puter credintials in the application to get access. and let the user know when one ai api is failed or busy or something else and moving to another one.
