@@ -15,16 +15,56 @@ Single source of truth. Read before writing any code.
 
 ## Current phase status
 
-| Phase | Name                           | Status  |
-| ----- | ------------------------------ | ------- |
-| 1     | Foundation & Design System     | ✅ Done |
-| 2     | Data Layer & State             | ✅ Done |
-| 3     | Core Pages & AI Intake         | ✅ Done |
-| 4     | Execution Mode & Pressure      | ✅ Done |
-| 5     | Completion, Postmortem, Polish | ✅ Done |
-| 6     | Auth, DB, AI Integration       | ✅ Done |
-| 7     | i18n, Model Picker, PDF Export | ✅ Done |
-| 8     | Puter.js, Anon Limit, Import   | ✅ Done |
+| Phase | Name                             | Status  |
+| ----- | -------------------------------- | ------- |
+| 1     | Foundation & Design System       | ✅ Done |
+| 2     | Data Layer & State               | ✅ Done |
+| 3     | Core Pages & AI Intake           | ✅ Done |
+| 4     | Execution Mode & Pressure        | ✅ Done |
+| 5     | Completion, Postmortem, Polish   | ✅ Done |
+| 6     | Auth, DB, AI Integration         | ✅ Done |
+| 7     | i18n, Model Picker, PDF Export   | ✅ Done |
+| 8     | Puter.js, Anon Limit, Import     | ✅ Done |
+| 9     | Nav Fix, Toast, Feedback & Admin | ✅ Done |
+
+---
+
+## Phase 9 — Nav Fix, Toast, Feedback & Admin
+
+**Status: ✅ Done**
+
+### What was fixed
+
+#### `app/new/page.jsx` — Wizard navigation overhaul
+
+- Back/forward navigation **never resets or regenerates** — all step state preserved
+- Blueprint cached with an `inputKey` (`idea + scopeLevel`); only marked stale when inputs actually change
+- `goTo(target)` — free navigation to any visited step, no state side-effects
+- `advance(target)` — moves forward and records `maxStep` for breadcrumb clickability
+- Clarify questions remain cached via `cachedQuestions` prop; no refetch on back
+- `StepReview` receives `cachedBlueprint` when returning — skips generation entirely
+
+#### `components/ui/Toast.jsx` — Feedback link on errors
+
+- Every `type: "error"` toast now automatically appends a `"Report this issue →"` link to `/feedback`
+- Explicit `action` prop overrides the auto-link (for custom CTAs)
+
+#### `app/feedback/page.jsx` — Public board + admin panel
+
+- Page confirmed fully public — no auth required to view, vote, or submit
+- Admin panel added: change status (`open → in_progress → resolved / wont_fix / duplicate`) + add team note
+- Admin gate: `user?.publicMetadata?.role === "admin"` (Clerk public metadata — no extra API)
+- Admin badge and per-card **Edit** button visible only to admin users
+
+#### `middleware.js` — Explicit public route
+
+- `/feedback` explicitly skipped from any auth checks — unambiguously public
+
+### Admin setup (one-time)
+
+1. Clerk Dashboard → Users → select user → Metadata tab
+2. Add to **Public metadata**: `{ "role": "admin" }`
+3. That user now sees the Admin badge and Edit controls on `/feedback`
 
 ---
 
@@ -127,6 +167,7 @@ Auth is **optional** — every feature works without signing in.
 - Signed-in: unlimited, userId-keyed MongoDB, full sync
 - Auth gate: shown after blueprint in StepReview (friendly, not a hard block for commit)
 - Project limit gate: hard block on `/new` if limit exceeded — sign up required
+- Admin role: set via Clerk `publicMetadata.role = "admin"` — grants feedback board admin panel
 
 ---
 
@@ -155,6 +196,37 @@ Triggered from Dashboard header Import button.
 
 ---
 
+## Wizard navigation rules (Phase 9)
+
+These rules govern `app/new/page.jsx` — do not regress them:
+
+- **Never reset step state on navigation** — all inputs (idea, answers, scope) persist for the session
+- **Blueprint cache key** = `idea + "||" + scopeLevel` — only invalidated when these change
+- **`goTo(n)`** — navigate to any step `n <= maxReached`, no side effects
+- **`advance(n)`** — navigate forward, updates `maxReached`
+- **`StepReview` receives `cachedBlueprint`** when navigating back to step 3 — skips AI call entirely
+- **`blueprintIsStale`** is shown as a warning badge in the breadcrumb — does not block navigation
+
+---
+
+## Toast rules (Phase 9)
+
+- `toast.error(msg)` — always appends "Report this issue →" `/feedback` link automatically
+- `toast.error(msg, { action: { label, onClick } })` — explicit action overrides the auto-link
+- Never show raw error objects in toasts — always a human-readable string
+
+---
+
+## Feedback page rules (Phase 9)
+
+- `/feedback` is **always public** — no auth, no redirect, no middleware guard
+- Anyone can: view all reports, upvote once per session, submit new report
+- Admin only (Clerk `publicMetadata.role === "admin"`): change status, add team note
+- Upvote is idempotent server-side (`$ne sessionId` guard in MongoDB query)
+- In-memory fallback (`memStore`) used when MongoDB is unavailable
+
+---
+
 ## What NOT to do
 
 - Do NOT use `lib/ai/openrouter.js` — use `lib/ai/client.js` (server) or `lib/ai/clientGenerate.js` (client)
@@ -163,6 +235,9 @@ Triggered from Dashboard header Import button.
 - Do NOT call `auth.protect()` anywhere
 - Do NOT add new localStorage keys outside `lib/persistence.js`
 - Do NOT remove `X-OpenRouter-Cache` header from `aiGenerate` calls in `lib/ai/client.js`
+- Do NOT reset wizard step state or blueprint on back-navigation
+- Do NOT regenerate blueprint when user navigates back to StepReview with unchanged inputs
+- Do NOT add auth guards to `/feedback` or its API route
 
 ---
 
@@ -178,8 +253,19 @@ CLERK_SECRET_KEY=...
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
 ```
 
-A complaining page. or suggestion
-the main page navigation is not working correctly yet. it needs to be smooth and well working, can go back without resetting the progress and shouldn't regenerate the request. every step and responses should be cached when set by user. it won't go forward and won't reset the steps.
-the toast is not set correctly. fix it for showing the report here with the feedback url.
-the feedback page is should be public and open without any auth. anyone can see the suggestion and interact and can submit their opinion.
-then the admin account setup in the clerk metadata to resolve the issues suggested by the users.
+---
+
+## Phase 10 — Post-MVP Backlog
+
+Features queued for after current fixes stabilize:
+
+- [ ] Recurring check-ins and deadline reminders (cron / server actions)
+- [ ] Timeline / Gantt visualization
+- [ ] Dependency mapping between tasks
+- [ ] AI weekly status summary generator
+- [ ] Notes per phase (rich text — Tiptap or similar)
+- [ ] Export to Notion / CSV / PDF
+- [ ] Team collaboration (shared projects, assigned tasks)
+- [ ] Analytics dashboard (completion rate, avg time per phase)
+- [ ] Paid tier gating (Stripe) — then switch `AI_PROVIDER=anthropic` for premium users
+- [ ] Mobile app (React Native or Expo)
