@@ -20,12 +20,20 @@ function checkRateLimit(ip) {
   }
   entry.count++;
   ipUsage.set(ip, entry);
-  if (ipUsage.size > 500) {
+
+  // Prune stale entries periodically (memory safety)
+  if (ipUsage.size > 1000) {
     for (const [k, v] of ipUsage) {
       if (now - v.windowStart > WINDOW_MS * 5) ipUsage.delete(k);
     }
   }
   return entry.count <= MAX_PER_MINUTE;
+}
+
+function getRetryAfter(ip) {
+  const entry = ipUsage.get(ip);
+  if (!entry) return 60;
+  return Math.ceil((entry.windowStart + WINDOW_MS - Date.now()) / 1000);
 }
 
 function getIP(req) {
@@ -40,42 +48,61 @@ export async function POST(request) {
   try {
     const ip = getIP(request);
     if (!checkRateLimit(ip)) {
+      const retryAfter = getRetryAfter(ip);
       return Response.json(
-        { error: "Too many requests. Wait a moment.", code: "RATE_LIMITED" },
-        { status: 429 }
+        {
+          error: `Too many requests. Wait ${retryAfter}s and retry.`,
+          code: "RATE_LIMITED",
+          retryAfter,
+        },
+        {
+          status: 429,
+          headers: { "Retry-After": String(retryAfter) },
+        }
       );
     }
 
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON body" }, { status: 400 });
+    }
+
     const { type, idea, clarifications, scopeLevel, project, profileContext } =
       body;
 
-    if (!type)
+    if (!type) {
       return Response.json({ error: "Missing type." }, { status: 400 });
+    }
 
-    // clarify & reengage — fallback only (puter handles these client-side first)
+    // clarify — fallback (puter handles first)
     if (type === "clarify") {
-      if (!idea)
+      if (!idea?.trim()) {
         return Response.json({ error: "Missing idea." }, { status: 400 });
+      }
       const text = await aiGenerate(buildClarifyPrompt(idea));
       return Response.json({ questions: text });
     }
 
+    // reengage — fallback
     if (type === "reengage") {
-      if (!project)
+      if (!project) {
         return Response.json({ error: "Missing project." }, { status: 400 });
+      }
       const text = await aiGenerate(buildReengagePrompt(project));
       return Response.json({ suggestion: text });
     }
 
-    // generate — called for ambitious/deep mode OR when puter fails
+    // generate — ambitious/deep mode or puter fallback
     if (type === "generate") {
-      if (!idea)
+      if (!idea?.trim()) {
         return Response.json({ error: "Missing idea." }, { status: 400 });
+      }
       const userPrompt = buildUserPrompt({
         idea,
-        clarifications,
-        scopeLevel,
+        clarifications: Array.isArray(clarifications) ? clarifications : [],
+        scopeLevel: scopeLevel || "standard",
         profileContext:
           typeof profileContext === "string" ? profileContext : "",
       });
@@ -97,7 +124,7 @@ export async function POST(request) {
         : "AI_ERROR";
     const message =
       status === 429
-        ? "Rate limit hit. Wait 30s and retry."
+        ? "Rate limit hit. Wait a moment and retry."
         : status === 402
         ? "AI quota exceeded. Try again tomorrow."
         : "Generation failed. Please try again.";

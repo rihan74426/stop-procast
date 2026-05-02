@@ -1,47 +1,58 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/Button";
 
 export function StepCommit({ blueprint, onBack, onConfirm }) {
   const [deadline, setDeadline] = useState("");
   const [committed, setCommitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [progress, setProgress] = useState(0); // 0-100
+  const [progress, setProgress] = useState(0);
   const [statusMessage, setStatusMessage] = useState("");
   const [error, setError] = useState(null);
+
   const progressRef = useRef(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (progressRef.current) {
+        clearInterval(progressRef.current);
+        progressRef.current = null;
+      }
+    };
+  }, []);
 
   // Suggest a deadline based on blueprint timeline
-  const suggestDeadline = () => {
+  const suggestDeadline = useCallback(() => {
     const weeks = parseInt(blueprint.timeline) || 6;
     const d = new Date();
     d.setDate(d.getDate() + weeks * 7);
     setDeadline(d.toISOString().split("T")[0]);
-  };
+  }, [blueprint.timeline]);
 
-  // Start a gentle progress animation while the commit runs
-  const startProgress = () => {
+  const startProgress = useCallback(() => {
     setProgress((p) => Math.max(p, 8));
     if (progressRef.current) clearInterval(progressRef.current);
     progressRef.current = setInterval(() => {
+      if (!mountedRef.current) {
+        clearInterval(progressRef.current);
+        return;
+      }
       setProgress((p) => {
-        // advance quickly at first then slow down, cap before completion
         const delta = p < 40 ? 6 : p < 80 ? 3 : 1;
         return Math.min(96, p + delta);
       });
     }, 700);
-  };
+  }, []);
 
-  const stopProgress = () => {
+  const stopProgress = useCallback(() => {
     if (progressRef.current) {
       clearInterval(progressRef.current);
       progressRef.current = null;
     }
-  };
-
-  useEffect(() => {
-    return () => stopProgress();
   }, []);
 
   const handleConfirm = async () => {
@@ -52,21 +63,23 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
     startProgress();
 
     try {
-      // Await parent's async handler so we can show progress until navigation finishes
       await onConfirm({ deadline: deadline || null });
-      // If the parent navigates away, this component will unmount.
-      // If it doesn't, finish the UI flow gracefully.
-      stopProgress();
-      setProgress(100);
-      setStatusMessage("Project created — redirecting…");
-      // small pause to show final state if not navigated
-      setTimeout(() => {
-        setSubmitting(false);
-      }, 500);
+      // If navigation happens, this component unmounts — that's fine
+      // If it doesn't navigate (error in parent), we reset
+      if (mountedRef.current) {
+        stopProgress();
+        setProgress(100);
+        setStatusMessage("Project created — redirecting…");
+        setTimeout(() => {
+          if (mountedRef.current) setSubmitting(false);
+        }, 500);
+      }
     } catch (e) {
+      if (!mountedRef.current) return;
       stopProgress();
       setSubmitting(false);
       setStatusMessage("");
+      setProgress(0);
       setError(e?.message ?? "Failed to create project. Please try again.");
     }
   };
@@ -91,11 +104,15 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
           {blueprint.oneLineGoal}
         </p>
         <div className="mt-4 flex flex-wrap gap-3 text-xs text-[var(--text-tertiary)]">
-          <span>{blueprint.phases.length} phases</span>
+          <span>{blueprint.phases?.length ?? 0} phases</span>
           <span>·</span>
-          <span>{blueprint.tasks.length} tasks</span>
-          <span>·</span>
-          <span>{blueprint.estimatedEffort}</span>
+          <span>{blueprint.tasks?.length ?? 0} tasks</span>
+          {blueprint.estimatedEffort && (
+            <>
+              <span>·</span>
+              <span>{blueprint.estimatedEffort}</span>
+            </>
+          )}
         </div>
       </div>
 
@@ -125,7 +142,11 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
         {deadline && (
           <p className="text-xs text-[var(--text-secondary)]">
             That gives you{" "}
-            {Math.ceil((new Date(deadline) - new Date()) / 86400000)} days.
+            {Math.max(
+              1,
+              Math.ceil((new Date(deadline) - Date.now()) / 86400000)
+            )}{" "}
+            days.
           </p>
         )}
       </div>
@@ -162,8 +183,8 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
 
       {/* Inline status / progress */}
       {submitting && (
-        <div className="rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-subtle)] px-4 py-3 text-sm flex items-center gap-3">
-          <div className="w-6 h-6 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin" />
+        <div className="rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-subtle)] px-4 py-3 flex items-center gap-3">
+          <div className="w-6 h-6 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin shrink-0" />
           <div className="flex-1 min-w-0">
             <div className="text-sm font-medium text-[var(--text-primary)]">
               {statusMessage}
@@ -171,15 +192,12 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
             <div className="mt-2 h-2 rounded-full bg-[var(--bg-muted)] overflow-hidden">
               <div
                 className="h-full rounded-full transition-all duration-700"
-                style={{
-                  width: `${progress}%`,
-                  background: "var(--violet)",
-                }}
+                style={{ width: `${progress}%`, background: "var(--violet)" }}
               />
             </div>
           </div>
           <div className="text-xs text-[var(--text-tertiary)] tabular-nums">
-            {Math.min(99, progress)}%
+            {Math.min(99, Math.round(progress))}%
           </div>
         </div>
       )}

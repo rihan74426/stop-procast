@@ -1,25 +1,30 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { toast } from "@/lib/toast";
+import { useToastStore } from "@/lib/toast";
 
 export function NetworkMonitor() {
   const offlineToastId = useRef(null);
+  const show = useToastStore((s) => s.show);
+  const dismiss = useToastStore((s) => s.dismiss);
 
   useEffect(() => {
     const handleOffline = () => {
-      offlineToastId.current = toast.error(
+      if (offlineToastId.current) return; // already showing
+      // Use 'warn' instead of 'error' so the "Report this issue" link
+      // doesn't appear — going offline is expected, not a bug
+      offlineToastId.current = show(
         "No internet connection — changes will sync when you're back online.",
-        { duration: 0 }
+        { type: "warn", duration: 0 }
       );
     };
 
     const handleOnline = () => {
       if (offlineToastId.current) {
-        toast.dismiss(offlineToastId.current);
+        dismiss(offlineToastId.current);
         offlineToastId.current = null;
       }
-      toast.success("Back online — syncing your changes.");
+      show("Back online — syncing your changes.", { type: "success" });
     };
 
     window.addEventListener("offline", handleOffline);
@@ -32,7 +37,7 @@ export function NetworkMonitor() {
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("online", handleOnline);
     };
-  }, []);
+  }, [show, dismiss]);
 
   return null;
 }

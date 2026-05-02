@@ -3,7 +3,6 @@
 import { use, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { useUser } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { SavePromptModal } from "@/components/ui/SavePromptModal";
@@ -23,7 +22,12 @@ import { Badge } from "@/components/ui/Badge";
 import { overallProgress } from "@/lib/utils/progress";
 import { formatDate, projectAgeLabel } from "@/lib/utils/date";
 import { useI18n } from "@/lib/i18n";
+import { toast } from "@/lib/toast";
 
+/**
+ * Unicode-safe base64 encoding for project export URLs.
+ * Handles Arabic, Chinese, emoji, and all non-ASCII characters.
+ */
 function toBase64Safe(str) {
   return btoa(
     encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) =>
@@ -35,10 +39,14 @@ function toBase64Safe(str) {
 function ProjectContent({ id }) {
   const router = useRouter();
   const { t } = useI18n();
+
   const project = useProjectStore((s) => s.getProject(id));
   const deleteProject = useProjectStore((s) => s.deleteProject);
   const completeProject = useProjectStore((s) => s.completeProject);
+
   const [showEmailExport, setShowEmailExport] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [completing, setCompleting] = useState(false);
 
   if (!project) {
     return (
@@ -58,30 +66,49 @@ function ProjectContent({ id }) {
   const progress = overallProgress(project);
   const isCompleted = !!project.completionDate;
 
-  const handleDelete = () => {
-    if (confirm(`Delete "${project.projectTitle}"? This cannot be undone.`)) {
-      deleteProject(id);
+  const handleDelete = async () => {
+    if (!confirm(`Delete "${project.projectTitle}"? This cannot be undone.`))
+      return;
+    setDeleting(true);
+    try {
+      await deleteProject(id);
       router.push("/");
+    } catch {
+      setDeleting(false);
+      toast.error("Failed to delete project.");
     }
   };
 
-  const handleComplete = () => {
-    if (confirm("Mark this project as complete?")) {
-      completeProject(id);
+  const handleComplete = async () => {
+    if (!confirm("Mark this project as complete?")) return;
+    setCompleting(true);
+    try {
+      await completeProject(id);
       router.push(`/project/${id}/complete`);
+    } catch {
+      setCompleting(false);
+      toast.error("Failed to complete project.");
     }
   };
 
   const handleExport = (format = "json") => {
-    const encoded = toBase64Safe(JSON.stringify(project));
-    window.location.href = `/project/${id}/export?format=${format}&data=${encoded}`;
+    try {
+      const encoded = toBase64Safe(JSON.stringify(project));
+      window.location.href = `/project/${id}/export?format=${format}&data=${encoded}`;
+    } catch {
+      toast.error("Export failed. Please try again.");
+    }
   };
 
   const handleExportPDF = async () => {
+    const toastId = toast.loading("Generating PDF…");
     try {
       const { exportProjectPDF } = await import("@/lib/utils/exportPDF");
       await exportProjectPDF(project);
+      toast.dismiss(toastId);
     } catch (err) {
+      toast.dismiss(toastId);
+      toast.error("PDF export failed. Please try again.");
       console.error("PDF export failed:", err);
     }
   };
@@ -108,7 +135,7 @@ function ProjectContent({ id }) {
             </div>
 
             <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-[1fr_280px] xl:grid-cols-[1fr_300px]">
-              {/* Left column */}
+              {/* ── Left column ── */}
               <div className="flex flex-col gap-5 sm:gap-6 min-w-0">
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-2">
@@ -166,7 +193,7 @@ function ProjectContent({ id }) {
                 </div>
               </div>
 
-              {/* Right column */}
+              {/* ── Right column ── */}
               <div className="flex flex-col gap-4 sm:gap-5 pb-16 lg:pb-0">
                 {/* Stats */}
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
@@ -211,6 +238,7 @@ function ProjectContent({ id }) {
                   </div>
                 </div>
 
+                {/* Success criteria */}
                 {project.successCriteria?.length > 0 && (
                   <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                     <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
@@ -232,10 +260,12 @@ function ProjectContent({ id }) {
                   </div>
                 )}
 
+                {/* Blockers */}
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                   <BlockerPanel project={project} />
                 </div>
 
+                {/* Suggested tools */}
                 {project.toolsSuggested?.length > 0 && (
                   <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                     <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
@@ -256,16 +286,18 @@ function ProjectContent({ id }) {
                   <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-1">
                     {t("project_actions")}
                   </p>
+
                   {!isCompleted && (
                     <Button
                       variant="emerald"
                       onClick={handleComplete}
+                      loading={completing}
                       className="w-full justify-center"
                     >
                       {t("project_mark_shipped")}
                     </Button>
                   )}
-                  {/* Email export — requires auth (handled inside modal) */}
+
                   <Button
                     variant="ghost"
                     onClick={() => setShowEmailExport(true)}
@@ -273,7 +305,7 @@ function ProjectContent({ id }) {
                   >
                     ✉️ {t("project_export_email")}
                   </Button>
-                  {/* PDF and file exports available to all */}
+
                   <Button
                     variant="ghost"
                     onClick={handleExportPDF}
@@ -281,6 +313,7 @@ function ProjectContent({ id }) {
                   >
                     {t("project_export_pdf")}
                   </Button>
+
                   <Button
                     variant="ghost"
                     onClick={() => handleExport("markdown")}
@@ -288,9 +321,20 @@ function ProjectContent({ id }) {
                   >
                     {t("project_export_md")}
                   </Button>
+
+                  {/* JSON export — was missing in original */}
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleExport("json")}
+                    className="w-full justify-center"
+                  >
+                    {t("project_export_json")}
+                  </Button>
+
                   <Button
                     variant="danger"
                     onClick={handleDelete}
+                    loading={deleting}
                     className="w-full justify-center"
                   >
                     {t("project_delete")}

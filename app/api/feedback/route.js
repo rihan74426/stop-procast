@@ -1,18 +1,33 @@
 // app/api/feedback/route.js
 // Feedback & bug reports — stored in MongoDB (or falls back to in-memory)
-// Public read, write-once per session (no auth required)
+// Public read, write-once per session (no auth required to view/submit)
+// Admin actions require Clerk auth + publicMetadata.role === "admin"
 
+import { auth, clerkClient } from "@clerk/nextjs/server";
 import { tryConnectDB } from "@/lib/db/mongoose";
 import { generateId, getFeedbackModel, memStore } from "@/lib/models/Feedback";
-import { getSessionId } from "@/lib/sessionId";
 
-// ─── GET /api/feedback — list all, newest first ───────────────────────
+// ─── Helper: verify admin ─────────────────────────────────────────────
+
+async function isAdminUser() {
+  try {
+    const { userId } = await auth();
+    if (!userId) return false;
+    const client = await clerkClient();
+    const user = await client.users.getUser(userId);
+    return user?.publicMetadata?.role === "admin";
+  } catch {
+    return false;
+  }
+}
+
+// ─── GET /api/feedback ────────────────────────────────────────────────
 export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
-    const status = searchParams.get("status"); // optional filter
-    const page = parseInt(searchParams.get("page") ?? "1");
-    const limit = Math.min(parseInt(searchParams.get("limit") ?? "30"), 50);
+    const status = searchParams.get("status");
+    const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
+    const limit = Math.min(50, parseInt(searchParams.get("limit") ?? "30"));
     const skip = (page - 1) * limit;
 
     const db = await tryConnectDB();
@@ -45,10 +60,16 @@ export async function GET(request) {
   }
 }
 
-// ─── POST /api/feedback — submit new report ───────────────────────────
+// ─── POST /api/feedback ───────────────────────────────────────────────
 export async function POST(request) {
   try {
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+
     const { type, title, body: text, sessionId } = body;
 
     if (!title?.trim() || title.trim().length < 5) {
@@ -67,7 +88,7 @@ export async function POST(request) {
       title: title.trim().slice(0, 120),
       body: (text ?? "").trim().slice(0, 2000),
       sessionId: sessionId ?? null,
-      userId: null, // extend later with Clerk auth
+      userId: null,
       upvotes: 0,
       upvotedBy: [],
       status: "open",
@@ -92,14 +113,31 @@ export async function POST(request) {
   }
 }
 
-// ─── PATCH /api/feedback — upvote or admin status update ─────────────
+// ─── PATCH /api/feedback — upvote or admin update ────────────────────
 export async function PATCH(request) {
   try {
-    const body = await request.json();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON" }, { status: 400 });
+    }
+
     const { id, action, sessionId, status, adminNote } = body;
 
     if (!id) {
       return Response.json({ error: "Missing id" }, { status: 400 });
+    }
+
+    // Admin actions require server-side verification
+    if (
+      (status !== undefined || adminNote !== undefined) &&
+      action !== "upvote"
+    ) {
+      const admin = await isAdminUser();
+      if (!admin) {
+        return Response.json({ error: "Unauthorized" }, { status: 403 });
+      }
     }
 
     const db = await tryConnectDB();
@@ -114,11 +152,14 @@ export async function PATCH(request) {
         item.upvotes++;
         item.upvotedBy.push(sessionId);
       }
+      if (status) item.status = status;
+      if (adminNote !== undefined) item.adminNote = adminNote;
       return Response.json({ item });
     }
 
     const Feedback = getFeedbackModel();
 
+    // Upvote — idempotent per session
     if (action === "upvote" && sessionId) {
       const doc = await Feedback.findOneAndUpdate(
         { id, upvotedBy: { $ne: sessionId } },
@@ -130,8 +171,8 @@ export async function PATCH(request) {
       return Response.json({ item: clean });
     }
 
-    // Admin status update (simple — no auth check, add Clerk guard in prod)
-    if (status) {
+    // Admin status/note update
+    if (status !== undefined || adminNote !== undefined) {
       const validStatuses = [
         "open",
         "in_progress",
@@ -139,11 +180,11 @@ export async function PATCH(request) {
         "wont_fix",
         "duplicate",
       ];
-      if (!validStatuses.includes(status)) {
+      if (status && !validStatuses.includes(status)) {
         return Response.json({ error: "Invalid status" }, { status: 400 });
       }
       const patch = {
-        status,
+        ...(status !== undefined ? { status } : {}),
         ...(adminNote !== undefined ? { adminNote } : {}),
         ...(status === "resolved"
           ? { resolvedAt: new Date().toISOString() }

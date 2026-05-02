@@ -5,21 +5,20 @@ import Project from "@/lib/models/Project";
 /**
  * GET /api/projects/check-limit
  *
- * Returns { allowed: bool, count: number, limit: number }
- * Called before generation begins so StepReview can gate properly.
+ * Returns { allowed: bool, count: number, limit: number, authed: bool }
  *
  * Rules:
- *   - Authenticated users: always allowed (no server-side cap here)
+ *   - Authenticated users: always allowed (no cap server-side)
  *   - Anonymous users: max 1 project per sessionId
  *
- * This is the server-enforced check — client-side rateLimit.js is
- * a UX hint only and can be bypassed. This cannot.
+ * This is the authoritative server-side check.
+ * Client-side rateLimit.js is a UX hint only.
  */
 export async function GET(request) {
   try {
     const { userId } = await auth();
 
-    // Authenticated — no limit enforced server-side
+    // Authenticated — unlimited
     if (userId) {
       return Response.json({
         allowed: true,
@@ -32,7 +31,7 @@ export async function GET(request) {
     const sessionId = request.headers.get("X-Session-Id");
 
     if (!sessionId) {
-      // No session yet — first visit, allow
+      // No session yet — first visit, always allow
       return Response.json({
         allowed: true,
         count: 0,
@@ -43,7 +42,7 @@ export async function GET(request) {
 
     const db = await tryConnectDB();
     if (!db) {
-      // DB down — allow optimistically (fail open, not closed)
+      // DB down — fail open (don't punish user for our infra issues)
       return Response.json({
         allowed: true,
         count: 0,
@@ -52,13 +51,14 @@ export async function GET(request) {
       });
     }
 
+    const ANON_LIMIT = 1;
+
+    // Count projects for this session (including any that haven't been claimed yet)
     const count = await Project.countDocuments({
       sessionId,
-      isAnonymous: true,
-      userId: null,
+      userId: null, // only truly anonymous, not yet claimed
     });
 
-    const ANON_LIMIT = 1;
     return Response.json({
       allowed: count < ANON_LIMIT,
       count,
@@ -67,7 +67,7 @@ export async function GET(request) {
     });
   } catch (err) {
     console.error("[check-limit]", err.message);
-    // Fail open — don't block the user on a server error
+    // Fail open
     return Response.json({ allowed: true, count: 0, limit: 1, authed: false });
   }
 }

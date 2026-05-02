@@ -23,61 +23,80 @@ export async function GET(request) {
 }
 
 // POST /api/projects
-// Called for EVERY new project — anonymous or authenticated
 export async function POST(request) {
   try {
-    const body = await request.json();
-    const { userId } = await auth();
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return Response.json({ error: "Invalid JSON" }, { status: 400 });
+    }
 
-    // Get sessionId from body or header
+    // Require a project id
+    if (!body?.id) {
+      return Response.json({ error: "Missing project id" }, { status: 400 });
+    }
+
+    const { userId } = await auth();
     const sessionId =
       body.sessionId || request.headers.get("X-Session-Id") || null;
 
-    const db = await tryConnectDB();
+    // Sanitize — never allow caller to spoof these server-set fields
+    const { _id, __v, ...safeBody } = body;
 
+    const db = await tryConnectDB();
     if (!db) {
       // DB down — acknowledge, client has local copy
-      return Response.json({ project: body }, { status: 201 });
+      return Response.json({ project: safeBody }, { status: 201 });
     }
 
     if (userId) {
-      // Authenticated: upsert (handles case where saved as anon first)
+      // Authenticated: upsert by id (handles anon→auth promotion)
       const doc = await Project.findOneAndUpdate(
-        { id: body.id },
-        { ...body, userId, isAnonymous: false, sessionId: sessionId || null },
+        { id: safeBody.id },
+        {
+          ...safeBody,
+          userId,
+          isAnonymous: false,
+          sessionId: sessionId || null,
+        },
         { upsert: true, new: true, setDefaultsOnInsert: true }
       );
-      const { _id, __v, ...clean } = doc.toObject();
+      const { _id: _d, __v: _v, ...clean } = doc.toObject();
       return Response.json({ project: clean }, { status: 201 });
     }
 
-    // Anonymous: save with sessionId for later claiming
+    // Anonymous: save with sessionId
     try {
-      const existing = await Project.findOne({ id: body.id });
+      // Check for existing doc first (idempotent)
+      const existing = await Project.findOne({ id: safeBody.id }).lean();
       if (existing) {
-        // Already saved (duplicate call) — just return it
-        const { _id, __v, ...clean } = existing.toObject();
+        const { _id: _d, __v: _v, ...clean } = existing;
         return Response.json({ project: clean }, { status: 200 });
       }
 
       const doc = await Project.create({
-        ...body,
+        ...safeBody,
         userId: null,
         sessionId: sessionId || null,
         isAnonymous: true,
       });
-      const { _id, __v, ...clean } = doc.toObject();
+      const { _id: _d, __v: _v, ...clean } = doc.toObject();
       return Response.json({ project: clean }, { status: 201 });
     } catch (dbErr) {
-      // Duplicate key — already exists
+      // Duplicate key — race condition, return existing
       if (dbErr.code === 11000) {
-        return Response.json({ project: body }, { status: 200 });
+        const existing = await Project.findOne({ id: safeBody.id }).lean();
+        if (existing) {
+          const { _id: _d, __v: _v, ...clean } = existing;
+          return Response.json({ project: clean }, { status: 200 });
+        }
+        return Response.json({ project: safeBody }, { status: 200 });
       }
       throw dbErr;
     }
   } catch (err) {
     console.error("POST /api/projects:", err.message);
-    // Always return 201 so client doesn't think it failed
     return Response.json({ project: {} }, { status: 201 });
   }
 }

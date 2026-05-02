@@ -269,3 +269,10 @@ Features queued for after current fixes stabilize:
 - [ ] Analytics dashboard (completion rate, avg time per phase)
 - [ ] Paid tier gating (Stripe) — then switch `AI_PROVIDER=anthropic` for premium users
 - [ ] Mobile app (React Native or Expo)
+
+the limits are not working correctly. it is generating in the back even when the limit message came.
+the limit is one project for the anonymous and 4 for the users.
+make this universal and well managed in everywhere.
+we also need a reminder push notification from this app to remind user to complete their daily task in the morning.
+
+make this pages and tool open for every aspects of plan, ideas, thinking, project on table, preparation, works, learning etc, not limitting to building anything. greet the user with their names and as stranger when not logged in. greet them in different words and ways. inspire them, motivate them to move forward.

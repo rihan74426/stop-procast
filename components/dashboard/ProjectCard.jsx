@@ -5,6 +5,7 @@ import { ProgressRing } from "@/components/ui/Progress";
 import { Badge } from "@/components/ui/Badge";
 import { overallProgress, activePhase, nextAction } from "@/lib/utils/progress";
 import { projectAgeLabel, timeAgo } from "@/lib/utils/date";
+import { FaFire } from "react-icons/fa";
 import { getPressure, PRESSURE_COLORS, PRESSURE_LABELS } from "@/lib/pressure";
 
 export function ProjectCard({ project }) {
@@ -88,8 +89,8 @@ export function ProjectCard({ project }) {
           </span>
           <div className="flex items-center gap-2 sm:gap-3">
             {project.streakDays > 0 && (
-              <span className="text-[var(--amber)]">
-                🔥 {project.streakDays}d
+              <span className="flex items-center text-red-400">
+                <FaFire /> {project.streakDays}d
               </span>
             )}
             <span>{timeAgo(project.lastActivityAt)}</span>

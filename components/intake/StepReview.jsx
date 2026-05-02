@@ -1,13 +1,6 @@
 "use client";
 
-import React, {
-  useEffect,
-  useRef,
-  useState,
-  useCallback,
-  useMemo,
-  memo,
-} from "react";
+import React, { useEffect, useRef, useState, useCallback, memo } from "react";
 import { useUser } from "@clerk/nextjs";
 import { parseBlueprint } from "@/lib/ai/parser";
 import { Badge } from "@/components/ui/Badge";
@@ -26,10 +19,6 @@ import {
   FiAlertTriangle,
   FiTool,
   FiStar,
-  FiCheck,
-  FiRefreshCw,
-  FiCircle,
-  FiZap,
 } from "react-icons/fi";
 
 // Animated stage messages shown while the AI streams
@@ -67,18 +56,18 @@ const SCOPE_META = {
 const StreamingProgress = memo(function StreamingProgress({
   charCount,
   scopeLevel,
+  streamPending, // added
 }) {
   const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
   const isDeep = scopeLevel === "ambitious";
   const stage =
     [...STREAM_STAGES].reverse().find((s) => charCount >= s.at) ??
     STREAM_STAGES[0];
-  const Icon = stage.icon; // render as component
+  const Icon = stage.icon;
   const pct = Math.min(98, Math.round((charCount / 3200) * 100));
 
   return (
     <div className="flex flex-col gap-5">
-      {/* Header */}
       <div>
         <div className="flex items-center gap-3 mb-1">
           <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)]">
@@ -94,7 +83,14 @@ const StreamingProgress = memo(function StreamingProgress({
         </p>
       </div>
 
-      {/* Active stage banner */}
+      {/* Contacting AI / pending indicator */}
+      {streamPending && charCount === 0 && (
+        <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+          <div className="w-3 h-3 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin" />
+          <div>Contacting AI…</div>
+        </div>
+      )}
+
       <div className="flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--violet)] bg-[var(--violet-bg)] px-4 py-3">
         <span className="text-xl">
           <Icon />
@@ -115,8 +111,12 @@ const StreamingProgress = memo(function StreamingProgress({
         </span>
       </div>
 
-      {/* Stage checklist */}
-      <div className="grid grid-cols-2 gap-2">
+      {/* Stage grid — pulse while waiting for first chunk */}
+      <div
+        className={`grid grid-cols-2 gap-2 ${
+          streamPending && charCount === 0 ? "animate-pulse opacity-80" : ""
+        }`}
+      >
         {STREAM_STAGES.map((s) => {
           const done = charCount >= s.at;
           const active = stage.at === s.at;
@@ -157,7 +157,6 @@ export function StepReview({
   cachedBlueprint,
   onBack,
   onCommit,
-  // Passed from parent — result of useProjectLimit()
   limitAllowed,
   limitLoading,
 }) {
@@ -169,25 +168,31 @@ export function StepReview({
   const [status, setStatus] = useState(cachedBlueprint ? "done" : "idle");
   const [error, setError] = useState(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
+  const [streamPending, setStreamPending] = useState(false); // added
+
   const rawRef = useRef("");
   const readerRef = useRef(null);
   const rafRef = useRef(null);
   const hasStarted = useRef(false);
   const mountedRef = useRef(true);
   const loadingToastId = useRef(null);
+  // Track retries to avoid infinite loops
+  const retryCount = useRef(0);
+  const MAX_RETRIES = 2;
 
-  // Show auth gate immediately if limit exceeded on mount
+  // Show limit gate if needed
   useEffect(() => {
     if (!limitLoading && !limitAllowed && !cachedBlueprint) {
       setStatus("limited");
     }
   }, [limitLoading, limitAllowed, cachedBlueprint]);
 
+  // Start generation when ready
   useEffect(() => {
     if (cachedBlueprint) return;
     if (hasStarted.current) return;
     if (status === "limited") return;
-    if (limitLoading) return; // wait for limit check
+    if (limitLoading) return;
     if (!limitAllowed) {
       setStatus("limited");
       return;
@@ -197,27 +202,48 @@ export function StepReview({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cachedBlueprint, limitLoading, limitAllowed]);
 
-  // cleanup on unmount: cancel reader and prevent state updates
+  // Cleanup on unmount — CRITICAL: dismiss loading toast
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      if (readerRef.current?.cancel) {
+      // Always dismiss loading toast on unmount
+      if (loadingToastId.current) {
+        toast.dismiss(loadingToastId.current);
+        loadingToastId.current = null;
+      }
+      // Cancel in-flight stream reader
+      if (readerRef.current) {
         try {
           readerRef.current.cancel();
-        } catch {}
+        } catch {
+          /* ignore */
+        }
+        readerRef.current = null;
       }
+      // Cancel pending animation frame
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
       }
+      // ensure pending flag cleared
+      setStreamPending(false);
     };
   }, []);
 
   async function runGeneration() {
+    if (!mountedRef.current) return;
+
     setStatus("streaming");
     setCharCount(0);
     setError(null);
     rawRef.current = "";
+    setStreamPending(true); // indicate request started
+
+    // Dismiss any previous loading toast before creating a new one
+    if (loadingToastId.current) {
+      toast.dismiss(loadingToastId.current);
+    }
     loadingToastId.current = toast.loading(
       scopeLevel === "ambitious"
         ? "Starting deep analysis…"
@@ -235,7 +261,6 @@ export function StepReview({
         profileContext,
       });
 
-      // keep reader ref for cancellation on unmount/retry
       const reader = stream.getReader();
       readerRef.current = reader;
       const decoder = new TextDecoder();
@@ -243,45 +268,95 @@ export function StepReview({
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
-        const chunk = typeof value === "string" ? value : decoder.decode(value);
+        if (!mountedRef.current) {
+          // Component unmounted mid-stream — cancel cleanly
+          try {
+            reader.cancel();
+          } catch {
+            /* ignore */
+          }
+          return;
+        }
+        const chunk =
+          typeof value === "string"
+            ? value
+            : decoder.decode(value, { stream: true });
+
+        // first chunk arrived -> clear pending flag
+        if (streamPending && chunk && chunk.length > 0) {
+          setStreamPending(false);
+        }
+
         rawRef.current += chunk;
-        // batch UI updates with requestAnimationFrame to reduce re-renders
+
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         rafRef.current = requestAnimationFrame(() => {
           if (mountedRef.current) setCharCount(rawRef.current.length);
         });
       }
       rafRef.current = null;
+      readerRef.current = null;
+
+      // Validate we got enough content to parse
+      if (rawRef.current.length < 50) {
+        throw new Error("AI returned incomplete response. Please try again.");
+      }
 
       const parsed = parseBlueprint(rawRef.current);
       if (!mountedRef.current) return;
+
+      // Reset retry counter on success
+      retryCount.current = 0;
+
+      toast.dismiss(loadingToastId.current);
+      loadingToastId.current = null;
+      toast.success("Your plan is ready!");
+
       setBlueprint(parsed);
       setStatus("done");
-      toast.dismiss(loadingToastId.current);
-      toast.success("Your plan is ready!");
+      setStreamPending(false);
     } catch (e) {
+      if (!mountedRef.current) return;
+
       toast.dismiss(loadingToastId.current);
+      loadingToastId.current = null;
 
-      // Rate limit / quota from OpenRouter path
-      if (e.code === "RATE_LIMITED") {
-        toast.warn("Rate limited — retrying in 3s…");
+      readerRef.current = null;
+      setStreamPending(false); // ensure cleared on error
+
+      // Auto-retry on rate limit (max MAX_RETRIES times)
+      if (e.code === "RATE_LIMITED" && retryCount.current < MAX_RETRIES) {
+        retryCount.current += 1;
+        toast.warn(
+          `Rate limited — retrying in 3s… (${retryCount.current}/${MAX_RETRIES})`
+        );
         await new Promise((r) => setTimeout(r, 3000));
-        hasStarted.current = false;
-        // ensure reader is cleaned up before retrying
-        if (readerRef.current?.cancel) {
-          try {
-            await readerRef.current.cancel();
-          } catch {}
+        if (mountedRef.current) {
+          hasStarted.current = false;
+          runGeneration();
         }
-        return runGeneration();
+        return;
       }
 
-      if (mountedRef.current) {
-        setError(e?.message ?? "Generation failed");
-        setStatus("error");
-      }
+      // Give up — show error
+      const message =
+        e.code === "RATE_LIMITED"
+          ? "Rate limit reached. Please wait a moment and try again."
+          : e.code === "QUOTA_EXCEEDED"
+          ? "AI quota exceeded for today. Try again tomorrow."
+          : e?.message ?? "Generation failed. Please try again.";
+
+      setError(message);
+      setStatus("error");
     }
   }
+
+  const handleRetry = useCallback(() => {
+    retryCount.current = 0;
+    hasStarted.current = false;
+    runGeneration();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCommitClick = useCallback(() => {
     if (!isSignedIn) {
@@ -291,7 +366,6 @@ export function StepReview({
     }
   }, [isSignedIn, onCommit, blueprint]);
 
-  // Ensure the continue-anyway callback is a stable hook (not created conditionally)
   const handleContinueAnyway = useCallback(() => {
     setShowAuthGate(false);
     onCommit(blueprint);
@@ -344,7 +418,7 @@ export function StepReview({
     );
   }
 
-  // ── Loading limit check ──────────────────────────────────────────
+  // ── Loading limit check ───────────────────────────────────────────
   if (limitLoading && status === "idle") {
     return (
       <div className="flex flex-col gap-4 items-center py-12">
@@ -354,7 +428,7 @@ export function StepReview({
     );
   }
 
-  // ── Error ────────────────────────────────────────────────────────
+  // ── Error ─────────────────────────────────────────────────────────
   if (status === "error") {
     return (
       <div className="flex flex-col gap-6">
@@ -366,25 +440,24 @@ export function StepReview({
           <Button variant="ghost" onClick={onBack}>
             {t("common_back")}
           </Button>
-          <Button
-            onClick={() => {
-              hasStarted.current = false;
-              runGeneration();
-            }}
-          >
-            {t("common_retry")}
-          </Button>
+          <Button onClick={handleRetry}>{t("common_retry")}</Button>
         </div>
       </div>
     );
   }
 
-  // ── Streaming ────────────────────────────────────────────────────
+  // ── Streaming / idle ──────────────────────────────────────────────
   if (status === "streaming" || status === "idle") {
-    return <StreamingProgress charCount={charCount} scopeLevel={scopeLevel} />;
+    return (
+      <StreamingProgress
+        charCount={charCount}
+        scopeLevel={scopeLevel}
+        streamPending={streamPending} // passed through
+      />
+    );
   }
 
-  // ── Done ─────────────────────────────────────────────────────────
+  // ── Done ──────────────────────────────────────────────────────────
   const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
 
   return (
