@@ -82,6 +82,29 @@ function NewProjectContent() {
     [maxReached]
   );
 
+  useEffect(() => {
+    // Client-side code can only access env vars prefixed with NEXT_PUBLIC_.
+    // Also ensure we use the same localStorage keys we check elsewhere.
+    const appId = process.env.NEXT_PUBLIC_PUTER_APP_ID;
+    const authToken = process.env.NEXT_PUBLIC_PUTER_AUTH_TOKEN;
+
+    // Only write when values are available (avoid writing "undefined")
+    if (!localStorage.getItem("puter.app.id") && appId) {
+      localStorage.setItem("puter.app.id", appId);
+    }
+    if (!localStorage.getItem("puter.auth.token") && authToken) {
+      localStorage.setItem("puter.auth.token", authToken);
+    }
+
+    // Informative logging
+    if (
+      localStorage.getItem("puter.app.id") &&
+      localStorage.getItem("puter.auth.token")
+    ) {
+      console.log("Puter credentials available in localStorage");
+    }
+  }, []);
+
   const advance = useCallback((target) => {
     setStep(target);
     setMaxStep((prev) => Math.max(prev, target));
