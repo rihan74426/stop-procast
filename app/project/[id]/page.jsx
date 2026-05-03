@@ -21,21 +21,14 @@ import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { overallProgress } from "@/lib/utils/progress";
 import { formatDate, projectAgeLabel } from "@/lib/utils/date";
+import {
+  exportProjectMarkdown,
+  exportProjectJSON,
+} from "@/lib/utils/exportMarkdown";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-
-/**
- * Unicode-safe base64 encoding for project export URLs.
- * Handles Arabic, Chinese, emoji, and all non-ASCII characters.
- */
-function toBase64Safe(str) {
-  return btoa(
-    encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) =>
-      String.fromCharCode(parseInt(p1, 16))
-    )
-  );
-}
-
+import { FaJs, FaMailBulk, FaRocket } from "react-icons/fa";
+import { MdDelete } from "react-icons/md";
 function ProjectContent({ id }) {
   const router = useRouter();
   const { t } = useI18n();
@@ -91,12 +84,20 @@ function ProjectContent({ id }) {
     }
   };
 
-  const handleExport = (format = "json") => {
+  // ── Client-side exports — no server round-trip, no URL size limits ──
+  const handleExportMarkdown = () => {
     try {
-      const encoded = toBase64Safe(JSON.stringify(project));
-      window.location.href = `/project/${id}/export?format=${format}&data=${encoded}`;
+      exportProjectMarkdown(project);
     } catch {
-      toast.error("Export failed. Please try again.");
+      toast.error("Markdown export failed. Please try again.");
+    }
+  };
+
+  const handleExportJSON = () => {
+    try {
+      exportProjectJSON(project);
+    } catch {
+      toast.error("JSON export failed. Please try again.");
     }
   };
 
@@ -294,7 +295,7 @@ function ProjectContent({ id }) {
                       loading={completing}
                       className="w-full justify-center"
                     >
-                      {t("project_mark_shipped")}
+                      <FaRocket /> {t("project_mark_shipped")}
                     </Button>
                   )}
 
@@ -303,7 +304,7 @@ function ProjectContent({ id }) {
                     onClick={() => setShowEmailExport(true)}
                     className="w-full justify-center"
                   >
-                    ✉️ {t("project_export_email")}
+                    <FaMailBulk /> {t("project_export_email")}
                   </Button>
 
                   <Button
@@ -316,19 +317,18 @@ function ProjectContent({ id }) {
 
                   <Button
                     variant="ghost"
-                    onClick={() => handleExport("markdown")}
+                    onClick={handleExportMarkdown}
                     className="w-full justify-center"
                   >
                     {t("project_export_md")}
                   </Button>
 
-                  {/* JSON export — was missing in original */}
                   <Button
                     variant="ghost"
-                    onClick={() => handleExport("json")}
+                    onClick={handleExportJSON}
                     className="w-full justify-center"
                   >
-                    {t("project_export_json")}
+                    <FaJs /> {t("project_export_json")}
                   </Button>
 
                   <Button
@@ -337,7 +337,7 @@ function ProjectContent({ id }) {
                     loading={deleting}
                     className="w-full justify-center"
                   >
-                    {t("project_delete")}
+                    <MdDelete /> {t("project_delete")}
                   </Button>
                 </div>
               </div>

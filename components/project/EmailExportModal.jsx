@@ -8,8 +8,10 @@ import { Button } from "@/components/ui/Button";
 
 export function EmailExportModal({ open, onClose, project }) {
   const { t } = useI18n();
-  const { isSignedIn } = useUser();
-  const [email, setEmail] = useState("");
+  const { isSignedIn, user } = useUser();
+  const [email, setEmail] = useState(
+    user?.emailAddresses?.[0]?.emailAddress || ""
+  );
   const [format, setFormat] = useState("markdown");
   const [status, setStatus] = useState("idle");
 

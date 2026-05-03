@@ -12,7 +12,7 @@ import {
   cancelReminders,
   showTestNotification,
   initNotifications,
-} from "@/lib/notifications";
+} from "@/lib/Notifications";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { activePhase, nextAction } from "@/lib/utils/progress";
 
@@ -66,7 +66,7 @@ export function NotificationSettings() {
     const next = topProject ? nextAction(topProject) : null;
     await showTestNotification(
       "Momentum — Test Reminder 🎯",
-      next ? `Your next action: "${next}"` : prefs.message,
+      next ? `Your next action: "${next}"` : prefs.message
     );
     setTimeout(() => setTesting(false), 2000);
   };

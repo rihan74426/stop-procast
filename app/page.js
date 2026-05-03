@@ -14,6 +14,17 @@ import { DataProvider } from "@/components/providers/DataProvider";
 import { SavePromptModal } from "@/components/ui/SavePromptModal";
 import { ImportProjectModal } from "@/components/project/ImportProjectModal";
 import { useI18n } from "@/lib/i18n";
+import {
+  FaStar,
+  FaRocket,
+  FaLightbulb,
+  FaClock,
+  FaFire,
+  FaBullseye,
+  FaChartLine,
+  FaRegSmile,
+  FaSmile,
+} from "react-icons/fa";
 
 // ─── Greeting system ──────────────────────────────────────────────────
 
@@ -27,19 +38,25 @@ function getTimeGreeting() {
 }
 
 const STRANGER_GREETINGS = [
-  { text: "Welcome. Your next chapter starts here.", emoji: "✨" },
-  { text: "Every great thing began with a single step. Ready?", emoji: "🚀" },
-  { text: "Ideas don't work until you do. Let's change that.", emoji: "💡" },
+  { text: "Welcome. Your next chapter starts here.", icon: FaStar },
+  {
+    text: "Every great thing began with a single step. Ready?",
+    icon: FaRocket,
+  },
+  {
+    text: "Ideas don't work until you do. Let's change that.",
+    icon: FaLightbulb,
+  },
   {
     text: "The best time to start was yesterday. Second best: now.",
-    emoji: "⏰",
+    icon: FaClock,
   },
-  { text: "Momentum isn't found — it's built. Start building.", emoji: "🔥" },
+  { text: "Momentum isn't found — it's built. Start building.", icon: FaFire },
   {
     text: "Whatever you're planning, this is where it gets real.",
-    emoji: "🎯",
+    icon: FaBullseye,
   },
-  { text: "Progress over perfection. Always.", emoji: "📈" },
+  { text: "Progress over perfection. Always.", icon: FaChartLine },
 ];
 
 const RETURNING_MOTIVATIONS = [
@@ -61,10 +78,13 @@ function DashboardGreeting({ user, projectCount }) {
 
   if (!isSignedIn) {
     const greeting = STRANGER_GREETINGS[dayIndex % STRANGER_GREETINGS.length];
+    const Icon = greeting.icon;
     return (
       <div className="mb-2">
         <div className="flex items-center gap-2 mb-1">
-          <span className="text-xl">{greeting.emoji}</span>
+          <span className="text-xl">
+            <Icon />
+          </span>
           <h1 className="font-display font-semibold text-xl sm:text-2xl text-[var(--text-primary)]">
             {greeting.text}
           </h1>
@@ -84,7 +104,7 @@ function DashboardGreeting({ user, projectCount }) {
   return (
     <div className="mb-2">
       <h1 className="font-display font-semibold text-xl sm:text-2xl text-[var(--text-primary)]">
-        {timeGreeting}, {firstName} 👋
+        {timeGreeting}, {firstName} <FaSmile className="inline" />
       </h1>
       <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
         {projectCount > 0
@@ -121,10 +141,10 @@ function DashboardContent() {
                   {active.length === 0
                     ? t("dashboard_no_active")
                     : active.length === 1
-                      ? t("dashboard_active_count", { count: 1 })
-                      : t("dashboard_active_count_plural", {
-                          count: active.length,
-                        })}
+                    ? t("dashboard_active_count", { count: 1 })
+                    : t("dashboard_active_count_plural", {
+                        count: active.length,
+                      })}
                 </p>
               </div>
 

@@ -1,32 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { getPressure, PRESSURE_LABELS } from "@/lib/pressure";
 import { generateReengage } from "@/lib/ai/clientGenerate";
 
 export function ProjectPressure({ project }) {
   const [suggestion, setSuggestion] = useState(null);
-  const [fetched, setFetched] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const pressure = getPressure(project);
-
-  useEffect(() => {
-    if (pressure.level !== "critical") return;
-    if (fetched) return;
-    let cancelled = false;
-    setFetched(true);
-
-    generateReengage(project)
-      .then((text) => {
-        if (!cancelled && text) setSuggestion(text);
-      })
-      .catch(() => {});
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [project.id, pressure.level]);
 
   if (pressure.level === "none" || pressure.level === "low") return null;
 
@@ -47,6 +29,19 @@ export function ProjectPressure({ project }) {
       text: "var(--coral)",
     },
   }[pressure.level];
+
+  const handleGetSuggestion = async () => {
+    if (loading || suggestion) return;
+    setLoading(true);
+    try {
+      const text = await generateReengage(project);
+      if (text) setSuggestion(text);
+    } catch {
+      /* silent */
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div
@@ -72,10 +67,20 @@ export function ProjectPressure({ project }) {
               </p>
             ))}
           </div>
-          {suggestion && (
+
+          {suggestion ? (
             <p className="mt-2 text-sm text-[var(--text-primary)] italic border-t border-[var(--border)] pt-2">
               💡 {suggestion}
             </p>
+          ) : (
+            <button
+              onClick={handleGetSuggestion}
+              disabled={loading}
+              className="mt-2 text-xs font-medium hover:underline disabled:opacity-50 transition-opacity"
+              style={{ color: colors.text }}
+            >
+              {loading ? "Thinking…" : "Get a suggestion →"}
+            </button>
           )}
         </div>
       </div>
