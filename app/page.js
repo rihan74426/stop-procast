@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useUser } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { ProjectCard } from "@/components/dashboard/ProjectCard";
 import { EmptyState } from "@/components/dashboard/EmptyState";
@@ -14,8 +15,91 @@ import { SavePromptModal } from "@/components/ui/SavePromptModal";
 import { ImportProjectModal } from "@/components/project/ImportProjectModal";
 import { useI18n } from "@/lib/i18n";
 
+// ─── Greeting system ──────────────────────────────────────────────────
+
+function getTimeGreeting() {
+  const h = new Date().getHours();
+  if (h < 5) return "Burning the midnight oil";
+  if (h < 12) return "Good morning";
+  if (h < 17) return "Good afternoon";
+  if (h < 21) return "Good evening";
+  return "Still at it";
+}
+
+const STRANGER_GREETINGS = [
+  { text: "Welcome. Your next chapter starts here.", emoji: "✨" },
+  { text: "Every great thing began with a single step. Ready?", emoji: "🚀" },
+  { text: "Ideas don't work until you do. Let's change that.", emoji: "💡" },
+  {
+    text: "The best time to start was yesterday. Second best: now.",
+    emoji: "⏰",
+  },
+  { text: "Momentum isn't found — it's built. Start building.", emoji: "🔥" },
+  {
+    text: "Whatever you're planning, this is where it gets real.",
+    emoji: "🎯",
+  },
+  { text: "Progress over perfection. Always.", emoji: "📈" },
+];
+
+const RETURNING_MOTIVATIONS = [
+  "Your ideas deserve to see the light of day.",
+  "One focused hour beats a week of hesitation.",
+  "The work you do today is the story you tell tomorrow.",
+  "Small steps, consistent days — that's how mountains move.",
+  "What got done yesterday? Let's beat it today.",
+  "Your future self is rooting for you.",
+  "Every task you complete is a promise you kept.",
+];
+
+function DashboardGreeting({ user, projectCount }) {
+  const timeGreeting = getTimeGreeting();
+  const isSignedIn = !!user;
+
+  // Deterministic random based on day (changes daily)
+  const dayIndex = Math.floor(Date.now() / 86400000);
+
+  if (!isSignedIn) {
+    const greeting = STRANGER_GREETINGS[dayIndex % STRANGER_GREETINGS.length];
+    return (
+      <div className="mb-2">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="text-xl">{greeting.emoji}</span>
+          <h1 className="font-display font-semibold text-xl sm:text-2xl text-[var(--text-primary)]">
+            {greeting.text}
+          </h1>
+        </div>
+        <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
+          Turn any idea, goal, or plan into structured action — then actually
+          follow through.
+        </p>
+      </div>
+    );
+  }
+
+  const firstName = user.firstName || user.username || "there";
+  const motivation =
+    RETURNING_MOTIVATIONS[dayIndex % RETURNING_MOTIVATIONS.length];
+
+  return (
+    <div className="mb-2">
+      <h1 className="font-display font-semibold text-xl sm:text-2xl text-[var(--text-primary)]">
+        {timeGreeting}, {firstName} 👋
+      </h1>
+      <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+        {projectCount > 0
+          ? motivation
+          : "You have no active projects. Ready to start something?"}
+      </p>
+    </div>
+  );
+}
+
+// ─── Main dashboard ───────────────────────────────────────────────────
+
 function DashboardContent() {
   const { t } = useI18n();
+  const { user, isLoaded } = useUser();
   const projects = useProjectStore((s) => s.projects);
   const active = projects.filter((p) => !p.completionDate);
   const completed = projects.filter((p) => p.completionDate);
@@ -28,24 +112,23 @@ function DashboardContent() {
         <TopBar />
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-            <div className="flex items-center justify-between mb-6 sm:mb-8">
-              <div>
-                <h1 className="font-display font-semibold text-xl sm:text-2xl text-[var(--text-primary)]">
-                  {t("dashboard_title")}
-                </h1>
-                <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
+            <div className="flex items-start justify-between mb-6 sm:mb-8 gap-4">
+              <div className="flex-1 min-w-0">
+                {isLoaded && (
+                  <DashboardGreeting user={user} projectCount={active.length} />
+                )}
+                <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
                   {active.length === 0
                     ? t("dashboard_no_active")
                     : active.length === 1
-                    ? t("dashboard_active_count", { count: 1 })
-                    : t("dashboard_active_count_plural", {
-                        count: active.length,
-                      })}
+                      ? t("dashboard_active_count", { count: 1 })
+                      : t("dashboard_active_count_plural", {
+                          count: active.length,
+                        })}
                 </p>
               </div>
 
-              <div className="flex items-center gap-2">
-                {/* Import button */}
+              <div className="flex items-center gap-2 shrink-0">
                 <Button
                   variant="ghost"
                   size="sm"

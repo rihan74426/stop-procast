@@ -1,3 +1,17 @@
+// PATCH: Add this import at the top of app/settings/page.jsx
+// import { NotificationSettings } from "@/components/ui/NotificationSettings";
+
+// PATCH: Add this section inside the settings page, after the Appearance section:
+/*
+<Section title="Notifications">
+  <p className="text-sm text-[var(--text-secondary)] -mt-1 leading-relaxed">
+    Get a morning reminder to stay on track with your goals.
+  </p>
+  <NotificationSettings />
+</Section>
+*/
+
+// Full updated settings page with notifications section:
 "use client";
 
 import { useState, useEffect } from "react";
@@ -13,6 +27,7 @@ import { useI18n } from "@/lib/i18n";
 import { LOCALES, LOCALE_NAMES } from "@/lib/i18n/config";
 import { AI_MODELS, getStoredModel, setStoredModel } from "@/lib/ai/models";
 import { loadUserProfile, saveUserProfile } from "@/lib/userProfile";
+import { NotificationSettings } from "@/components/ui/NotificationSettings";
 
 function SettingsContent() {
   const { theme, toggle } = useTheme();
@@ -53,7 +68,7 @@ function SettingsContent() {
     const data = JSON.stringify(
       { version: 1, exportedAt: new Date().toISOString(), projects },
       null,
-      2
+      2,
     );
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -123,6 +138,14 @@ function SettingsContent() {
                 </div>
               </Section>
 
+              {/* Notifications */}
+              <Section title="Notifications">
+                <p className="text-sm text-[var(--text-secondary)] -mt-1 leading-relaxed">
+                  Get a morning reminder to stay on track with your daily tasks.
+                </p>
+                <NotificationSettings />
+              </Section>
+
               {/* AI Model */}
               <Section title={t("settings_ai_model")}>
                 <p className="text-sm text-[var(--text-secondary)] -mt-1 leading-relaxed">
@@ -176,7 +199,6 @@ function SettingsContent() {
                 <p className="text-sm text-[var(--text-secondary)] -mt-1 leading-relaxed">
                   {t("settings_ai_profile_desc")}
                 </p>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                   <Field label={t("settings_profession")}>
                     <input
@@ -220,7 +242,7 @@ function SettingsContent() {
                         >
                           {t(`settings_exp_${level}`)}
                         </button>
-                      )
+                      ),
                     )}
                   </div>
                 </Field>
@@ -243,7 +265,7 @@ function SettingsContent() {
                         >
                           {t(`settings_style_${style}`)}
                         </button>
-                      )
+                      ),
                     )}
                   </div>
                 </Field>

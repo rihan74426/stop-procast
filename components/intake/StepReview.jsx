@@ -21,7 +21,6 @@ import {
   FiStar,
 } from "react-icons/fi";
 
-// Animated stage messages shown while the AI streams
 const STREAM_STAGES = [
   { at: 0, icon: FiCpu, text: "Analysing your idea…" },
   { at: 300, icon: FiMap, text: "Mapping out phases…" },
@@ -56,7 +55,7 @@ const SCOPE_META = {
 const StreamingProgress = memo(function StreamingProgress({
   charCount,
   scopeLevel,
-  streamPending, // added
+  streamPending,
 }) {
   const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
   const isDeep = scopeLevel === "ambitious";
@@ -83,11 +82,10 @@ const StreamingProgress = memo(function StreamingProgress({
         </p>
       </div>
 
-      {/* Contacting AI / pending indicator */}
       {streamPending && charCount === 0 && (
         <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
           <div className="w-3 h-3 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin" />
-          <div>Contacting AI…</div>
+          <span>Contacting AI…</span>
         </div>
       )}
 
@@ -111,7 +109,6 @@ const StreamingProgress = memo(function StreamingProgress({
         </span>
       </div>
 
-      {/* Stage grid — pulse while waiting for first chunk */}
       <div
         className={`grid grid-cols-2 gap-2 ${
           streamPending && charCount === 0 ? "animate-pulse opacity-80" : ""
@@ -165,10 +162,11 @@ export function StepReview({
 
   const [blueprint, setBlueprint] = useState(cachedBlueprint ?? null);
   const [charCount, setCharCount] = useState(0);
+  // Start as 'idle' — only move to 'streaming' when limit confirmed
   const [status, setStatus] = useState(cachedBlueprint ? "done" : "idle");
   const [error, setError] = useState(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
-  const [streamPending, setStreamPending] = useState(false); // added
+  const [streamPending, setStreamPending] = useState(false);
 
   const rawRef = useRef("");
   const readerRef = useRef(null);
@@ -176,43 +174,40 @@ export function StepReview({
   const hasStarted = useRef(false);
   const mountedRef = useRef(true);
   const loadingToastId = useRef(null);
-  // Track retries to avoid infinite loops
   const retryCount = useRef(0);
   const MAX_RETRIES = 2;
 
-  // Show limit gate if needed
+  // ── Limit gate: set status IMMEDIATELY when limit check resolves ──
   useEffect(() => {
-    if (!limitLoading && !limitAllowed && !cachedBlueprint) {
+    if (cachedBlueprint) return; // already have blueprint, skip
+    if (limitLoading) return; // wait for check to finish
+    if (!limitAllowed) {
+      // Hard block — set status before any generation can start
       setStatus("limited");
+      hasStarted.current = true; // prevent generation from ever starting
     }
   }, [limitLoading, limitAllowed, cachedBlueprint]);
 
-  // Start generation when ready
+  // ── Start generation only when limit check confirms allowed ──────
   useEffect(() => {
     if (cachedBlueprint) return;
     if (hasStarted.current) return;
-    if (status === "limited") return;
-    if (limitLoading) return;
-    if (!limitAllowed) {
-      setStatus("limited");
-      return;
-    }
+    if (limitLoading) return; // don't start until check resolves
+    if (!limitAllowed) return; // blocked by limit
+
     hasStarted.current = true;
     runGeneration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cachedBlueprint, limitLoading, limitAllowed]);
 
-  // Cleanup on unmount — CRITICAL: dismiss loading toast
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      // Always dismiss loading toast on unmount
       if (loadingToastId.current) {
         toast.dismiss(loadingToastId.current);
         loadingToastId.current = null;
       }
-      // Cancel in-flight stream reader
       if (readerRef.current) {
         try {
           readerRef.current.cancel();
@@ -221,29 +216,29 @@ export function StepReview({
         }
         readerRef.current = null;
       }
-      // Cancel pending animation frame
       if (rafRef.current) {
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
-      // ensure pending flag cleared
-      setStreamPending(false);
     };
   }, []);
 
   async function runGeneration() {
     if (!mountedRef.current) return;
 
+    // Final guard — never generate if not allowed
+    if (!limitAllowed) {
+      setStatus("limited");
+      return;
+    }
+
     setStatus("streaming");
     setCharCount(0);
     setError(null);
     rawRef.current = "";
-    setStreamPending(true); // indicate request started
+    setStreamPending(true);
 
-    // Dismiss any previous loading toast before creating a new one
-    if (loadingToastId.current) {
-      toast.dismiss(loadingToastId.current);
-    }
+    if (loadingToastId.current) toast.dismiss(loadingToastId.current);
     loadingToastId.current = toast.loading(
       scopeLevel === "ambitious"
         ? "Starting deep analysis…"
@@ -269,7 +264,6 @@ export function StepReview({
         const { done, value } = await reader.read();
         if (done) break;
         if (!mountedRef.current) {
-          // Component unmounted mid-stream — cancel cleanly
           try {
             reader.cancel();
           } catch {
@@ -281,11 +275,7 @@ export function StepReview({
           typeof value === "string"
             ? value
             : decoder.decode(value, { stream: true });
-
-        // first chunk arrived -> clear pending flag
-        if (streamPending && chunk && chunk.length > 0) {
-          setStreamPending(false);
-        }
+        if (streamPending && chunk?.length > 0) setStreamPending(false);
 
         rawRef.current += chunk;
 
@@ -297,7 +287,6 @@ export function StepReview({
       rafRef.current = null;
       readerRef.current = null;
 
-      // Validate we got enough content to parse
       if (rawRef.current.length < 50) {
         throw new Error("AI returned incomplete response. Please try again.");
       }
@@ -305,9 +294,7 @@ export function StepReview({
       const parsed = parseBlueprint(rawRef.current);
       if (!mountedRef.current) return;
 
-      // Reset retry counter on success
       retryCount.current = 0;
-
       toast.dismiss(loadingToastId.current);
       loadingToastId.current = null;
       toast.success("Your plan is ready!");
@@ -320,11 +307,9 @@ export function StepReview({
 
       toast.dismiss(loadingToastId.current);
       loadingToastId.current = null;
-
       readerRef.current = null;
-      setStreamPending(false); // ensure cleared on error
+      setStreamPending(false);
 
-      // Auto-retry on rate limit (max MAX_RETRIES times)
       if (e.code === "RATE_LIMITED" && retryCount.current < MAX_RETRIES) {
         retryCount.current += 1;
         toast.warn(
@@ -338,7 +323,6 @@ export function StepReview({
         return;
       }
 
-      // Give up — show error
       const message =
         e.code === "RATE_LIMITED"
           ? "Rate limit reached. Please wait a moment and try again."
@@ -420,11 +404,14 @@ export function StepReview({
           <div className="rounded-[var(--r-xl)] border-2 border-[var(--violet)] bg-[var(--violet-bg)] p-6 text-center">
             <div className="text-5xl mb-4">🎯</div>
             <h2 className="font-display font-semibold text-2xl text-[var(--text-primary)] mb-2">
-              You've used your free project
+              {isSignedIn
+                ? "You've reached your project limit"
+                : "You've used your free project"}
             </h2>
             <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-sm mx-auto mb-5">
-              Sign up free to create unlimited projects, save your work across
-              devices, and access deeper AI planning.
+              {isSignedIn
+                ? "You've created 4 projects. Upgrade to continue building without limits."
+                : "Sign up free to create unlimited projects, save your work across devices, and access deeper AI planning."}
             </p>
             <div className="flex flex-col gap-2 max-w-xs mx-auto">
               <Button
@@ -433,7 +420,7 @@ export function StepReview({
                 className="w-full justify-center"
                 onClick={() => setShowAuthGate(true)}
               >
-                Create free account
+                {isSignedIn ? "Upgrade plan" : "Create free account"}
               </Button>
               <Button
                 variant="ghost"
@@ -444,11 +431,13 @@ export function StepReview({
               </Button>
             </div>
           </div>
-          <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3">
-            <p className="text-xs text-[var(--text-secondary)] text-center">
-              Free account · No credit card · Unlimited projects
-            </p>
-          </div>
+          {!isSignedIn && (
+            <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3">
+              <p className="text-xs text-[var(--text-secondary)] text-center">
+                Free account · No credit card · Unlimited projects
+              </p>
+            </div>
+          )}
         </div>
         <AuthGateModal
           open={showAuthGate}
@@ -459,14 +448,16 @@ export function StepReview({
     );
   }
 
-  // ── Loading limit check ───────────────────────────────────────────
+  // ── Loading limit check ──────────────────────────────────────────
   if (limitLoading && status === "idle") {
     return (
       <>
         <GreetingBanner />
         <div className="flex flex-col gap-4 items-center py-12">
           <div className="w-8 h-8 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin" />
-          <p className="text-sm text-[var(--text-secondary)]">Checking access…</p>
+          <p className="text-sm text-[var(--text-secondary)]">
+            Checking access…
+          </p>
         </div>
       </>
     );
@@ -493,7 +484,7 @@ export function StepReview({
     );
   }
 
-  // ── Streaming / idle ──────────────────────────────────────────────
+  // ── Streaming / idle ─────────────────────────────────────────────
   if (status === "streaming" || status === "idle") {
     return (
       <>
@@ -507,14 +498,13 @@ export function StepReview({
     );
   }
 
-  // ── Done ──────────────────────────────────────────────────────────
+  // ── Done ─────────────────────────────────────────────────────────
   const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
 
   return (
     <>
       <GreetingBanner />
       <div className="flex flex-col gap-6 sm:gap-8">
-        {/* Header */}
         <div>
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span className="w-2 h-2 rounded-full bg-[var(--emerald)] shrink-0" />
@@ -534,7 +524,6 @@ export function StepReview({
           </p>
         </div>
 
-        {/* Scope summary bar */}
         <div
           className="rounded-[var(--r-lg)] border px-4 py-3 flex flex-wrap gap-x-5 gap-y-2 text-sm"
           style={{
@@ -563,7 +552,6 @@ export function StepReview({
           )}
         </div>
 
-        {/* Phases */}
         <div>
           <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
             Phases & milestones
@@ -599,7 +587,6 @@ export function StepReview({
           </div>
         </div>
 
-        {/* Success criteria */}
         {blueprint.successCriteria?.length > 0 && (
           <div>
             <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
@@ -621,7 +608,6 @@ export function StepReview({
           </div>
         )}
 
-        {/* Anticipated blockers */}
         {blueprint.blockers?.length > 0 && (
           <div>
             <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
@@ -641,7 +627,6 @@ export function StepReview({
           </div>
         )}
 
-        {/* Sign-in nudge for anonymous users */}
         {!isSignedIn && (
           <div className="rounded-[var(--r-md)] bg-[var(--violet-bg)] border border-[var(--violet)] px-4 py-3 flex items-start gap-3">
             <span className="text-lg shrink-0">💡</span>

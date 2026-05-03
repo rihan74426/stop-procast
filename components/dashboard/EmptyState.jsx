@@ -3,9 +3,20 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
 
+const IDEA_EXAMPLES = [
+  "Learn a new language",
+  "Write a book",
+  "Launch a business",
+  "Get fit",
+  "Plan a trip",
+  "Build a habit",
+  "Study for an exam",
+  "Start a side project",
+];
+
 export function EmptyState() {
   return (
-    <div className="flex flex-col items-center justify-center py-24 px-6 text-center">
+    <div className="flex flex-col items-center justify-center py-16 sm:py-24 px-6 text-center">
       <div className="relative mb-8">
         <div className="w-20 h-20 rounded-[var(--r-xl)] bg-[var(--violet-bg)] flex items-center justify-center">
           <svg width="36" height="36" viewBox="0 0 36 36" fill="none">
@@ -22,7 +33,7 @@ export function EmptyState() {
       </div>
 
       <h2 className="font-display font-semibold text-2xl text-[var(--text-primary)] mb-3">
-        Your first goal is waiting
+        What are you working towards?
       </h2>
       <p className="text-[var(--text-secondary)] max-w-sm leading-relaxed mb-8">
         Whether it's a business idea, a fitness goal, a creative project, or
@@ -40,7 +51,7 @@ export function EmptyState() {
               strokeLinecap="round"
             />
           </svg>
-          Start your first project
+          Start your first plan
         </Button>
       </Link>
 
@@ -50,3 +61,4 @@ export function EmptyState() {
     </div>
   );
 }
+s;

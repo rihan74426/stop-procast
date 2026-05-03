@@ -2,6 +2,9 @@ import { auth } from "@clerk/nextjs/server";
 import { tryConnectDB } from "@/lib/db/mongoose";
 import Project from "@/lib/models/Project";
 
+const ANON_LIMIT = 1;
+const AUTH_LIMIT = 4;
+
 // GET /api/projects
 export async function GET(request) {
   try {
@@ -22,7 +25,7 @@ export async function GET(request) {
   }
 }
 
-// POST /api/projects
+// POST /api/projects — with server-side limit enforcement
 export async function POST(request) {
   try {
     let body;
@@ -32,7 +35,6 @@ export async function POST(request) {
       return Response.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    // Require a project id
     if (!body?.id) {
       return Response.json({ error: "Missing project id" }, { status: 400 });
     }
@@ -41,7 +43,6 @@ export async function POST(request) {
     const sessionId =
       body.sessionId || request.headers.get("X-Session-Id") || null;
 
-    // Sanitize — never allow caller to spoof these server-set fields
     const { _id, __v, ...safeBody } = body;
 
     const db = await tryConnectDB();
@@ -51,7 +52,22 @@ export async function POST(request) {
     }
 
     if (userId) {
-      // Authenticated: upsert by id (handles anon→auth promotion)
+      // Check authenticated user limit
+      const existingDoc = await Project.findOne({ id: safeBody.id }).lean();
+      if (!existingDoc) {
+        const count = await Project.countDocuments({ userId });
+        if (count >= AUTH_LIMIT) {
+          return Response.json(
+            {
+              error: "Project limit reached. Upgrade to create more.",
+              code: "LIMIT_REACHED",
+              limit: AUTH_LIMIT,
+            },
+            { status: 403 },
+          );
+        }
+      }
+
       const doc = await Project.findOneAndUpdate(
         { id: safeBody.id },
         {
@@ -60,21 +76,32 @@ export async function POST(request) {
           isAnonymous: false,
           sessionId: sessionId || null,
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true }
+        { upsert: true, new: true, setDefaultsOnInsert: true },
       );
       const { _id: _d, __v: _v, ...clean } = doc.toObject();
       return Response.json({ project: clean }, { status: 201 });
     }
 
-    // Anonymous: save with sessionId
-    try {
-      // Check for existing doc first (idempotent)
-      const existing = await Project.findOne({ id: safeBody.id }).lean();
-      if (existing) {
-        const { _id: _d, __v: _v, ...clean } = existing;
-        return Response.json({ project: clean }, { status: 200 });
-      }
+    // Anonymous user — check limit
+    const existing = await Project.findOne({ id: safeBody.id }).lean();
+    if (existing) {
+      const { _id: _d, __v: _v, ...clean } = existing;
+      return Response.json({ project: clean }, { status: 200 });
+    }
 
+    const anonCount = await Project.countDocuments({ sessionId, userId: null });
+    if (anonCount >= ANON_LIMIT) {
+      return Response.json(
+        {
+          error: "Free limit reached. Sign up to create more projects.",
+          code: "LIMIT_REACHED",
+          limit: ANON_LIMIT,
+        },
+        { status: 403 },
+      );
+    }
+
+    try {
       const doc = await Project.create({
         ...safeBody,
         userId: null,
@@ -84,11 +111,10 @@ export async function POST(request) {
       const { _id: _d, __v: _v, ...clean } = doc.toObject();
       return Response.json({ project: clean }, { status: 201 });
     } catch (dbErr) {
-      // Duplicate key — race condition, return existing
       if (dbErr.code === 11000) {
-        const existing = await Project.findOne({ id: safeBody.id }).lean();
-        if (existing) {
-          const { _id: _d, __v: _v, ...clean } = existing;
+        const existing2 = await Project.findOne({ id: safeBody.id }).lean();
+        if (existing2) {
+          const { _id: _d, __v: _v, ...clean } = existing2;
           return Response.json({ project: clean }, { status: 200 });
         }
         return Response.json({ project: safeBody }, { status: 200 });
