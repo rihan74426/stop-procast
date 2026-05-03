@@ -4,11 +4,12 @@ import { ThemeProvider } from "@/lib/theme";
 import { I18nProvider } from "@/lib/i18n";
 import { ToastContainer } from "@/components/ui/Toast";
 import { NetworkMonitor } from "@/components/ui/NetworkMonitor";
+import { NotificationInit } from "@/components/ui/NotificationInit";
 
 export const metadata = {
   title: "Momentum — Finish What You Start",
   description:
-    "Turn raw ideas into shipped projects. AI-powered planning with built-in accountability.",
+    "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.",
 };
 
 export default function RootLayout({ children }) {
@@ -32,6 +33,7 @@ export default function RootLayout({ children }) {
               {children}
               <ToastContainer />
               <NetworkMonitor />
+              <NotificationInit />
             </I18nProvider>
           </ThemeProvider>
         </body>
