@@ -275,4 +275,4 @@ the rate-limit should be rechecked, it's showing low balance on new users on the
 
 (node:4608) [MONGOOSE] Warning: Duplicate schema index on {"id":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
 
-the api generation is not properly set.
+the api generation is not properly set. go through the process and make sure everything is working fine
