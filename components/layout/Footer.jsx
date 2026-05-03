@@ -28,8 +28,9 @@ export function Footer() {
                 Momentum
               </span>
             </div>
-            <p className="text-xs text-[var(--text-tertiary)] max-w-[200px] leading-relaxed">
-              Turn ideas into shipped projects with AI-powered planning.
+            <p className="text-xs text-[var(--text-tertiary)] max-w-[240px] leading-relaxed">
+              Turn ideas, learning, experiments and habits into clear plans and
+              consistent progress.
             </p>
           </div>
 

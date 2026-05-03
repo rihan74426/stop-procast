@@ -2,10 +2,59 @@
 // Feedback & bug reports — stored in MongoDB (or falls back to in-memory)
 // Public read, write-once per session (no auth required to view/submit)
 // Admin actions require Clerk auth + publicMetadata.role === "admin"
+// New submissions fire a Formspree email to admins automatically.
 
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { tryConnectDB } from "@/lib/db/mongoose";
 import { generateId, getFeedbackModel, memStore } from "@/lib/models/Feedback";
+
+const FORMSPREE_ENDPOINT = "https://formspree.io/f/mpqbqjkd";
+
+// ─── Notify admins via Formspree ──────────────────────────────────────
+// Fire-and-forget — never blocks the response or throws to the client.
+
+async function notifyAdmins(item) {
+  try {
+    const typeLabel =
+      {
+        bug: "🐛 Bug Report",
+        suggestion: "💡 Idea / Suggestion",
+        praise: "⭐ Praise",
+        question: "❓ Question",
+      }[item.type] ?? item.type;
+
+    const params = new URLSearchParams();
+    params.set("type", typeLabel);
+    params.set("title", item.title);
+    params.set("details", item.body || "(no details provided)");
+    params.set("submitted_at", item.createdAt);
+    params.set(
+      "feedback_url",
+      `${
+        process.env.NEXT_PUBLIC_APP_URL ?? "https://momentum-app.com"
+      }/feedback`
+    );
+    params.set("_subject", `[Momentum Feedback] ${typeLabel}: ${item.title}`);
+
+    const res = await fetch(FORMSPREE_ENDPOINT, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+        Accept: "application/json",
+      },
+      body: params.toString(),
+      signal: AbortSignal.timeout(8000),
+    });
+
+    if (!res.ok) {
+      const text = await res.text().catch(() => "");
+      console.warn("[feedback] Formspree notify failed:", res.status, text);
+    }
+  } catch (err) {
+    // Never propagate — email notification is best-effort
+    console.warn("[feedback] Formspree notify error:", err.message);
+  }
+}
 
 // ─── Helper: verify admin ─────────────────────────────────────────────
 
@@ -98,15 +147,21 @@ export async function POST(request) {
     };
 
     const db = await tryConnectDB();
+    let savedItem = item;
+
     if (!db) {
       memStore.unshift(item);
-      return Response.json({ item, fallback: true }, { status: 201 });
+    } else {
+      const Feedback = getFeedbackModel();
+      const doc = await Feedback.create(item);
+      const { _id, __v, ...clean } = doc.toObject();
+      savedItem = clean;
     }
 
-    const Feedback = getFeedbackModel();
-    const doc = await Feedback.create(item);
-    const { _id, __v, ...clean } = doc.toObject();
-    return Response.json({ item: clean }, { status: 201 });
+    // Notify admins via Formspree — fire-and-forget, never blocks response
+    notifyAdmins(savedItem);
+
+    return Response.json({ item: savedItem, fallback: !db }, { status: 201 });
   } catch (err) {
     console.error("[feedback POST]", err.message);
     return Response.json({ error: "Failed to submit" }, { status: 500 });

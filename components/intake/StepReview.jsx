@@ -160,7 +160,7 @@ export function StepReview({
   limitAllowed,
   limitLoading,
 }) {
-  const { isSignedIn } = useUser();
+  const { isSignedIn, user } = useUser(); // include user
   const { t } = useI18n();
 
   const [blueprint, setBlueprint] = useState(cachedBlueprint ?? null);
@@ -371,10 +371,51 @@ export function StepReview({
     onCommit(blueprint);
   }, [onCommit, blueprint]);
 
+  // Greeting logic: compute once on mount
+  const [greeting] = useState(() => {
+    const anonVariants = [
+      "Hello there — ready to explore?",
+      "Hi! What's on your mind today?",
+      "Greetings — let's turn this into action.",
+      "Hey stranger — ready to take one small step?",
+    ];
+    const signedVariants = [
+      "Let's do this — onward!",
+      "Nice to see you — let's move forward.",
+      "Great to have you back — ready to ship?",
+      "Welcome — time to turn this into progress.",
+    ];
+    // pick based on later runtime (user presence checked in render)
+    return { anonVariants, signedVariants };
+  });
+
+  // helper to derive display name
+  function displayNameFromUser(u) {
+    if (!u) return null;
+    // Clerk user object may expose firstName / fullName / username
+    return u.firstName || u.fullName || u.username || null;
+  }
+
+  // Greeting banner element (call inside render branches)
+  function GreetingBanner() {
+    const name = displayNameFromUser(user);
+    const text = isSignedIn
+      ? name
+        ? `Hi ${name}! ${greeting.signedVariants[0]}`
+        : `${greeting.signedVariants[0]}`
+      : greeting.anonVariants[0];
+    return (
+      <div className="rounded-[var(--r-md)] px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border)] mb-4">
+        <p className="text-sm text-[var(--text-primary)] font-medium">{text}</p>
+      </div>
+    );
+  }
+
   // ── Limit gate ───────────────────────────────────────────────────
   if (status === "limited") {
     return (
       <>
+        <GreetingBanner />
         <div className="flex flex-col gap-6">
           <div className="rounded-[var(--r-xl)] border-2 border-[var(--violet)] bg-[var(--violet-bg)] p-6 text-center">
             <div className="text-5xl mb-4">🎯</div>
@@ -421,39 +462,48 @@ export function StepReview({
   // ── Loading limit check ───────────────────────────────────────────
   if (limitLoading && status === "idle") {
     return (
-      <div className="flex flex-col gap-4 items-center py-12">
-        <div className="w-8 h-8 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin" />
-        <p className="text-sm text-[var(--text-secondary)]">Checking access…</p>
-      </div>
+      <>
+        <GreetingBanner />
+        <div className="flex flex-col gap-4 items-center py-12">
+          <div className="w-8 h-8 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin" />
+          <p className="text-sm text-[var(--text-secondary)]">Checking access…</p>
+        </div>
+      </>
     );
   }
 
-  // ── Error ─────────────────────────────────────────────────────────
+  // ── Error ─────────────────────────────────────────────────--------
   if (status === "error") {
     return (
-      <div className="flex flex-col gap-6">
-        <div className="rounded-[var(--r-lg)] border border-[var(--coral)] bg-[var(--coral-bg)] p-5 text-[var(--coral)]">
-          <p className="font-medium mb-1">Couldn't generate your plan</p>
-          <p className="text-sm opacity-80">{error}</p>
+      <>
+        <GreetingBanner />
+        <div className="flex flex-col gap-6">
+          <div className="rounded-[var(--r-lg)] border border-[var(--coral)] bg-[var(--coral-bg)] p-5 text-[var(--coral)]">
+            <p className="font-medium mb-1">Couldn't generate your plan</p>
+            <p className="text-sm opacity-80">{error}</p>
+          </div>
+          <div className="flex gap-3">
+            <Button variant="ghost" onClick={onBack}>
+              {t("common_back")}
+            </Button>
+            <Button onClick={handleRetry}>{t("common_retry")}</Button>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <Button variant="ghost" onClick={onBack}>
-            {t("common_back")}
-          </Button>
-          <Button onClick={handleRetry}>{t("common_retry")}</Button>
-        </div>
-      </div>
+      </>
     );
   }
 
   // ── Streaming / idle ──────────────────────────────────────────────
   if (status === "streaming" || status === "idle") {
     return (
-      <StreamingProgress
-        charCount={charCount}
-        scopeLevel={scopeLevel}
-        streamPending={streamPending} // passed through
-      />
+      <>
+        <GreetingBanner />
+        <StreamingProgress
+          charCount={charCount}
+          scopeLevel={scopeLevel}
+          streamPending={streamPending}
+        />
+      </>
     );
   }
 
@@ -462,6 +512,7 @@ export function StepReview({
 
   return (
     <>
+      <GreetingBanner />
       <div className="flex flex-col gap-6 sm:gap-8">
         {/* Header */}
         <div>

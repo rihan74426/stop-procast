@@ -6,39 +6,31 @@ import { useI18n } from "@/lib/i18n";
 
 const EXAMPLES = [
   "Learn conversational Spanish in 3 months through daily 20-minute practice sessions",
-  "Plan and launch a home bakery business selling to local cafes and weekend markets",
-  "Write and self-publish a short non-fiction book about my area of expertise",
-  "Renovate my kitchen on a budget — new cabinets, counters, and lighting",
-  "Get fit enough to run a 10K race, starting from zero current fitness",
-  "Launch a freelance design service and land my first 3 paying clients",
-  "Build a habit of reading 20 books this year with a daily reading routine",
+  "Prepare for a research review and summarize key findings by month-end",
+  "Build a short habit of daily journaling for 30 days and reflect weekly",
+  "Plan a home renovation: scope, budget, and milestones",
+  "Train to run a 10K with progressive weekly workouts",
+  "Organize a small community event and recruit 5 volunteers",
+  "Create a study plan to master a topic and produce a short guide",
 ];
 
 const SUGGESTIONS = [
+  { trigger: "learn", ghost: " a new skill and track progress week by week" },
+  { trigger: "practice", ghost: " regularly with small, repeatable sessions" },
   {
-    trigger: "learn",
-    ghost: " a new skill and track my progress week by week",
+    trigger: "plan",
+    ghost: " a roadmap with clear milestones, research and next steps",
   },
-  { trigger: "build", ghost: " something real and put it in front of people" },
+  { trigger: "research", ghost: " key sources and produce a short summary" },
+  { trigger: "start", ghost: " a routine and measure small wins each day" },
+  { trigger: "build", ghost: " something to test with real users or learners" },
+  { trigger: "improve", ghost: " by iterating on one small metric" },
+  { trigger: "write", ghost: " an outline and finish a first draft fast" },
   {
-    trigger: "start",
-    ghost: " from scratch and reach a clear, measurable goal",
+    trigger: "organize",
+    ghost: " a plan that others can follow and contribute to",
   },
-  { trigger: "plan", ghost: " every step with clear milestones and deadlines" },
-  { trigger: "launch", ghost: " it publicly and get real feedback" },
-  { trigger: "write", ghost: " and publish it for the audience that needs it" },
-  {
-    trigger: "create",
-    ghost: " something valuable and share it with the world",
-  },
-  { trigger: "improve", ghost: " consistently by building a daily routine" },
-  { trigger: "grow", ghost: " it into something sustainable and repeatable" },
-  {
-    trigger: "finish",
-    ghost: " what I started and finally ship the final version",
-  },
-  { trigger: "open", ghost: " a business and serve my first real customers" },
-  { trigger: "get", ghost: " measurable results through focused daily action" },
+  { trigger: "habit", ghost: " a tiny daily action and a tracking method" },
 ];
 
 function getGhostText(value) {

@@ -26,7 +26,7 @@ export function EmptyState() {
       </h2>
       <p className="text-[var(--text-secondary)] max-w-sm leading-relaxed mb-8">
         Whether it's a business idea, a fitness goal, a creative project, or
-        anything else — drop it in and get a structured plan you can actually
+        anything else. Drop it in and get a structured plan you can actually
         follow.
       </p>
 

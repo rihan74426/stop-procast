@@ -270,11 +270,9 @@ Features queued for after current fixes stabilize:
 - [ ] Paid tier gating (Stripe) — then switch `AI_PROVIDER=anthropic` for premium users
 - [ ] Mobile app (React Native or Expo)
 
-the limits are not working correctly. it is generating in the back even when the limit message came.
-the limit is one project for the anonymous and 4 for the users.
-make this universal and well managed in everywhere.
-we also need a reminder push notification from this app to remind user to complete their daily task in the morning.
+the markdown export is failing
+the rate-limit should be rechecked, it's showing low balance on new users on their first project.
 
-make these pages and tool open for every aspects of plan, ideas, thinking, project on table, preparation, works, learning etc, not limitting to building anything. greet the user with their names and as stranger when not logged in. greet them in different words and ways. inspire them, motivate them to move forward.
+(node:4608) [MONGOOSE] Warning: Duplicate schema index on {"id":1} found. This is often due to declaring an index using both "index: true" and "schema.index()". Please remove the duplicate index definition.
 
-we need to add the puter credintials in the application to get access. and let the user know when one ai api is failed or busy or something else and moving to another one.
+the api generation is not properly set.
