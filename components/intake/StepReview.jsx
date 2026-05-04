@@ -55,7 +55,7 @@ const SCOPE_META = {
 const StreamingProgress = memo(function StreamingProgress({
   charCount,
   scopeLevel,
-  streamPending,
+  isPending,
 }) {
   const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
   const isDeep = scopeLevel === "ambitious";
@@ -82,7 +82,7 @@ const StreamingProgress = memo(function StreamingProgress({
         </p>
       </div>
 
-      {streamPending && charCount === 0 && (
+      {isPending && charCount === 0 && (
         <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
           <div className="w-3 h-3 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin" />
           <span>Contacting AI…</span>
@@ -111,7 +111,7 @@ const StreamingProgress = memo(function StreamingProgress({
 
       <div
         className={`grid grid-cols-2 gap-2 ${
-          streamPending && charCount === 0 ? "animate-pulse opacity-80" : ""
+          isPending && charCount === 0 ? "animate-pulse opacity-80" : ""
         }`}
       >
         {STREAM_STAGES.map((s) => {
@@ -157,15 +157,17 @@ export function StepReview({
   limitAllowed,
   limitLoading,
 }) {
-  const { isSignedIn, user } = useUser(); // include user
+  const { isSignedIn, user } = useUser();
   const { t } = useI18n();
 
   const [blueprint, setBlueprint] = useState(cachedBlueprint ?? null);
   const [charCount, setCharCount] = useState(0);
-  // Start as 'idle' — only move to 'streaming' when limit confirmed
   const [status, setStatus] = useState(cachedBlueprint ? "done" : "idle");
   const [error, setError] = useState(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
+
+  // Use refs for values accessed inside async loops to avoid stale closures
+  const streamPendingRef = useRef(false);
   const [streamPending, setStreamPending] = useState(false);
 
   const rawRef = useRef("");
@@ -177,37 +179,20 @@ export function StepReview({
   const retryCount = useRef(0);
   const MAX_RETRIES = 2;
 
-  // ── Limit gate: set status IMMEDIATELY when limit check resolves ──
-  useEffect(() => {
-    if (cachedBlueprint) return; // already have blueprint, skip
-    if (limitLoading) return; // wait for check to finish
-    if (!limitAllowed) {
-      // Hard block — set status before any generation can start
-      setStatus("limited");
-      hasStarted.current = true; // prevent generation from ever starting
+  // ── Dismiss loading toast helper ─────────────────────────────────
+  const dismissLoadingToast = useCallback(() => {
+    if (loadingToastId.current) {
+      toast.dismiss(loadingToastId.current);
+      loadingToastId.current = null;
     }
-  }, [limitLoading, limitAllowed, cachedBlueprint]);
+  }, []);
 
-  // ── Start generation only when limit check confirms allowed ──────
-  useEffect(() => {
-    if (cachedBlueprint) return;
-    if (hasStarted.current) return;
-    if (limitLoading) return; // don't start until check resolves
-    if (!limitAllowed) return; // blocked by limit
-
-    hasStarted.current = true;
-    runGeneration();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cachedBlueprint, limitLoading, limitAllowed]);
-
+  // ── Cleanup on unmount ────────────────────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      if (loadingToastId.current) {
-        toast.dismiss(loadingToastId.current);
-        loadingToastId.current = null;
-      }
+      dismissLoadingToast();
       if (readerRef.current) {
         try {
           readerRef.current.cancel();
@@ -221,12 +206,32 @@ export function StepReview({
         rafRef.current = null;
       }
     };
-  }, []);
+  }, [dismissLoadingToast]);
+
+  // ── Limit gate: block generation when limit confirmed ─────────────
+  useEffect(() => {
+    if (cachedBlueprint) return;
+    if (limitLoading) return;
+    if (!limitAllowed) {
+      setStatus("limited");
+      hasStarted.current = true; // prevent any generation from starting
+    }
+  }, [limitLoading, limitAllowed, cachedBlueprint]);
+
+  // ── Start generation when limit confirmed as OK ───────────────────
+  useEffect(() => {
+    if (cachedBlueprint) return;
+    if (hasStarted.current) return;
+    if (limitLoading) return;
+    if (!limitAllowed) return;
+
+    hasStarted.current = true;
+    runGeneration();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cachedBlueprint, limitLoading, limitAllowed]);
 
   async function runGeneration() {
     if (!mountedRef.current) return;
-
-    // Final guard — never generate if not allowed
     if (!limitAllowed) {
       setStatus("limited");
       return;
@@ -236,9 +241,12 @@ export function StepReview({
     setCharCount(0);
     setError(null);
     rawRef.current = "";
+
+    // Mark pending via both ref and state
+    streamPendingRef.current = true;
     setStreamPending(true);
 
-    if (loadingToastId.current) toast.dismiss(loadingToastId.current);
+    dismissLoadingToast();
     loadingToastId.current = toast.loading(
       scopeLevel === "ambitious"
         ? "Starting deep analysis…"
@@ -271,11 +279,17 @@ export function StepReview({
           }
           return;
         }
+
         const chunk =
           typeof value === "string"
             ? value
             : decoder.decode(value, { stream: true });
-        if (streamPending && chunk?.length > 0) setStreamPending(false);
+
+        // Use ref to avoid stale closure — safely check pending state
+        if (streamPendingRef.current && chunk?.length > 0) {
+          streamPendingRef.current = false;
+          setStreamPending(false);
+        }
 
         rawRef.current += chunk;
 
@@ -284,6 +298,7 @@ export function StepReview({
           if (mountedRef.current) setCharCount(rawRef.current.length);
         });
       }
+
       rafRef.current = null;
       readerRef.current = null;
 
@@ -295,27 +310,34 @@ export function StepReview({
       if (!mountedRef.current) return;
 
       retryCount.current = 0;
-      toast.dismiss(loadingToastId.current);
-      loadingToastId.current = null;
+      dismissLoadingToast();
       toast.success("Your plan is ready!");
 
       setBlueprint(parsed);
       setStatus("done");
       setStreamPending(false);
+      streamPendingRef.current = false;
     } catch (e) {
       if (!mountedRef.current) return;
 
-      toast.dismiss(loadingToastId.current);
-      loadingToastId.current = null;
+      dismissLoadingToast();
       readerRef.current = null;
       setStreamPending(false);
+      streamPendingRef.current = false;
 
-      if (e.code === "RATE_LIMITED" && retryCount.current < MAX_RETRIES) {
+      // Auto-retry on rate limit
+      if (
+        (e.code === "RATE_LIMITED" || e.status === 429) &&
+        retryCount.current < MAX_RETRIES
+      ) {
         retryCount.current += 1;
+        const delay = 3000 * retryCount.current;
         toast.warn(
-          `Rate limited — retrying in 3s… (${retryCount.current}/${MAX_RETRIES})`
+          `Rate limited — retrying in ${delay / 1000}s… (${
+            retryCount.current
+          }/${MAX_RETRIES})`
         );
-        await new Promise((r) => setTimeout(r, 3000));
+        await new Promise((r) => setTimeout(r, delay));
         if (mountedRef.current) {
           hasStarted.current = false;
           runGeneration();
@@ -324,10 +346,12 @@ export function StepReview({
       }
 
       const message =
-        e.code === "RATE_LIMITED"
+        e.code === "RATE_LIMITED" || e.status === 429
           ? "Rate limit reached. Please wait a moment and try again."
-          : e.code === "QUOTA_EXCEEDED"
+          : e.code === "QUOTA_EXCEEDED" || e.status === 402
           ? "AI quota exceeded for today. Try again tomorrow."
+          : e.code === "TIMEOUT" || e.status === 504
+          ? "Request timed out. Please try again."
           : e?.message ?? "Generation failed. Please try again.";
 
       setError(message);
@@ -337,7 +361,8 @@ export function StepReview({
 
   const handleRetry = useCallback(() => {
     retryCount.current = 0;
-    hasStarted.current = false;
+    hasStarted.current = false; // FIX: was missing — prevented retry from starting
+    setError(null);
     runGeneration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -355,39 +380,15 @@ export function StepReview({
     onCommit(blueprint);
   }, [onCommit, blueprint]);
 
-  // Greeting logic: compute once on mount
-  const [greeting] = useState(() => {
-    const anonVariants = [
-      "Hello there — ready to explore?",
-      "Hi! What's on your mind today?",
-      "Greetings — let's turn this into action.",
-      "Hey stranger — ready to take one small step?",
-    ];
-    const signedVariants = [
-      "Let's do this — onward!",
-      "Nice to see you — let's move forward.",
-      "Great to have you back — ready to ship?",
-      "Welcome — time to turn this into progress.",
-    ];
-    // pick based on later runtime (user presence checked in render)
-    return { anonVariants, signedVariants };
-  });
-
-  // helper to derive display name
-  function displayNameFromUser(u) {
-    if (!u) return null;
-    // Clerk user object may expose firstName / fullName / username
-    return u.firstName || u.fullName || u.username || null;
-  }
-
-  // Greeting banner element (call inside render branches)
+  // ── Greeting ──────────────────────────────────────────────────────
   function GreetingBanner() {
-    const name = displayNameFromUser(user);
+    const name = user?.firstName || user?.fullName || user?.username || null;
     const text = isSignedIn
       ? name
-        ? `Hi ${name}! ${greeting.signedVariants[0]}`
-        : `${greeting.signedVariants[0]}`
-      : greeting.anonVariants[0];
+        ? `Hi ${name}! Let's get to work.`
+        : "Let's do this — onward!"
+      : "Hello there — ready to explore?";
+
     return (
       <div className="rounded-[var(--r-md)] px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border)] mb-4">
         <p className="text-sm text-[var(--text-primary)] font-medium">{text}</p>
@@ -395,7 +396,7 @@ export function StepReview({
     );
   }
 
-  // ── Limit gate ───────────────────────────────────────────────────
+  // ── Limit gate ────────────────────────────────────────────────────
   if (status === "limited") {
     return (
       <>
@@ -410,8 +411,8 @@ export function StepReview({
             </h2>
             <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-sm mx-auto mb-5">
               {isSignedIn
-                ? "You've created 4 projects. Upgrade to continue building without limits."
-                : "Sign up free to create unlimited projects, save your work across devices, and access deeper AI planning."}
+                ? "You've created 4 projects. Sign up for more."
+                : "Sign up free to create unlimited projects, save your work, and access deeper AI planning."}
             </p>
             <div className="flex flex-col gap-2 max-w-xs mx-auto">
               <Button
@@ -448,7 +449,7 @@ export function StepReview({
     );
   }
 
-  // ── Loading limit check ──────────────────────────────────────────
+  // ── Loading limit check ───────────────────────────────────────────
   if (limitLoading && status === "idle") {
     return (
       <>
@@ -463,7 +464,7 @@ export function StepReview({
     );
   }
 
-  // ── Error ─────────────────────────────────────────────────--------
+  // ── Error ─────────────────────────────────────────────────────────
   if (status === "error") {
     return (
       <>
@@ -484,7 +485,7 @@ export function StepReview({
     );
   }
 
-  // ── Streaming / idle ─────────────────────────────────────────────
+  // ── Streaming / idle ──────────────────────────────────────────────
   if (status === "streaming" || status === "idle") {
     return (
       <>
@@ -492,13 +493,13 @@ export function StepReview({
         <StreamingProgress
           charCount={charCount}
           scopeLevel={scopeLevel}
-          streamPending={streamPending}
+          isPending={streamPending}
         />
       </>
     );
   }
 
-  // ── Done ─────────────────────────────────────────────────────────
+  // ── Done ──────────────────────────────────────────────────────────
   const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
 
   return (

@@ -18,6 +18,7 @@ import {
   FiX,
   FiMessageSquare,
 } from "react-icons/fi";
+import { FaCloud } from "react-icons/fa";
 
 export function Sidebar() {
   const { t } = useI18n();
@@ -44,12 +45,12 @@ export function Sidebar() {
       {onClose && (
         <div className="flex items-center justify-between px-3 py-3 border-b border-[var(--border)] lg:hidden">
           <div className="flex items-center gap-2">
-            <div className="h-6 w-6 rounded-[var(--r-sm)] overflow-hidden bg-[var(--violet)]">
+            <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center">
               <Image
                 src="/logo.png"
                 alt="Momentum"
-                width={24}
-                height={24}
+                width={28}
+                height={40}
                 className="object-cover"
                 onError={(e) => {
                   e.currentTarget.style.display = "none";
@@ -71,12 +72,12 @@ export function Sidebar() {
 
       {/* Logo on desktop */}
       <div className="hidden lg:flex items-center gap-2 px-4 py-4 border-b border-[var(--border)]">
-        <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden bg-[var(--violet)]">
+        <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center">
           <Image
             src="/logo.png"
             alt="Momentum"
             width={28}
-            height={28}
+            height={40}
             className="object-cover"
             onError={(e) => {
               e.currentTarget.style.display = "none";
@@ -154,7 +155,7 @@ export function Sidebar() {
           <SignInButton mode="modal">
             <button className="w-full rounded-[var(--r-md)] bg-[var(--violet-bg)] border border-[var(--violet)] px-3 py-2.5 text-left transition-colors hover:bg-[var(--violet)] hover:text-white group">
               <p className="text-xs font-medium text-[var(--violet-dim)] group-hover:text-white transition-colors">
-                ☁️ {t("nav_sign_in")}
+                <FaCloud className="inline" /> {t("nav_sign_in")}
               </p>
               <p className="text-xs text-[var(--text-tertiary)] group-hover:text-white/70 transition-colors mt-0.5">
                 Sign in to keep your data
