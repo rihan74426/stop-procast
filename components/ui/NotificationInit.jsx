@@ -7,7 +7,7 @@ import {
   getReminderPrefs,
   scheduleNextReminder,
   getNotificationPermission,
-} from "@/lib/notifications";
+} from "@/lib/Notifications";
 
 /**
  * Mounts silently in layout — registers service worker
@@ -29,7 +29,7 @@ export function NotificationInit() {
       const activeProject = projects
         .filter((p) => !p.completionDate)
         .sort(
-          (a, b) => new Date(b.lastActivityAt) - new Date(a.lastActivityAt),
+          (a, b) => new Date(b.lastActivityAt) - new Date(a.lastActivityAt)
         )[0];
 
       scheduleNextReminder(prefs, activeProject?.projectTitle);
