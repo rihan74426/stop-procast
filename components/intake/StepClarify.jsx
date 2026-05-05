@@ -303,7 +303,7 @@ function GhostInput({
           placeholder={placeholder}
           autoComplete="off"
           spellCheck
-          className="w-full h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)] transition-all relative z-10"
+          className="w-full h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] !bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)] transition-all relative z-10"
           style={{ background: "transparent" }}
         />
       </div>

@@ -20,6 +20,7 @@ import {
   FiTool,
   FiStar,
 } from "react-icons/fi";
+import { FaLightbulb } from "react-icons/fa";
 
 const STREAM_STAGES = [
   { at: 0, icon: FiCpu, text: "Analysing your idea…" },
@@ -630,7 +631,9 @@ export function StepReview({
 
         {!isSignedIn && (
           <div className="rounded-[var(--r-md)] bg-[var(--violet-bg)] border border-[var(--violet)] px-4 py-3 flex items-start gap-3">
-            <span className="text-lg shrink-0">💡</span>
+            <span className="text-lg shrink-0">
+              <FaLightbulb />
+            </span>
             <div>
               <p className="text-xs font-medium text-[var(--violet-dim)]">
                 Sign in to save this project
