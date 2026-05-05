@@ -148,30 +148,44 @@ const ANSWER_COMPLETIONS = [
  *   3. Nothing
  */
 function getAnswerGhost(value, placeholder) {
-  if (!value || value.trim().length < 3) return "";
+  if (!value || value.trim().length < 1) return "";
 
-  const lower = value.toLowerCase();
+  const lowerValue = value.toLowerCase();
 
-  // 1. Placeholder prefix match — user is typing what placeholder says
-  if (
-    placeholder &&
-    value.length >= 3 &&
-    placeholder.toLowerCase().startsWith(lower) &&
-    placeholder.toLowerCase() !== lower
-  ) {
-    return placeholder.slice(value.length);
+  // 1. Placeholder prefix match
+  if (placeholder) {
+    const lowerPlaceholder = placeholder.toLowerCase();
+    if (
+      lowerPlaceholder.startsWith(lowerValue) &&
+      lowerPlaceholder !== lowerValue
+    ) {
+      return placeholder.slice(value.length);
+    }
   }
 
   // 2. Semantic completion
   for (const rule of ANSWER_COMPLETIONS) {
     const conditionOk = !rule.condition || rule.condition(value);
     if (!conditionOk) continue;
+
     for (const trigger of rule.triggers) {
-      if (lower.includes(trigger)) {
-        // Don't suggest if the suffix content is already in the value
-        const suffixCore = rule.suffix.replace(/^[ —-]+/, "").toLowerCase();
-        if (!lower.includes(suffixCore.slice(0, 20))) {
-          return rule.suffix;
+      const triggerIndex = lowerValue.indexOf(trigger.toLowerCase());
+
+      if (triggerIndex !== -1) {
+        // Find where the trigger ends
+        const triggerEndIndex = triggerIndex + trigger.length;
+        const afterTrigger = value.slice(triggerEndIndex);
+        const lowerAfterTrigger = afterTrigger.toLowerCase();
+
+        // Only suggest if the user hasn't already typed the whole suffix
+        const suffix = rule.suffix;
+        const lowerSuffix = suffix.toLowerCase();
+
+        // Check if the user has started typing the suffix already
+        if (lowerSuffix.startsWith(lowerAfterTrigger)) {
+          const remainingSuffix = suffix.slice(afterTrigger.length);
+          // Don't show if the remaining part is empty
+          if (remainingSuffix.trim().length > 0) return remainingSuffix;
         }
       }
     }
@@ -179,7 +193,6 @@ function getAnswerGhost(value, placeholder) {
 
   return "";
 }
-
 // ─── Word-by-word accept ──────────────────────────────────────────────
 // Pressing Tab accepts the full ghost.
 // Pressing Ctrl+→ (or Option+→ on Mac) accepts one word at a time.
@@ -207,13 +220,14 @@ function GhostInput({
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
       setLocalGhost(getAnswerGhost(value, suggestion || placeholder));
-    }, 100);
+    }, 30);
     return () => clearTimeout(debounceRef.current);
   }, [value, suggestion, placeholder]);
 
   // Clear ghost if user deletes enough
   useEffect(() => {
-    if (!value || value.trim().length < 3) setLocalGhost("");
+    // mirror the minimum used in getAnswerGhost
+    if (!value || value.trim().length < 1) setLocalGhost("");
   }, [value]);
 
   const acceptFull = useCallback(() => {
@@ -244,6 +258,13 @@ function GhostInput({
     (e) => {
       if (!localGhost) return;
 
+      // Ctrl/Cmd/Alt + ArrowRight = accept one word
+      if (e.key === "ArrowRight" && (e.ctrlKey || e.metaKey || e.altKey)) {
+        e.preventDefault();
+        acceptOneWord();
+        return;
+      }
+
       if (e.key === "Tab") {
         e.preventDefault();
         acceptFull();
@@ -258,12 +279,6 @@ function GhostInput({
         }
         return;
       }
-      // Ctrl/Cmd + ArrowRight = accept one word
-      if (e.key === "ArrowRight" && (e.ctrlKey || e.metaKey)) {
-        e.preventDefault();
-        acceptOneWord();
-        return;
-      }
       // Escape = dismiss ghost
       if (e.key === "Escape") {
         setLocalGhost("");
@@ -275,19 +290,24 @@ function GhostInput({
   const showGhost = localGhost.length > 0;
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="relative">
-        {/* Ghost overlay */}
+    <div className="flex flex-col gap-1.5 w-full">
+      <div className="relative w-full">
         {showGhost && (
           <div
             aria-hidden="true"
-            className="absolute inset-0 flex items-center px-3 pointer-events-none select-none overflow-hidden rounded-[var(--r-md)]"
-            style={{ fontFamily: "inherit", fontSize: "0.875rem" }}
+            className="absolute inset-0 z-20 flex items-center px-3 pointer-events-none select-none overflow-hidden"
+            // Ensure font exactly matches the input to prevent horizontal offset
+            style={{
+              fontFamily: "inherit",
+              fontSize: "0.875rem",
+              lineHeight: "1.25rem", // Match Tailwind's text-sm
+            }}
           >
-            <span className="invisible whitespace-pre">{value}</span>
+            {/* The invisible span MUST match the input text perfectly */}
+            <span className="invisible whitespace-pre shrink-0">{value}</span>
             <span
-              className="whitespace-pre truncate"
-              style={{ color: "var(--text-tertiary)", opacity: 0.55 }}
+              className="whitespace-pre opacity-40 truncate"
+              style={{ color: "var(--text-tertiary)" }}
             >
               {localGhost}
             </span>
@@ -302,9 +322,7 @@ function GhostInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           autoComplete="off"
-          spellCheck
-          className="w-full h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] !bg-transparent text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)] transition-all relative z-10"
-          style={{ background: "transparent" }}
+          className="w-full h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-transparent text-sm text-[var(--text-primary)] relative z-10"
         />
       </div>
 
