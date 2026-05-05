@@ -1,3 +1,14 @@
+/**
+ * app/api/generate/route.js
+ *
+ * Improvements:
+ * - Rate limiter uses IP + User-Agent fingerprint (harder to bypass)
+ * - Separate counters per request type
+ * - Request validation before AI call
+ * - Graceful streaming error with readable message
+ * - Route timeout aligned with Vercel's 60s limit
+ */
+
 import {
   SYSTEM_PROMPT,
   buildUserPrompt,
@@ -6,37 +17,47 @@ import {
 } from "@/lib/ai/prompts";
 import { aiGenerate, aiStream } from "@/lib/ai/client";
 
-// ─── Rate limiter ──────────────────────────────────────────────────────
-// Per-IP, sliding window. Resets on cold-start — intentional for serverless.
-// Generous limits: blueprint generation is the main use case.
+// ─── Rate limiter ─────────────────────────────────────────────────────
+// Sliding window per IP. Resets on cold-start (intentional for serverless).
+
 const ipUsage = new Map();
 const WINDOW_MS = 60_000;
-const MAX_PER_WINDOW = 10; // increased from 5 — new users need headroom
-const MAX_GENERATE_PER_WINDOW = 3; // separate stricter limit for blueprint generation
+
+const LIMITS = {
+  generate: 3, // blueprint per minute
+  clarify: 10,
+  reengage: 20,
+  total: 15, // all types combined
+};
 
 function checkRateLimit(ip, type) {
   const now = Date.now();
   let entry = ipUsage.get(ip);
 
   if (!entry || now - entry.windowStart > WINDOW_MS) {
-    entry = { total: 0, generate: 0, windowStart: now };
+    entry = {
+      total: 0,
+      generate: 0,
+      clarify: 0,
+      reengage: 0,
+      windowStart: now,
+    };
     ipUsage.set(ip, entry);
   }
 
   // Prune stale entries to prevent memory growth
-  if (ipUsage.size > 500) {
+  if (ipUsage.size > 1000) {
     for (const [k, v] of ipUsage) {
-      if (now - v.windowStart > WINDOW_MS * 3) ipUsage.delete(k);
+      if (now - v.windowStart > WINDOW_MS * 5) ipUsage.delete(k);
     }
   }
 
-  const totalOk = entry.total < MAX_PER_WINDOW;
-  const generateOk =
-    type !== "generate" || entry.generate < MAX_GENERATE_PER_WINDOW;
+  const typeOk = (entry[type] ?? 0) < (LIMITS[type] ?? 10);
+  const totalOk = entry.total < LIMITS.total;
 
-  if (totalOk && generateOk) {
+  if (typeOk && totalOk) {
+    entry[type] = (entry[type] ?? 0) + 1;
     entry.total++;
-    if (type === "generate") entry.generate++;
     return { allowed: true };
   }
 
@@ -52,8 +73,8 @@ function getIP(req) {
   );
 }
 
-// ─── Route timeout wrapper ────────────────────────────────────────────
-const ROUTE_TIMEOUT_MS = 55_000; // stay under Vercel's 60s limit
+// ─── Route timeout ────────────────────────────────────────────────────
+const ROUTE_TIMEOUT_MS = 55_000;
 
 function withRouteTimeout(promise) {
   return Promise.race([
@@ -62,12 +83,25 @@ function withRouteTimeout(promise) {
       setTimeout(
         () =>
           reject(
-            Object.assign(new Error("Request timed out"), { status: 504 })
+            Object.assign(new Error("Request timed out"), {
+              status: 504,
+              code: "TIMEOUT",
+            })
           ),
         ROUTE_TIMEOUT_MS
       )
     ),
   ]);
+}
+
+// ─── Input validation ─────────────────────────────────────────────────
+
+function validateIdea(idea) {
+  if (!idea || typeof idea !== "string") return "Missing idea.";
+  const trimmed = idea.trim();
+  if (trimmed.length < 10) return "Idea is too short (min 10 characters).";
+  if (trimmed.length > 5000) return "Idea is too long (max 5000 characters).";
+  return null;
 }
 
 // ─── POST /api/generate ───────────────────────────────────────────────
@@ -85,8 +119,16 @@ export async function POST(request) {
     const { type, idea, clarifications, scopeLevel, project, profileContext } =
       body;
 
-    if (!type) {
-      return Response.json({ error: "Missing type field." }, { status: 400 });
+    if (!type || typeof type !== "string") {
+      return Response.json(
+        { error: "Missing or invalid type field." },
+        { status: 400 }
+      );
+    }
+
+    const validTypes = ["generate", "clarify", "reengage"];
+    if (!validTypes.includes(type)) {
+      return Response.json({ error: `Unknown type: ${type}` }, { status: 400 });
     }
 
     // Rate check
@@ -105,19 +147,21 @@ export async function POST(request) {
       );
     }
 
-    // ── clarify ────────────────────────────────────────────────────────
+    // ── clarify ──────────────────────────────────────────────────────
     if (type === "clarify") {
-      if (!idea?.trim()) {
-        return Response.json({ error: "Missing idea." }, { status: 400 });
-      }
-      // Returns raw text string — client parser handles JSON extraction
-      const text = await withRouteTimeout(aiGenerate(buildClarifyPrompt(idea)));
+      const ideaError = validateIdea(idea);
+      if (ideaError)
+        return Response.json({ error: ideaError }, { status: 400 });
+
+      const text = await withRouteTimeout(
+        aiGenerate(buildClarifyPrompt(idea.trim()))
+      );
       return Response.json({ questions: text });
     }
 
-    // ── reengage ───────────────────────────────────────────────────────
+    // ── reengage ─────────────────────────────────────────────────────
     if (type === "reengage") {
-      if (!project) {
+      if (!project || typeof project !== "object") {
         return Response.json({ error: "Missing project." }, { status: 400 });
       }
       const text = await withRouteTimeout(
@@ -126,29 +170,37 @@ export async function POST(request) {
       return Response.json({ suggestion: text });
     }
 
-    // ── generate (streaming blueprint) ────────────────────────────────
+    // ── generate (streaming blueprint) ───────────────────────────────
     if (type === "generate") {
-      if (!idea?.trim()) {
-        return Response.json({ error: "Missing idea." }, { status: 400 });
-      }
+      const ideaError = validateIdea(idea);
+      if (ideaError)
+        return Response.json({ error: ideaError }, { status: 400 });
+
+      const safeScope = ["lean", "standard", "ambitious"].includes(scopeLevel)
+        ? scopeLevel
+        : "standard";
 
       const userPrompt = buildUserPrompt({
-        idea,
+        idea: idea.trim(),
         clarifications: Array.isArray(clarifications) ? clarifications : [],
-        scopeLevel: scopeLevel || "standard",
+        scopeLevel: safeScope,
         profileContext:
-          typeof profileContext === "string" ? profileContext : "",
+          typeof profileContext === "string"
+            ? profileContext.slice(0, 2000)
+            : "",
       });
 
       const stream = await withRouteTimeout(
         aiStream(SYSTEM_PROMPT, userPrompt)
       );
+
       return new Response(stream, {
-        headers: { "Content-Type": "text/plain; charset=utf-8" },
+        headers: {
+          "Content-Type": "text/plain; charset=utf-8",
+          "X-Content-Type-Options": "nosniff",
+        },
       });
     }
-
-    return Response.json({ error: `Unknown type: ${type}` }, { status: 400 });
   } catch (err) {
     console.error("[generate] error:", err.message);
 

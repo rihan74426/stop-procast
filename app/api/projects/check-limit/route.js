@@ -3,21 +3,15 @@ import { tryConnectDB } from "@/lib/db/mongoose";
 import Project from "@/lib/models/Project";
 
 const ANON_LIMIT = 1;
-const AUTH_LIMIT = 4;
+const AUTH_LIMIT = 50; // matches route.js
 
 /**
  * GET /api/projects/check-limit
- *
  * Returns { allowed, count, limit, authed }
- *
- * Limits:
- *   - Anonymous: 1 project per sessionId
- *   - Authenticated: 4 projects per userId
  */
 export async function GET(request) {
   try {
     const { userId } = await auth();
-
     const db = await tryConnectDB();
 
     if (userId) {
@@ -38,18 +32,9 @@ export async function GET(request) {
       });
     }
 
-    // Anonymous user
+    // Anonymous
     const sessionId = request.headers.get("X-Session-Id");
-    if (!sessionId) {
-      return Response.json({
-        allowed: true,
-        count: 0,
-        limit: ANON_LIMIT,
-        authed: false,
-      });
-    }
-
-    if (!db) {
+    if (!sessionId || !db) {
       return Response.json({
         allowed: true,
         count: 0,
@@ -67,6 +52,7 @@ export async function GET(request) {
     });
   } catch (err) {
     console.error("[check-limit]", err.message);
+    // Fail open — never block on our error
     return Response.json({
       allowed: true,
       count: 0,

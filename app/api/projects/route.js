@@ -63,7 +63,7 @@ export async function POST(request) {
               code: "LIMIT_REACHED",
               limit: AUTH_LIMIT,
             },
-            { status: 403 },
+            { status: 403 }
           );
         }
       }
@@ -76,7 +76,7 @@ export async function POST(request) {
           isAnonymous: false,
           sessionId: sessionId || null,
         },
-        { upsert: true, new: true, setDefaultsOnInsert: true },
+        { upsert: true, new: true, setDefaultsOnInsert: true }
       );
       const { _id: _d, __v: _v, ...clean } = doc.toObject();
       return Response.json({ project: clean }, { status: 201 });
@@ -97,7 +97,7 @@ export async function POST(request) {
           code: "LIMIT_REACHED",
           limit: ANON_LIMIT,
         },
-        { status: 403 },
+        { status: 403 }
       );
     }
 
