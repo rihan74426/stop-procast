@@ -269,3 +269,5 @@ Features queued for after current fixes stabilize:
 - [ ] Analytics dashboard (completion rate, avg time per phase)
 - [ ] Paid tier gating (Stripe) — then switch `AI_PROVIDER=anthropic` for premium users
 - [ ] Mobile app (React Native or Expo)
+
+the auto-complete is not suggesting based on the examples. it is sugesting on its own. when the auto-complete concept is about user typing the example answer and the ghost helps user accepting the example.
