@@ -7,16 +7,7 @@ import { parseClarifyQuestions } from "@/lib/ai/parser";
 import { toast } from "@/lib/toast";
 
 // ─── Ghost suggestion engine ──────────────────────────────────────────
-//
-// Instead of matching only when value is an exact prefix of placeholder,
-// we do semantic keyword-based completion: if the user's answer contains
-// certain keywords we offer a relevant continuation.
-//
-// Format: { triggers: string[], template: (value) => string }
-// template receives the current raw value and returns the full ghost suffix.
-
 const ANSWER_COMPLETIONS = [
-  // Success / outcome language
   {
     triggers: [
       "done when",
@@ -31,8 +22,6 @@ const ANSWER_COMPLETIONS = [
     triggers: ["i want to", "i'd like to", "i need to"],
     suffix: " be able to do this independently without looking anything up",
   },
-
-  // Time / deadline
   {
     triggers: ["by ", "within ", "in the next ", "over the next "],
     suffix: " — I have no hard deadline but sooner is better",
@@ -50,8 +39,6 @@ const ANSWER_COMPLETIONS = [
     ],
     suffix: " — working on it a little every day",
   },
-
-  // Resources / constraints
   {
     triggers: [
       "i have ",
@@ -72,8 +59,6 @@ const ANSWER_COMPLETIONS = [
     ],
     suffix: " so I'll rely on free tools and open-source resources",
   },
-
-  // Experience level
   {
     triggers: [
       "beginner",
@@ -103,8 +88,6 @@ const ANSWER_COMPLETIONS = [
     ],
     suffix: " so I want an advanced, nuanced plan that challenges me",
   },
-
-  // Uncertain first step
   {
     triggers: [
       "not sure",
@@ -120,8 +103,6 @@ const ANSWER_COMPLETIONS = [
     triggers: ["start with", "begin with", "first step", "first thing"],
     suffix: " to build momentum and get early feedback",
   },
-
-  // Accountability / solo vs team
   {
     triggers: ["alone", "solo", "by myself", "on my own", "just me"],
     suffix: " — I'll need to build my own accountability structure",
@@ -130,62 +111,35 @@ const ANSWER_COMPLETIONS = [
     triggers: ["team", "with others", "colleague", "partner", "collaborat"],
     suffix: " — we'll need clear ownership and weekly check-ins",
   },
-
-  // Tools / tech
   {
     triggers: ["use ", "using ", "tool", "app", "software", "platform"],
     suffix: " — open to recommendations if there's a better option",
   },
 ];
 
-/**
- * Given a partially-typed answer and the question's placeholder,
- * return the best ghost suffix string, or "".
- *
- * Priority:
- *   1. Placeholder prefix match (original behaviour, most precise)
- *   2. Semantic completion from ANSWER_COMPLETIONS
- *   3. Nothing
- */
 function getAnswerGhost(value, placeholder) {
-  if (!value || value.trim().length < 1) return "";
-
-  const lowerValue = value.toLowerCase();
+  if (!value || value.trim().length < 3) return "";
+  const lower = value.toLowerCase();
 
   // 1. Placeholder prefix match
-  if (placeholder) {
-    const lowerPlaceholder = placeholder.toLowerCase();
-    if (
-      lowerPlaceholder.startsWith(lowerValue) &&
-      lowerPlaceholder !== lowerValue
-    ) {
-      return placeholder.slice(value.length);
-    }
+  if (
+    placeholder &&
+    value.length >= 3 &&
+    placeholder.toLowerCase().startsWith(lower) &&
+    placeholder.toLowerCase() !== lower
+  ) {
+    return placeholder.slice(value.length);
   }
 
   // 2. Semantic completion
   for (const rule of ANSWER_COMPLETIONS) {
     const conditionOk = !rule.condition || rule.condition(value);
     if (!conditionOk) continue;
-
     for (const trigger of rule.triggers) {
-      const triggerIndex = lowerValue.indexOf(trigger.toLowerCase());
-
-      if (triggerIndex !== -1) {
-        // Find where the trigger ends
-        const triggerEndIndex = triggerIndex + trigger.length;
-        const afterTrigger = value.slice(triggerEndIndex);
-        const lowerAfterTrigger = afterTrigger.toLowerCase();
-
-        // Only suggest if the user hasn't already typed the whole suffix
-        const suffix = rule.suffix;
-        const lowerSuffix = suffix.toLowerCase();
-
-        // Check if the user has started typing the suffix already
-        if (lowerSuffix.startsWith(lowerAfterTrigger)) {
-          const remainingSuffix = suffix.slice(afterTrigger.length);
-          // Don't show if the remaining part is empty
-          if (remainingSuffix.trim().length > 0) return remainingSuffix;
+      if (lower.includes(trigger)) {
+        const suffixCore = rule.suffix.replace(/^[ —-]+/, "").toLowerCase();
+        if (!lower.includes(suffixCore.slice(0, 20))) {
+          return rule.suffix;
         }
       }
     }
@@ -193,9 +147,6 @@ function getAnswerGhost(value, placeholder) {
 
   return "";
 }
-// ─── Word-by-word accept ──────────────────────────────────────────────
-// Pressing Tab accepts the full ghost.
-// Pressing Ctrl+→ (or Option+→ on Mac) accepts one word at a time.
 
 function getFirstWord(ghost) {
   const match = ghost.match(/^(\s*\S+)/);
@@ -203,6 +154,9 @@ function getFirstWord(ghost) {
 }
 
 // ─── GhostInput ───────────────────────────────────────────────────────
+// Uses a canvas-measure approach: the ghost is rendered as an absolutely
+// positioned <span> overlaid on the input, offset by the text width.
+// This avoids all z-index / background-transparency issues.
 
 function GhostInput({
   value,
@@ -212,65 +166,61 @@ function GhostInput({
   questionIndex,
 }) {
   const inputRef = useRef(null);
-  const [localGhost, setLocalGhost] = useState("");
+  const mirrorRef = useRef(null);
+  const [ghost, setGhost] = useState("");
+  const [ghostLeft, setGhostLeft] = useState(0);
   const debounceRef = useRef(null);
 
-  // Recompute ghost whenever value changes (debounced)
+  // Compute ghost text
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      setLocalGhost(getAnswerGhost(value, suggestion || placeholder));
-    }, 30);
+      if (!value || value.trim().length < 3) {
+        setGhost("");
+        return;
+      }
+      setGhost(getAnswerGhost(value, suggestion || placeholder));
+    }, 80);
     return () => clearTimeout(debounceRef.current);
   }, [value, suggestion, placeholder]);
 
-  // Clear ghost if user deletes enough
+  // Measure text width to position the ghost correctly
   useEffect(() => {
-    // mirror the minimum used in getAnswerGhost
-    if (!value || value.trim().length < 1) setLocalGhost("");
-  }, [value]);
+    if (!ghost || !mirrorRef.current) return;
+    // mirrorRef contains the current value text; its scrollWidth = pixel offset
+    setGhostLeft(mirrorRef.current.scrollWidth);
+  }, [ghost, value]);
 
   const acceptFull = useCallback(() => {
-    if (!localGhost) return;
-    const newVal = value + localGhost;
+    if (!ghost) return;
+    const newVal = value + ghost;
     onChange(newVal);
-    setLocalGhost("");
-    setTimeout(() => {
+    setGhost("");
+    requestAnimationFrame(() => {
       const el = inputRef.current;
       if (el) el.setSelectionRange(el.value.length, el.value.length);
-    }, 0);
-  }, [localGhost, value, onChange]);
+    });
+  }, [ghost, value, onChange]);
 
   const acceptOneWord = useCallback(() => {
-    if (!localGhost) return;
-    const word = getFirstWord(localGhost);
-    const newVal = value + word;
-    const remaining = localGhost.slice(word.length);
-    onChange(newVal);
-    setLocalGhost(remaining);
-    setTimeout(() => {
+    if (!ghost) return;
+    const word = getFirstWord(ghost);
+    onChange(value + word);
+    setGhost(ghost.slice(word.length));
+    requestAnimationFrame(() => {
       const el = inputRef.current;
       if (el) el.setSelectionRange(el.value.length, el.value.length);
-    }, 0);
-  }, [localGhost, value, onChange]);
+    });
+  }, [ghost, value, onChange]);
 
   const handleKeyDown = useCallback(
     (e) => {
-      if (!localGhost) return;
-
-      // Ctrl/Cmd/Alt + ArrowRight = accept one word
-      if (e.key === "ArrowRight" && (e.ctrlKey || e.metaKey || e.altKey)) {
-        e.preventDefault();
-        acceptOneWord();
-        return;
-      }
-
+      if (!ghost) return;
       if (e.key === "Tab") {
         e.preventDefault();
         acceptFull();
         return;
       }
-      // ArrowRight at end of input = accept full ghost
       if (e.key === "ArrowRight") {
         const el = inputRef.current;
         if (el && el.selectionStart === el.value.length) {
@@ -279,41 +229,75 @@ function GhostInput({
         }
         return;
       }
-      // Escape = dismiss ghost
       if (e.key === "Escape") {
-        setLocalGhost("");
+        setGhost("");
       }
     },
-    [localGhost, acceptFull, acceptOneWord]
+    [ghost, acceptFull],
   );
 
-  const showGhost = localGhost.length > 0;
+  // Clear ghost on delete
+  useEffect(() => {
+    if (!value || value.trim().length < 3) setGhost("");
+  }, [value]);
+
+  // The shared font style — must match the input exactly
+  const fontStyle = {
+    fontFamily: "var(--font-body, DM Sans, sans-serif)",
+    fontSize: "0.875rem", // text-sm = 14px
+    fontWeight: "400",
+    letterSpacing: "normal",
+    whiteSpace: "pre",
+  };
 
   return (
-    <div className="flex flex-col gap-1.5 w-full">
-      <div className="relative w-full">
-        {showGhost && (
-          <div
+    <div className="flex flex-col gap-1.5">
+      {/* Input wrapper — relative so ghost can overlay */}
+      <div className="relative">
+        {/* Hidden mirror span — measures pixel width of current value */}
+        <span
+          ref={mirrorRef}
+          aria-hidden="true"
+          style={{
+            ...fontStyle,
+            position: "absolute",
+            visibility: "hidden",
+            pointerEvents: "none",
+            // Match input padding-left exactly (px-3 = 12px)
+            left: 12,
+            top: 0,
+          }}
+        >
+          {value || ""}
+        </span>
+
+        {/* Ghost overlay span */}
+        {ghost && (
+          <span
             aria-hidden="true"
-            className="absolute inset-0 z-20 flex items-center px-3 pointer-events-none select-none overflow-hidden"
-            // Ensure font exactly matches the input to prevent horizontal offset
             style={{
-              fontFamily: "inherit",
-              fontSize: "0.875rem",
-              lineHeight: "1.25rem", // Match Tailwind's text-sm
+              ...fontStyle,
+              position: "absolute",
+              // px-3 = 12px left padding, same as input
+              left: 12 + ghostLeft,
+              // vertically center inside h-10 (40px) input: (40 - lineHeight) / 2
+              top: "50%",
+              transform: "translateY(-50%)",
+              color: "var(--text-tertiary)",
+              opacity: 0.6,
+              pointerEvents: "none",
+              userSelect: "none",
+              zIndex: 2,
+              maxWidth: "calc(100% - 24px)",
+              overflow: "hidden",
+              whiteSpace: "nowrap",
             }}
           >
-            {/* The invisible span MUST match the input text perfectly */}
-            <span className="invisible whitespace-pre shrink-0">{value}</span>
-            <span
-              className="whitespace-pre opacity-40 truncate"
-              style={{ color: "var(--text-tertiary)" }}
-            >
-              {localGhost}
-            </span>
-          </div>
+            {ghost}
+          </span>
         )}
 
+        {/* Real input — transparent background so ghost shows through */}
         <input
           ref={inputRef}
           type="text"
@@ -322,14 +306,15 @@ function GhostInput({
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           autoComplete="off"
-          className="w-full h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-transparent text-sm text-[var(--text-primary)] relative z-10"
+          spellCheck
+          style={{ position: "relative", zIndex: 1, background: "transparent" }}
+          className="w-full h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)] transition-all"
         />
       </div>
 
-      {/* Accept controls — shown only when ghost is active */}
-      {showGhost && (
+      {/* Accept controls */}
+      {ghost && (
         <div className="flex items-center gap-2 flex-wrap">
-          {/* Full accept */}
           <button
             onMouseDown={(e) => {
               e.preventDefault();
@@ -342,7 +327,6 @@ function GhostInput({
             <span>Accept all</span>
           </button>
 
-          {/* Word-by-word accept */}
           <button
             onMouseDown={(e) => {
               e.preventDefault();
@@ -355,11 +339,10 @@ function GhostInput({
             <span>One word</span>
           </button>
 
-          {/* Dismiss */}
           <button
             onMouseDown={(e) => {
               e.preventDefault();
-              setLocalGhost("");
+              setGhost("");
               inputRef.current?.focus();
             }}
             className="h-6 px-2 text-[10px] text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
@@ -367,7 +350,6 @@ function GhostInput({
             ✕ dismiss
           </button>
 
-          {/* Keyboard hint — desktop only */}
           <span className="hidden sm:inline text-[10px] text-[var(--text-tertiary)] ml-auto">
             <kbd className="px-1 py-0.5 rounded bg-[var(--bg-muted)] font-mono text-[9px]">
               Tab
@@ -442,7 +424,6 @@ export function StepClarify({
         </p>
       </div>
 
-      {/* Loading skeletons */}
       {loading && (
         <div className="flex flex-col gap-4">
           {[0, 1, 2].map((i) => (
@@ -457,14 +438,12 @@ export function StepClarify({
         </div>
       )}
 
-      {/* Error */}
       {error && !loading && (
         <div className="rounded-[var(--r-lg)] border border-[var(--amber)] bg-[var(--amber-bg)] px-5 py-4 text-sm text-[var(--amber)]">
           {error}
         </div>
       )}
 
-      {/* Questions */}
       {!loading && questions.length > 0 && (
         <div className="flex flex-col gap-5">
           {questions.map((q, i) => (
@@ -475,7 +454,6 @@ export function StepClarify({
                 borderColor: answers[i]?.trim() ? "var(--emerald)" : undefined,
               }}
             >
-              {/* Question header */}
               <div className="flex items-start gap-2 mb-3">
                 <span
                   className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-semibold shrink-0 mt-0.5"
@@ -507,7 +485,6 @@ export function StepClarify({
         </div>
       )}
 
-      {/* Progress indicator */}
       {!loading && questions.length > 0 && (
         <div className="flex items-center gap-2">
           {questions.map((_, i) => (
@@ -528,7 +505,6 @@ export function StepClarify({
         </div>
       )}
 
-      {/* Actions */}
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onBack}>
           ← Back
