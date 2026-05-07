@@ -26,45 +26,61 @@ Single source of truth. Read before writing any code.
 | 7     | i18n, Model Picker, PDF Export   | ✅ Done |
 | 8     | Puter.js, Anon Limit, Import     | ✅ Done |
 | 9     | Nav Fix, Toast, Feedback & Admin | ✅ Done |
+| 10    | Bug Fixes: Ghost, AI, Store      | ✅ Done |
 
 ---
 
-## Phase 9 — Nav Fix, Toast, Feedback & Admin
+## Phase 10 — Bug Fixes
 
 **Status: ✅ Done**
 
 ### What was fixed
 
-#### `app/new/page.jsx` — Wizard navigation overhaul
+#### `components/intake/StepCapture.jsx` — Ghost rewritten to be example-based
 
-- Back/forward navigation **never resets or regenerates** — all step state preserved
-- Blueprint cached with an `inputKey` (`idea + scopeLevel`); only marked stale when inputs actually change
-- `goTo(target)` — free navigation to any visited step, no state side-effects
-- `advance(target)` — moves forward and records `maxStep` for breadcrumb clickability
-- Clarify questions remain cached via `cachedQuestions` prop; no refetch on back
-- `StepReview` receives `cachedBlueprint` when returning — skips generation entirely
+- **Before**: ghost used a complex trigger-word system that generated its own suggestions unrelated to examples.
+- **After**: ghost finds the first `EXAMPLE` string that starts with the user's typed prefix and returns the remainder. Typing "Learn conv..." shows the ghost "ersational Spanish in 3 months...". Tab or → accepts. This matches the design intent in CLAUDE.md.
+- Removed all `SUGGESTION_RULES` and `DOMAIN_HINTS` — these were generating arbitrary completions.
 
-#### `components/ui/Toast.jsx` — Feedback link on errors
+#### `components/intake/StepClarify.jsx` — Ghost simplified to placeholder-based
 
-- Every `type: "error"` toast now automatically appends a `"Report this issue →"` link to `/feedback`
-- Explicit `action` prop overrides the auto-link (for custom CTAs)
+- **Before**: `getAnswerGhost` checked semantic rules unrelated to the question.
+- **After**: ghost shows the remainder of `q.placeholder` after the user's typed prefix. Clean, predictable, and directly tied to the AI-generated example answer for each question.
+- Removed `ANSWER_COMPLETIONS` rule set — was overcomplicated and wrong in intent.
 
-#### `app/feedback/page.jsx` — Public board + admin panel
+#### `lib/ai/clientGenerate.js` — Routing and stream handling
 
-- Page confirmed fully public — no auth required to view, vote, or submit
-- Admin panel added: change status (`open → in_progress → resolved / wont_fix / duplicate`) + add team note
-- Admin gate: `user?.publicMetadata?.role === "admin"` (Clerk public metadata — no extra API)
-- Admin badge and per-card **Edit** button visible only to admin users
+- **Before**: returned `res.body` for API route (correct) but the comment said streams differed; no clarity on types.
+- **After**: both puter and API route return `ReadableStream<Uint8Array>`. Documented explicitly. `generateBlueprint` routing order: puter for lean/standard → API for ambitious or puter failure.
 
-#### `middleware.js` — Explicit public route
+#### `components/intake/StepReview.jsx` — Stream decoder fix
 
-- `/feedback` explicitly skipped from any auth checks — unambiguously public
+- **Before**: chunk handling with `typeof value === "string"` guard was fragile; `streamPending` ref was out of sync with state.
+- **After**: explicit `value instanceof Uint8Array` check → `decoder.decode()`, else string coerce. `streamPending` managed via state only (ref removed — was redundant and caused stale-closure bugs). Retry `hasStarted.current = false` reset is now inside `handleRetry` (was already correct in Phase 9 but consolidate here).
 
-### Admin setup (one-time)
+#### `lib/store/projectStore.js` — Immer draft id capture + streak logic
 
-1. Clerk Dashboard → Users → select user → Metadata tab
-2. Add to **Public metadata**: `{ "role": "admin" }`
-3. That user now sees the Admin badge and Edit controls on `/feedback`
+- **Before**: `addProject` did `return project.id` after the `set()` call — in Immer, `project` inside the callback is a draft proxy; reading `.id` outside the callback on the original object is safe but confusing.
+- **After**: `const projectId = project.id` captured BEFORE `set()` call, returned after. Unambiguous and safe.
+- **Before**: streak logic in `updateTask` read `p.lastActivityAt` AFTER updating it to `now`, always getting today's date.
+- **After**: `lastActive` captured before `p.lastActivityAt = now`. Streak now correctly computes based on previous activity date.
+
+---
+
+## Ghost Writing Rules (canonical)
+
+### StepCapture
+
+- Ghost matches typed prefix against the `EXAMPLES` array (case-insensitive).
+- Returns `example.slice(value.length)` when `example.toLowerCase().startsWith(value.toLowerCase())`.
+- If no example starts with the typed text, ghost is empty.
+- Tab or → accepts the full ghost. Ghost is cleared on blur or if no example matches.
+
+### StepClarify
+
+- Ghost matches typed prefix against `q.placeholder` (the AI-generated example answer).
+- Returns `placeholder.slice(value.length)` when placeholder starts with the typed text.
+- Tab or → accepts. ✕ button dismisses. Esc clears.
 
 ---
 
@@ -79,11 +95,20 @@ Single source of truth. Read before writing any code.
 | ambitious | OpenRouter (API) | **server-side** | Rate limited |
 
 **Puter.js is a browser SDK — it CANNOT run in Next.js API routes.**
-All puter calls happen in `lib/ai/clientGenerate.js` (client-only) or component files.
+All puter calls happen in `lib/ai/clientGenerate.js` (client-only).
+
+### Stream type contract
+
+Both puter and the API route return `ReadableStream<Uint8Array>`.
+
+- `puterStream()` in `lib/ai/puter.js`: gets full text, emits as chunked `ReadableStream` via `TextEncoder`.
+- `POST /api/generate` body: `ReadableStream<Uint8Array>` from the fetch Response.
+
+StepReview's reader loop decodes with: `value instanceof Uint8Array ? decoder.decode(value, { stream: true }) : String(value)`
 
 ### Entry point: `lib/ai/clientGenerate.js`
 
-- `generateBlueprint()` → puter for lean/standard, API route for ambitious
+- `generateBlueprint()` → puter for lean/standard, API route for ambitious or puter failure
 - `generateClarifyQuestions()` → puter first, API fallback
 - `generateReengage()` → puter first, API fallback
 
@@ -91,71 +116,76 @@ All puter calls happen in `lib/ai/clientGenerate.js` (client-only) or component 
 
 - `puterGenerate(prompt)` — non-streaming, returns string
 - `puterStream(system, user)` — simulates streaming via chunked ReadableStream
-- `isPuterAvailable()` — checks `window.puter` global
+- `isPuterAvailable()` — checks `typeof window.puter?.ai?.chat === "function"` (synchronous)
 
 ### `app/api/generate/route.js`
 
-Only called for: ambitious scope OR puter failure fallback. Uses OpenRouter via `lib/ai/client.js`.
+Only called for: ambitious scope OR puter failure fallback.
 
 ### `app/layout.js`
 
 ```html
-<script src="https://js.puter.com/v2/" async />
+<script src="https://js.puter.com/v2/" defer />
 ```
 
-This is the ONLY way puter is loaded. Do not import it as a module.
+ONLY way puter is loaded. Do not import as a module.
 
 ---
 
 ## Anonymous project limit — CRITICAL
 
-### Rule: 1 project per anonymous session. Cannot be bypassed.
+### Rule: 1 project per anonymous session.
 
-**Enforcement is server-side** — client checks are UX hints only.
+**Server-side enforcement** — client checks are UX hints only.
 
 Flow:
 
 1. `GET /api/projects/check-limit` — counts MongoDB docs for this sessionId
-2. `lib/ai/useProjectLimit.js` hook — fetches the check on mount
-3. `app/new/page.jsx` — shows gate UI before wizard even starts if limit exceeded
-4. `StepReview` — receives `limitAllowed` + `limitLoading` props, shows gate there too
-5. `POST /api/projects` — saves every new project with `sessionId` immediately (anon or authed)
+2. `lib/ai/useProjectLimit.js` hook — fetches check on mount
+3. `app/new/page.jsx` — shows gate UI if limit exceeded
+4. `StepReview` — receives `limitAllowed` + `limitLoading` props
+5. `POST /api/projects` — saves every new project with `sessionId`
 
 ### On sign-in:
 
 1. `DataProvider` calls `claimAnonymousProjects()` first
-2. `POST /api/projects/claim` bulk-updates `{ sessionId, userId: null }` → `{ userId }`
+2. `POST /api/projects/claim` bulk-updates sessionId docs → userId
 3. `hydrateFromServer()` merges everything
 
-### Key files:
+---
 
-- `lib/sessionId.js` — generates persistent anonymous session ID
-- `lib/ai/useProjectLimit.js` — React hook, checks limit on mount
-- `app/api/projects/check-limit/route.js` — server count query
-- `app/api/projects/claim/route.js` — transfers anon → user on login
+## Streak calculation (fixed in Phase 10)
+
+In `updateTask`:
+
+```js
+const lastActive = p.lastActivityAt?.split("T")[0]; // read BEFORE update
+p.lastActivityAt = now; // then update
+if (lastActive === today) {
+  if (p.streakDays < 1) p.streakDays = 1;
+} else if (lastActive === yesterday) {
+  p.streakDays += 1;
+} else {
+  p.streakDays = 1;
+}
+```
 
 ---
 
 ## MongoDB: graceful degradation
 
-`tryConnectDB()` (in `lib/db/mongoose.js`) returns `null` instead of throwing.
-All API routes use it — DB outage degrades to localStorage-only, never 500s the client.
-
-SSL fix: `family: 4` in mongoose options forces IPv4, resolves Windows TLS error.
+`tryConnectDB()` returns `null` instead of throwing. DB outage degrades to localStorage-only.
 
 ---
 
 ## Server/Client boundary rules
 
-**NEVER** import or call in server files (`app/api/`, `lib/db/`, `lib/models/`):
+**NEVER** import in server files (`app/api/`, `lib/db/`, `lib/models/`):
 
 - `puter` — browser SDK only
 - `lib/ai/clientGenerate.js` — client only
 - `lib/ai/puter.js` — client only
 - `lib/ai/rateLimit.js` — client only (localStorage)
-- `lib/userProfile.js` — pure utility, no "use client" directive
-
-**NEVER** call OpenRouter directly from client components — always via `lib/ai/clientGenerate.js` which routes through the API.
 
 ---
 
@@ -165,9 +195,7 @@ Auth is **optional** — every feature works without signing in.
 
 - Anonymous: 1 project limit, sessionId-keyed MongoDB + localStorage
 - Signed-in: unlimited, userId-keyed MongoDB, full sync
-- Auth gate: shown after blueprint in StepReview (friendly, not a hard block for commit)
-- Project limit gate: hard block on `/new` if limit exceeded — sign up required
-- Admin role: set via Clerk `publicMetadata.role = "admin"` — grants feedback board admin panel
+- Admin role: Clerk `publicMetadata.role === "admin"` — grants feedback board admin panel
 
 ---
 
@@ -187,43 +215,30 @@ Auth is **optional** — every feature works without signing in.
 
 ---
 
-## Import feature
+## Wizard navigation rules
 
-`components/project/ImportProjectModal.jsx` — accepts `.json` exports.
-Supports single project objects and the Settings bulk-backup format.
-Re-hydrates as fresh project (new ID, tasks reset to todo).
-Triggered from Dashboard header Import button.
-
----
-
-## Wizard navigation rules (Phase 9)
-
-These rules govern `app/new/page.jsx` — do not regress them:
-
-- **Never reset step state on navigation** — all inputs (idea, answers, scope) persist for the session
-- **Blueprint cache key** = `idea + "||" + scopeLevel` — only invalidated when these change
-- **`goTo(n)`** — navigate to any step `n <= maxReached`, no side effects
+- **Never reset step state on navigation**
+- **Blueprint cache key** = `idea + "||" + scopeLevel`
+- **`goTo(n)`** — navigate to any step `≤ maxReached`, no side effects
 - **`advance(n)`** — navigate forward, updates `maxReached`
-- **`StepReview` receives `cachedBlueprint`** when navigating back to step 3 — skips AI call entirely
-- **`blueprintIsStale`** is shown as a warning badge in the breadcrumb — does not block navigation
+- **`StepReview` receives `cachedBlueprint`** when navigating back — skips AI call
+- **`blueprintIsStale`** shown as warning badge, does not block navigation
 
 ---
 
-## Toast rules (Phase 9)
+## Toast rules
 
-- `toast.error(msg)` — always appends "Report this issue →" `/feedback` link automatically
-- `toast.error(msg, { action: { label, onClick } })` — explicit action overrides the auto-link
-- Never show raw error objects in toasts — always a human-readable string
+- `toast.error(msg)` — always appends "Report this issue →" `/feedback` link
+- `toast.error(msg, { action: { label, onClick } })` — explicit action overrides auto-link
 
 ---
 
-## Feedback page rules (Phase 9)
+## Feedback page rules
 
 - `/feedback` is **always public** — no auth, no redirect, no middleware guard
-- Anyone can: view all reports, upvote once per session, submit new report
-- Admin only (Clerk `publicMetadata.role === "admin"`): change status, add team note
-- Upvote is idempotent server-side (`$ne sessionId` guard in MongoDB query)
-- In-memory fallback (`memStore`) used when MongoDB is unavailable
+- Admin only: change status, add team note (Clerk `publicMetadata.role === "admin"`)
+- Upvote is idempotent server-side (`$ne sessionId` guard)
+- In-memory fallback (`memStore`) when MongoDB unavailable
 
 ---
 
@@ -231,13 +246,14 @@ These rules govern `app/new/page.jsx` — do not regress them:
 
 - Do NOT use `lib/ai/openrouter.js` — use `lib/ai/client.js` (server) or `lib/ai/clientGenerate.js` (client)
 - Do NOT call puter from API routes
-- Do NOT skip the server-side limit check — client rateLimit.js is bypassable
+- Do NOT skip the server-side limit check
 - Do NOT call `auth.protect()` anywhere
 - Do NOT add new localStorage keys outside `lib/persistence.js`
-- Do NOT remove `X-OpenRouter-Cache` header from `aiGenerate` calls in `lib/ai/client.js`
 - Do NOT reset wizard step state or blueprint on back-navigation
 - Do NOT regenerate blueprint when user navigates back to StepReview with unchanged inputs
 - Do NOT add auth guards to `/feedback` or its API route
+- Do NOT read `p.lastActivityAt` after setting it to `now` in streak calc
+- Do NOT return `project.id` from inside an Immer `set()` callback
 
 ---
 
@@ -245,7 +261,7 @@ These rules govern `app/new/page.jsx` — do not regress them:
 
 ```
 OPENROUTER_API_KEY=sk-or-v1-...
-OPENROUTER_MODEL=           # primary model (e.g. z-ai/glm-4.5-air:free)
+OPENROUTER_MODEL=           # primary model
 OPENROUTER_MODEL1=          # fallback model
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 MONGODB_URI=mongodb+srv://...
@@ -255,9 +271,7 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
 
 ---
 
-## Phase 10 — Post-MVP Backlog
-
-Features queued for after current fixes stabilize:
+## Phase 11 — Post-MVP Backlog
 
 - [ ] Recurring check-ins and deadline reminders (cron / server actions)
 - [ ] Timeline / Gantt visualization
@@ -267,7 +281,5 @@ Features queued for after current fixes stabilize:
 - [ ] Export to Notion / CSV / PDF
 - [ ] Team collaboration (shared projects, assigned tasks)
 - [ ] Analytics dashboard (completion rate, avg time per phase)
-- [ ] Paid tier gating (Stripe) — then switch `AI_PROVIDER=anthropic` for premium users
+- [ ] Paid tier gating (Stripe)
 - [ ] Mobile app (React Native or Expo)
-
-the auto-complete is not suggesting based on the examples. it is sugesting on its own. when the auto-complete concept is about user typing the example answer and the ghost helps user accepting the example.

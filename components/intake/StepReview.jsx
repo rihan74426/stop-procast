@@ -166,9 +166,6 @@ export function StepReview({
   const [status, setStatus] = useState(cachedBlueprint ? "done" : "idle");
   const [error, setError] = useState(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
-
-  // Use refs for values accessed inside async loops to avoid stale closures
-  const streamPendingRef = useRef(false);
   const [streamPending, setStreamPending] = useState(false);
 
   const rawRef = useRef("");
@@ -180,7 +177,6 @@ export function StepReview({
   const retryCount = useRef(0);
   const MAX_RETRIES = 2;
 
-  // ── Dismiss loading toast helper ─────────────────────────────────
   const dismissLoadingToast = useCallback(() => {
     if (loadingToastId.current) {
       toast.dismiss(loadingToastId.current);
@@ -188,44 +184,38 @@ export function StepReview({
     }
   }, []);
 
-  // ── Cleanup on unmount ────────────────────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       dismissLoadingToast();
-      if (readerRef.current) {
-        try {
-          readerRef.current.cancel();
-        } catch {
-          /* ignore */
-        }
-        readerRef.current = null;
+      try {
+        readerRef.current?.cancel();
+      } catch {
+        /* ignore */
       }
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
+      readerRef.current = null;
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+      rafRef.current = null;
     };
   }, [dismissLoadingToast]);
 
-  // ── Limit gate: block generation when limit confirmed ─────────────
+  // Limit gate
   useEffect(() => {
     if (cachedBlueprint) return;
     if (limitLoading) return;
     if (!limitAllowed) {
       setStatus("limited");
-      hasStarted.current = true; // prevent any generation from starting
+      hasStarted.current = true;
     }
   }, [limitLoading, limitAllowed, cachedBlueprint]);
 
-  // ── Start generation when limit confirmed as OK ───────────────────
+  // Start generation when limit confirmed as OK
   useEffect(() => {
     if (cachedBlueprint) return;
     if (hasStarted.current) return;
     if (limitLoading) return;
     if (!limitAllowed) return;
-
     hasStarted.current = true;
     runGeneration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -241,11 +231,8 @@ export function StepReview({
     setStatus("streaming");
     setCharCount(0);
     setError(null);
-    rawRef.current = "";
-
-    // Mark pending via both ref and state
-    streamPendingRef.current = true;
     setStreamPending(true);
+    rawRef.current = "";
 
     dismissLoadingToast();
     loadingToastId.current = toast.loading(
@@ -258,6 +245,8 @@ export function StepReview({
       const profile = loadUserProfile();
       const profileContext = buildProfileContext(profile);
 
+      // generateBlueprint returns a ReadableStream<Uint8Array>
+      // (either from puter or from the API response body)
       const stream = await generateBlueprint({
         idea,
         clarifications,
@@ -281,14 +270,15 @@ export function StepReview({
           return;
         }
 
+        // value is always Uint8Array here (both puter and fetch streams)
         const chunk =
-          typeof value === "string"
+          value instanceof Uint8Array
+            ? decoder.decode(value, { stream: true })
+            : typeof value === "string"
             ? value
-            : decoder.decode(value, { stream: true });
+            : "";
 
-        // Use ref to avoid stale closure — safely check pending state
-        if (streamPendingRef.current && chunk?.length > 0) {
-          streamPendingRef.current = false;
+        if (streamPending && chunk?.length > 0) {
           setStreamPending(false);
         }
 
@@ -303,7 +293,7 @@ export function StepReview({
       rafRef.current = null;
       readerRef.current = null;
 
-      if (rawRef.current.length < 50) {
+      if (rawRef.current.trim().length < 50) {
         throw new Error("AI returned incomplete response. Please try again.");
       }
 
@@ -313,20 +303,15 @@ export function StepReview({
       retryCount.current = 0;
       dismissLoadingToast();
       toast.success("Your plan is ready!");
-
       setBlueprint(parsed);
       setStatus("done");
       setStreamPending(false);
-      streamPendingRef.current = false;
     } catch (e) {
       if (!mountedRef.current) return;
-
       dismissLoadingToast();
       readerRef.current = null;
       setStreamPending(false);
-      streamPendingRef.current = false;
 
-      // Auto-retry on rate limit
       if (
         (e.code === "RATE_LIMITED" || e.status === 429) &&
         retryCount.current < MAX_RETRIES
@@ -339,10 +324,7 @@ export function StepReview({
           }/${MAX_RETRIES})`
         );
         await new Promise((r) => setTimeout(r, delay));
-        if (mountedRef.current) {
-          hasStarted.current = false;
-          runGeneration();
-        }
+        if (mountedRef.current) runGeneration();
         return;
       }
 
@@ -362,7 +344,7 @@ export function StepReview({
 
   const handleRetry = useCallback(() => {
     retryCount.current = 0;
-    hasStarted.current = false; // FIX: was missing — prevented retry from starting
+    hasStarted.current = false;
     setError(null);
     runGeneration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -381,7 +363,6 @@ export function StepReview({
     onCommit(blueprint);
   }, [onCommit, blueprint]);
 
-  // ── Greeting ──────────────────────────────────────────────────────
   function GreetingBanner() {
     const name = user?.firstName || user?.fullName || user?.username || null;
     const text = isSignedIn
@@ -389,7 +370,6 @@ export function StepReview({
         ? `Hi ${name}! Let's get to work.`
         : "Let's do this — onward!"
       : "Hello there — ready to explore?";
-
     return (
       <div className="rounded-[var(--r-md)] px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border)] mb-4">
         <p className="text-sm text-[var(--text-primary)] font-medium">{text}</p>
@@ -433,13 +413,6 @@ export function StepReview({
               </Button>
             </div>
           </div>
-          {!isSignedIn && (
-            <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-surface)] px-4 py-3">
-              <p className="text-xs text-[var(--text-secondary)] text-center">
-                Free account · No credit card · Unlimited projects
-              </p>
-            </div>
-          )}
         </div>
         <AuthGateModal
           open={showAuthGate}
@@ -450,7 +423,6 @@ export function StepReview({
     );
   }
 
-  // ── Loading limit check ───────────────────────────────────────────
   if (limitLoading && status === "idle") {
     return (
       <>
@@ -465,7 +437,6 @@ export function StepReview({
     );
   }
 
-  // ── Error ─────────────────────────────────────────────────────────
   if (status === "error") {
     return (
       <>
@@ -486,7 +457,6 @@ export function StepReview({
     );
   }
 
-  // ── Streaming / idle ──────────────────────────────────────────────
   if (status === "streaming" || status === "idle") {
     return (
       <>

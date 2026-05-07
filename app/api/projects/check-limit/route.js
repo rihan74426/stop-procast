@@ -3,7 +3,7 @@ import { tryConnectDB } from "@/lib/db/mongoose";
 import Project from "@/lib/models/Project";
 
 const ANON_LIMIT = 1;
-const AUTH_LIMIT = 50; // matches route.js
+const AUTH_LIMIT = 4; // matches route.js
 
 /**
  * GET /api/projects/check-limit
