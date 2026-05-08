@@ -283,3 +283,9 @@ NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
 - [ ] Analytics dashboard (completion rate, avg time per phase)
 - [ ] Paid tier gating (Stripe)
 - [ ] Mobile app (React Native or Expo)
+
+the edit on the steps should regenerate the response of the next page. there'll be a state in the ui that'll remind user that it has changed or edited.
+
+the clarify should be more polished and effective for every functionality.
+
+we need to keep some feature if the ai returns a invalid json. we need to fix it automatically to save the costs.
