@@ -64,7 +64,11 @@ const StreamingProgress = memo(function StreamingProgress({
     [...STREAM_STAGES].reverse().find((s) => charCount >= s.at) ??
     STREAM_STAGES[0];
   const Icon = stage.icon;
-  const pct = Math.min(98, Math.round((charCount / 3200) * 100));
+  // Show 100% only when charCount signals completion (set to Infinity by caller)
+  const pct =
+    charCount === Infinity
+      ? 100
+      : Math.min(98, Math.round((charCount / 3200) * 100));
 
   return (
     <div className="flex flex-col gap-5">
@@ -96,7 +100,7 @@ const StreamingProgress = memo(function StreamingProgress({
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-[var(--violet-dim)]">
-            {stage.text}…
+            {pct === 100 ? "Done!" : `${stage.text}…`}
           </p>
           <div className="mt-1.5 h-1.5 rounded-full bg-[var(--bg-muted)] overflow-hidden">
             <div
@@ -200,6 +204,42 @@ export function StepReview({
     };
   }, [dismissLoadingToast]);
 
+  // Keep local blueprint/status in sync with cachedBlueprint prop changes.
+  // If a cached blueprint appears, cancel any in-progress generation and show it immediately.
+  // If cachedBlueprint becomes null, reset generation state so runGeneration can start.
+  useEffect(() => {
+    // If a cached blueprint is provided, stop any streaming and show it
+    if (cachedBlueprint) {
+      // cancel any active reader/stream
+      try {
+        readerRef.current?.cancel();
+      } catch {
+        /* ignore */
+      }
+      readerRef.current = null;
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      dismissLoadingToast();
+      rawRef.current = "";
+      setCharCount(Infinity);
+      setStreamPending(false);
+      setBlueprint(cachedBlueprint);
+      setStatus("done");
+      setError(null);
+      return;
+    }
+
+    // cachedBlueprint cleared → prepare to run a fresh generation
+    // Leave hasStarted gating / runGeneration to existing effects, but reset local state
+    setBlueprint(null);
+    setStatus("idle");
+    setCharCount(0);
+    rawRef.current = "";
+    setError(null);
+  }, [cachedBlueprint, dismissLoadingToast]);
+
   // Limit gate
   useEffect(() => {
     if (cachedBlueprint) return;
@@ -245,15 +285,12 @@ export function StepReview({
       const profile = loadUserProfile();
       const profileContext = buildProfileContext(profile);
 
-      // generateBlueprint returns a ReadableStream<Uint8Array>
-      // (either from puter or from the API response body)
       const stream = await generateBlueprint({
         idea,
         clarifications,
         scopeLevel,
         profileContext,
       });
-
       const reader = stream.getReader();
       readerRef.current = reader;
       const decoder = new TextDecoder();
@@ -270,7 +307,6 @@ export function StepReview({
           return;
         }
 
-        // value is always Uint8Array here (both puter and fetch streams)
         const chunk =
           value instanceof Uint8Array
             ? decoder.decode(value, { stream: true })
@@ -278,10 +314,7 @@ export function StepReview({
             ? value
             : "";
 
-        if (streamPending && chunk?.length > 0) {
-          setStreamPending(false);
-        }
-
+        if (streamPending && chunk?.length > 0) setStreamPending(false);
         rawRef.current += chunk;
 
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -302,6 +335,12 @@ export function StepReview({
 
       retryCount.current = 0;
       dismissLoadingToast();
+
+      // Signal 100% before transitioning to "done" state
+      setCharCount(Infinity);
+      await new Promise((r) => setTimeout(r, 300));
+
+      if (!mountedRef.current) return;
       toast.success("Your plan is ready!");
       setBlueprint(parsed);
       setStatus("done");
@@ -343,9 +382,17 @@ export function StepReview({
   }
 
   const handleRetry = useCallback(() => {
+    // Reset ALL generation state so the useEffect gate and runGeneration
+    // both start from scratch — critical after back-nav + error + retry.
     retryCount.current = 0;
-    hasStarted.current = false;
+    hasStarted.current = false; // ← was missing: gate was permanently closed
     setError(null);
+    setStatus("idle");
+    setCharCount(0);
+    rawRef.current = "";
+    // The useEffect watching [cachedBlueprint, limitLoading, limitAllowed]
+    // will NOT re-fire because those haven't changed. Trigger directly:
+    hasStarted.current = true;
     runGeneration();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -377,7 +424,6 @@ export function StepReview({
     );
   }
 
-  // ── Limit gate ────────────────────────────────────────────────────
   if (status === "limited") {
     return (
       <>

@@ -1,12 +1,14 @@
 /**
  * app/api/generate/route.js
  *
- * Improvements:
- * - Rate limiter uses IP + User-Agent fingerprint (harder to bypass)
- * - Separate counters per request type
- * - Request validation before AI call
- * - Graceful streaming error with readable message
- * - Route timeout aligned with Vercel's 60s limit
+ * Rate limiter note:
+ *   The ipUsage Map lives in module scope. On Vercel (serverless), every
+ *   cold start creates a fresh Map — a user can technically exceed the
+ *   per-minute limit by hitting different function instances. This is
+ *   acceptable for MVP (the server-side limit is a supplement to the
+ *   client-side rateLimit.js guard). For hard enforcement at scale, move
+ *   to Redis/Upstash. Until then: x-ratelimit-* headers are returned so
+ *   clients can self-throttle even when the Map resets.
  */
 
 import {
@@ -17,17 +19,16 @@ import {
 } from "@/lib/ai/prompts";
 import { aiGenerate, aiStream } from "@/lib/ai/client";
 
-// ─── Rate limiter ─────────────────────────────────────────────────────
-// Sliding window per IP. Resets on cold-start (intentional for serverless).
+// ─── Rate limiter (in-memory, per cold-start instance) ────────────────
 
 const ipUsage = new Map();
 const WINDOW_MS = 60_000;
 
 const LIMITS = {
-  generate: 3, // blueprint per minute
+  generate: 3,
   clarify: 10,
   reengage: 20,
-  total: 15, // all types combined
+  total: 15,
 };
 
 function checkRateLimit(ip, type) {
@@ -45,24 +46,29 @@ function checkRateLimit(ip, type) {
     ipUsage.set(ip, entry);
   }
 
-  // Prune stale entries to prevent memory growth
+  // Prune stale entries to prevent memory growth on long-lived instances
   if (ipUsage.size > 1000) {
     for (const [k, v] of ipUsage) {
       if (now - v.windowStart > WINDOW_MS * 5) ipUsage.delete(k);
     }
   }
 
-  const typeOk = (entry[type] ?? 0) < (LIMITS[type] ?? 10);
+  const typeLimit = LIMITS[type] ?? 10;
+  const typeOk = (entry[type] ?? 0) < typeLimit;
   const totalOk = entry.total < LIMITS.total;
 
   if (typeOk && totalOk) {
     entry[type] = (entry[type] ?? 0) + 1;
     entry.total++;
-    return { allowed: true };
+    return {
+      allowed: true,
+      remaining: typeLimit - entry[type],
+      reset: Math.ceil((entry.windowStart + WINDOW_MS - now) / 1000),
+    };
   }
 
   const retryAfter = Math.ceil((entry.windowStart + WINDOW_MS - now) / 1000);
-  return { allowed: false, retryAfter };
+  return { allowed: false, retryAfter, remaining: 0, reset: retryAfter };
 }
 
 function getIP(req) {
@@ -74,6 +80,7 @@ function getIP(req) {
 }
 
 // ─── Route timeout ────────────────────────────────────────────────────
+
 const ROUTE_TIMEOUT_MS = 55_000;
 
 function withRouteTimeout(promise) {
@@ -105,6 +112,7 @@ function validateIdea(idea) {
 }
 
 // ─── POST /api/generate ───────────────────────────────────────────────
+
 export async function POST(request) {
   try {
     const ip = getIP(request);
@@ -131,8 +139,16 @@ export async function POST(request) {
       return Response.json({ error: `Unknown type: ${type}` }, { status: 400 });
     }
 
-    // Rate check
     const rl = checkRateLimit(ip, type);
+
+    // Always include rate-limit info in response headers so clients can
+    // self-throttle even when cold starts reset the in-memory counter.
+    const rlHeaders = {
+      "X-RateLimit-Limit": String(LIMITS[type] ?? 10),
+      "X-RateLimit-Remaining": String(rl.remaining),
+      "X-RateLimit-Reset": String(rl.reset ?? 60),
+    };
+
     if (!rl.allowed) {
       return Response.json(
         {
@@ -142,7 +158,7 @@ export async function POST(request) {
         },
         {
           status: 429,
-          headers: { "Retry-After": String(rl.retryAfter) },
+          headers: { ...rlHeaders, "Retry-After": String(rl.retryAfter) },
         }
       );
     }
@@ -152,11 +168,10 @@ export async function POST(request) {
       const ideaError = validateIdea(idea);
       if (ideaError)
         return Response.json({ error: ideaError }, { status: 400 });
-
       const text = await withRouteTimeout(
         aiGenerate(buildClarifyPrompt(idea.trim()))
       );
-      return Response.json({ questions: text });
+      return Response.json({ questions: text }, { headers: rlHeaders });
     }
 
     // ── reengage ─────────────────────────────────────────────────────
@@ -167,7 +182,7 @@ export async function POST(request) {
       const text = await withRouteTimeout(
         aiGenerate(buildReengagePrompt(project))
       );
-      return Response.json({ suggestion: text });
+      return Response.json({ suggestion: text }, { headers: rlHeaders });
     }
 
     // ── generate (streaming blueprint) ───────────────────────────────
@@ -196,6 +211,7 @@ export async function POST(request) {
 
       return new Response(stream, {
         headers: {
+          ...rlHeaders,
           "Content-Type": "text/plain; charset=utf-8",
           "X-Content-Type-Options": "nosniff",
         },

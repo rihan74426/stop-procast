@@ -1,6 +1,6 @@
 "use client";
 
-import { use, useState } from "react";
+import { use, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useProjectStore } from "@/lib/store/projectStore";
@@ -19,6 +19,7 @@ import { EmailExportModal } from "@/components/project/EmailExportModal";
 import { ProgressRing } from "@/components/ui/Progress";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
+import { Modal } from "@/components/ui/Modal";
 import { overallProgress } from "@/lib/utils/progress";
 import { formatDate, projectAgeLabel } from "@/lib/utils/date";
 import {
@@ -29,6 +30,45 @@ import { useI18n } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import { FaJs, FaMailBulk, FaRocket } from "react-icons/fa";
 import { MdDelete } from "react-icons/md";
+
+// ─── ConfirmModal ─────────────────────────────────────────────────────
+// Replaces native confirm() — works in all contexts (iframes, PWAs, etc.)
+
+function ConfirmModal({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  description,
+  confirmLabel,
+  confirmVariant = "danger",
+  loading,
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title={title} size="sm">
+      <div className="flex flex-col gap-5">
+        <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+          {description}
+        </p>
+        <div className="flex gap-2 justify-end">
+          <Button variant="ghost" onClick={onClose} disabled={loading}>
+            Cancel
+          </Button>
+          <Button
+            variant={confirmVariant}
+            onClick={onConfirm}
+            loading={loading}
+          >
+            {confirmLabel}
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ─── Project content ──────────────────────────────────────────────────
+
 function ProjectContent({ id }) {
   const router = useRouter();
   const { t } = useI18n();
@@ -38,8 +78,41 @@ function ProjectContent({ id }) {
   const completeProject = useProjectStore((s) => s.completeProject);
 
   const [showEmailExport, setShowEmailExport] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [completing, setCompleting] = useState(false);
+
+  // Confirm modal state
+  const [confirmModal, setConfirmModal] = useState({
+    open: false,
+    type: null, // 'delete' | 'complete'
+    loading: false,
+  });
+
+  const openConfirm = useCallback((type) => {
+    setConfirmModal({ open: true, type, loading: false });
+  }, []);
+
+  const closeConfirm = useCallback(() => {
+    setConfirmModal((s) => ({ ...s, open: false, loading: false }));
+  }, []);
+
+  const handleConfirmAction = useCallback(async () => {
+    setConfirmModal((s) => ({ ...s, loading: true }));
+    try {
+      if (confirmModal.type === "delete") {
+        await deleteProject(id);
+        router.push("/");
+      } else if (confirmModal.type === "complete") {
+        await completeProject(id);
+        router.push(`/project/${id}/complete`);
+      }
+    } catch {
+      setConfirmModal({ open: false, type: null, loading: false });
+      toast.error(
+        confirmModal.type === "delete"
+          ? "Failed to delete project."
+          : "Failed to complete project."
+      );
+    }
+  }, [confirmModal.type, deleteProject, completeProject, id, router]);
 
   if (!project) {
     return (
@@ -59,32 +132,6 @@ function ProjectContent({ id }) {
   const progress = overallProgress(project);
   const isCompleted = !!project.completionDate;
 
-  const handleDelete = async () => {
-    if (!confirm(`Delete "${project.projectTitle}"? This cannot be undone.`))
-      return;
-    setDeleting(true);
-    try {
-      await deleteProject(id);
-      router.push("/");
-    } catch {
-      setDeleting(false);
-      toast.error("Failed to delete project.");
-    }
-  };
-
-  const handleComplete = async () => {
-    if (!confirm("Mark this project as complete?")) return;
-    setCompleting(true);
-    try {
-      await completeProject(id);
-      router.push(`/project/${id}/complete`);
-    } catch {
-      setCompleting(false);
-      toast.error("Failed to complete project.");
-    }
-  };
-
-  // ── Client-side exports — no server round-trip, no URL size limits ──
   const handleExportMarkdown = () => {
     try {
       exportProjectMarkdown(project);
@@ -113,6 +160,26 @@ function ProjectContent({ id }) {
       console.error("PDF export failed:", err);
     }
   };
+
+  // Confirm modal config per action type
+  const confirmConfig = {
+    delete: {
+      title: "Delete project",
+      description: `"${project.projectTitle}" will be permanently deleted. This cannot be undone.`,
+      confirmLabel: "Delete permanently",
+      confirmVariant: "danger",
+    },
+    complete: {
+      title: "Mark as shipped",
+      description: `Mark "${project.projectTitle}" as complete? You'll be taken to the completion screen to write a retrospective.`,
+      confirmLabel: "Mark as shipped 🚀",
+      confirmVariant: "emerald",
+    },
+  };
+
+  const activeConfig = confirmModal.type
+    ? confirmConfig[confirmModal.type]
+    : null;
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -266,7 +333,7 @@ function ProjectContent({ id }) {
                   <BlockerPanel project={project} />
                 </div>
 
-                {/* Suggested tools */}
+                {/* Tools */}
                 {project.toolsSuggested?.length > 0 && (
                   <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                     <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
@@ -291,8 +358,7 @@ function ProjectContent({ id }) {
                   {!isCompleted && (
                     <Button
                       variant="emerald"
-                      onClick={handleComplete}
-                      loading={completing}
+                      onClick={() => openConfirm("complete")}
                       className="w-full justify-center"
                     >
                       <FaRocket /> {t("project_mark_shipped")}
@@ -306,7 +372,6 @@ function ProjectContent({ id }) {
                   >
                     <FaMailBulk /> {t("project_export_email")}
                   </Button>
-
                   <Button
                     variant="ghost"
                     onClick={handleExportPDF}
@@ -314,7 +379,6 @@ function ProjectContent({ id }) {
                   >
                     {t("project_export_pdf")}
                   </Button>
-
                   <Button
                     variant="ghost"
                     onClick={handleExportMarkdown}
@@ -322,7 +386,6 @@ function ProjectContent({ id }) {
                   >
                     {t("project_export_md")}
                   </Button>
-
                   <Button
                     variant="ghost"
                     onClick={handleExportJSON}
@@ -330,11 +393,9 @@ function ProjectContent({ id }) {
                   >
                     <FaJs /> {t("project_export_json")}
                   </Button>
-
                   <Button
                     variant="danger"
-                    onClick={handleDelete}
-                    loading={deleting}
+                    onClick={() => openConfirm("delete")}
                     className="w-full justify-center"
                   >
                     <MdDelete /> {t("project_delete")}
@@ -347,11 +408,26 @@ function ProjectContent({ id }) {
         </main>
       </div>
 
+      {/* Modals */}
       <EmailExportModal
         open={showEmailExport}
         onClose={() => setShowEmailExport(false)}
         project={project}
       />
+
+      {activeConfig && (
+        <ConfirmModal
+          open={confirmModal.open}
+          onClose={closeConfirm}
+          onConfirm={handleConfirmAction}
+          loading={confirmModal.loading}
+          title={activeConfig.title}
+          description={activeConfig.description}
+          confirmLabel={activeConfig.confirmLabel}
+          confirmVariant={activeConfig.confirmVariant}
+        />
+      )}
+
       <SavePromptModal />
     </div>
   );

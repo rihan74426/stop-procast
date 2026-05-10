@@ -1,19 +1,19 @@
 "use client";
 
 /**
- * app/new/page.jsx — Fixed wizard navigation
+ * app/new/page.jsx
  *
- * Key fixes:
- * 1. Blueprint NEVER regenerated on back-nav — cached until inputs change
- * 2. goTo() allows free nav to any visited step (no state reset)
- * 3. Clarify questions cached, never refetched on back
- * 4. Stale detection: only marks stale if idea/scope actually changed
- * 5. StepReview receives cachedBlueprint when navigating back — skips AI call
- * 6. handleCommit correctly uses blueprint fields (not addProject defaults)
- * 7. Blueprint passed correctly from StepReview → StepCommit via state
+ * Changes in this version:
+ * 1. Edit detection: when user goes back to Step 0 or 1 and changes
+ *    idea/clarifications, a banner appears on Step 2/3 asking permission
+ *    to regenerate (instead of silently marking stale).
+ * 2. Permission dialog: a clear modal/banner with "Keep current plan" vs
+ *    "Regenerate" — no surprise regenerations.
+ * 3. StepReview receives the permission state so it knows whether to
+ *    re-run generation or show the cached blueprint.
  */
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
 import { StepCapture } from "@/components/intake/StepCapture";
@@ -29,6 +29,7 @@ import { TopBar } from "@/components/layout/Topbar";
 import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { toast } from "@/lib/toast";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { BiSolidPencil } from "react-icons/bi";
 
 const STEP_LABELS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
 
@@ -39,6 +40,44 @@ export default function NewProjectPage() {
     </DataProvider>
   );
 }
+
+// ─── Regeneration permission banner ──────────────────────────────────
+
+function RegenPermissionBanner({ onKeep, onRegenerate }) {
+  return (
+    <div className="mb-6 rounded-[var(--r-lg)] border-2 border-[var(--amber)] bg-[var(--amber-bg)] px-4 py-4">
+      <div className="flex items-start gap-3">
+        <span className="text-xl shrink-0 mt-0.5">✏️</span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">
+            Your inputs changed
+          </p>
+          <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-3">
+            You edited your idea or answers after generating your plan. Do you
+            want to regenerate with the updated inputs, or keep your current
+            plan?
+          </p>
+          <div className="flex gap-2 flex-wrap">
+            <button
+              onClick={onRegenerate}
+              className="h-8 px-4 text-xs font-semibold rounded-[var(--r-md)] bg-[var(--amber)] text-white hover:opacity-90 active:scale-[0.97] transition-all"
+            >
+              Regenerate plan ↺
+            </button>
+            <button
+              onClick={onKeep}
+              className="h-8 px-4 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all"
+            >
+              Keep current plan
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main content ─────────────────────────────────────────────────────
 
 function NewProjectContent() {
   const router = useRouter();
@@ -54,7 +93,7 @@ function NewProjectContent() {
     }
   }, [limitLoading, limitAllowed, isSignedIn]);
 
-  // ── Wizard state ──────────────────────────────────────────────────
+  // ── Wizard state ─────────────────────────────────────────────────
   const [step, setStep] = useState(0);
   const [maxStep, setMaxStep] = useState(0);
 
@@ -63,77 +102,93 @@ function NewProjectContent() {
   const [cachedQuestions, setCachedQuestions] = useState(null);
   const [scopeLevel, setScopeLevel] = useState("standard");
 
-  // Blueprint cache
+  // Blueprint + change tracking
   const [blueprint, setBlueprint] = useState(null);
   const [blueprintKey, setBlueprintKey] = useState(null);
+  // null = no conflict; 'pending' = waiting for user decision; 'keep' | 'regen'
+  const [regenDecision, setRegenDecision] = useState(null);
 
-  const inputKey = `${idea}||${scopeLevel}`;
+  // The key that was used to generate the current blueprint
+  const inputKey = `${idea.trim()}||${scopeLevel}||${JSON.stringify(
+    clarifyAnswers
+  )}`;
   const blueprintIsStale =
     blueprint !== null && blueprintKey !== null && inputKey !== blueprintKey;
 
+  // When blueprint becomes stale and user is on step 2 or 3 (Scope or Review), show banner
+  const showRegenBanner =
+    blueprintIsStale && (step === 2 || step === 3) && regenDecision === null;
+
+  // ── Navigation ───────────────────────────────────────────────────
   const maxReached = blueprint !== null && !blueprintIsStale ? 4 : maxStep;
 
-  // ── Navigation ────────────────────────────────────────────────────
   const goTo = useCallback(
     (target) => {
       if (target < 0 || target > maxReached) return;
+      // If navigating to step 2 or 3 and blueprint is stale, reset decision so user must choose
+      if ((target === 2 || target === 3) && blueprintIsStale) {
+        setRegenDecision(null);
+      }
       setStep(target);
     },
-    [maxReached]
+    [maxReached, blueprintIsStale]
   );
-
-  useEffect(() => {
-    // Client-side code can only access env vars prefixed with NEXT_PUBLIC_.
-    // Also ensure we use the same localStorage keys we check elsewhere.
-    const appId = process.env.NEXT_PUBLIC_PUTER_APP_ID;
-    const authToken = process.env.NEXT_PUBLIC_PUTER_AUTH_TOKEN;
-
-    // Only write when values are available (avoid writing "undefined")
-    if (!localStorage.getItem("puter.app.id") && appId) {
-      localStorage.setItem("puter.app.id", appId);
-    }
-    if (!localStorage.getItem("puter.auth.token") && authToken) {
-      localStorage.setItem("puter.auth.token", authToken);
-    }
-
-    // Informative logging
-    if (
-      localStorage.getItem("puter.app.id") &&
-      localStorage.getItem("puter.auth.token")
-    ) {
-      console.log("Puter credentials available in localStorage");
-    }
-  }, []);
 
   const advance = useCallback((target) => {
     setStep(target);
     setMaxStep((prev) => Math.max(prev, target));
   }, []);
 
-  // ── Input handlers ────────────────────────────────────────────────
+  useEffect(() => {
+    const appId = process.env.NEXT_PUBLIC_PUTER_APP_ID;
+    const authToken = process.env.NEXT_PUBLIC_PUTER_AUTH_TOKEN;
+    if (!localStorage.getItem("puter.app.id") && appId)
+      localStorage.setItem("puter.app.id", appId);
+    if (!localStorage.getItem("puter.auth.token") && authToken)
+      localStorage.setItem("puter.auth.token", authToken);
+  }, []);
+
+  // ── Input handlers ───────────────────────────────────────────────
   const handleIdeaChange = useCallback((v) => setIdea(v), []);
+
   const handleClarifyChange = useCallback(
     (i, v) => setClarifyAnswers((prev) => ({ ...prev, [i]: v })),
     []
   );
+
   const handleScopeChange = useCallback((v) => setScopeLevel(v), []);
 
   /**
-   * Called by StepReview when blueprint is ready.
+   * Called by StepReview when blueprint is ready (fresh generation).
    * Advances to step 4 (Commit) and caches the blueprint.
    */
   const handleBlueprintReady = useCallback(
     (bp) => {
       setBlueprint(bp);
       setBlueprintKey(inputKey);
+      setRegenDecision(null);
       advance(4);
     },
     [inputKey, advance]
   );
 
+  // User chose to keep the stale plan
+  const handleKeepPlan = useCallback(() => {
+    setBlueprintKey(inputKey); // treat current inputs as "accepted"
+    setRegenDecision("keep");
+    // small UX feedback
+    toast.success("Kept current plan. Your inputs are accepted.");
+  }, [inputKey]);
+
+  // User chose to regenerate
+  const handleRegenerate = useCallback(() => {
+    setBlueprint(null);
+    setBlueprintKey(null);
+    setRegenDecision("regen");
+  }, []);
+
   /**
    * Called by StepCommit when user commits.
-   * Uses blueprint data directly — addProject merges into createProject defaults.
    */
   const handleCommit = async ({ deadline }) => {
     if (!blueprint) {
@@ -143,8 +198,6 @@ function NewProjectContent() {
 
     const toastId = toast.loading("Creating your project…");
     try {
-      // Build the project data from blueprint
-      // createProject() in the store merges these over the defaults
       const projectData = {
         projectTitle: blueprint.projectTitle,
         oneLineGoal: blueprint.oneLineGoal,
@@ -183,7 +236,19 @@ function NewProjectContent() {
     .map(([i, answer]) => ({ question: `Q${parseInt(i) + 1}`, answer }))
     .filter((c) => c.answer?.trim());
 
-  // ── Early gate (anon limit exceeded) ─────────────────────────────
+  // The blueprint to pass to StepReview:
+  // - null if we want fresh generation (no cached blueprint OR user explicitly chose regen)
+  // - blueprint if we want to show cached (either not stale, or stale but user hasn't chosen regen yet OR user chose keep)
+  const reviewBlueprint =
+    blueprint === null
+      ? null
+      : blueprintIsStale
+      ? regenDecision === "regen"
+        ? null
+        : blueprint
+      : blueprint;
+
+  // ── Early gate ───────────────────────────────────────────────────
   if (!limitLoading && !limitAllowed && !isSignedIn) {
     return (
       <div className="flex h-screen overflow-hidden">
@@ -301,9 +366,10 @@ function NewProjectContent() {
                   );
                 })}
 
-                {blueprintIsStale && (
-                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber)] whitespace-nowrap">
-                    ⚠ Inputs changed — will regenerate
+                {/* Compact stale indicator in breadcrumb (not a decision point) */}
+                {blueprintIsStale && step !== 2 && step !== 3 && (
+                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber)] whitespace-nowrap shrink-0">
+                    <BiSolidPencil /> Edited
                   </span>
                 )}
               </div>
@@ -343,16 +409,26 @@ function NewProjectContent() {
               )}
 
               {step === 3 && (
-                <StepReview
-                  idea={idea}
-                  clarifications={clarifications}
-                  scopeLevel={scopeLevel}
-                  cachedBlueprint={blueprintIsStale ? null : blueprint}
-                  onBack={() => goTo(2)}
-                  onCommit={handleBlueprintReady}
-                  limitAllowed={limitAllowed}
-                  limitLoading={limitLoading}
-                />
+                <>
+                  {/* Regeneration permission banner (now shown on step 2 or 3; decision controlled by showRegenBanner) */}
+                  {showRegenBanner && (
+                    <RegenPermissionBanner
+                      onKeep={handleKeepPlan}
+                      onRegenerate={handleRegenerate}
+                    />
+                  )}
+                  <StepReview
+                    idea={idea}
+                    clarifications={clarifications}
+                    scopeLevel={scopeLevel}
+                    cachedBlueprint={reviewBlueprint}
+                    regenDecision={regenDecision} // StepReview can reflect permission state
+                    onBack={() => goTo(2)}
+                    onCommit={handleBlueprintReady}
+                    limitAllowed={limitAllowed}
+                    limitLoading={limitLoading}
+                  />
+                </>
               )}
 
               {step === 4 && blueprint && (
@@ -363,7 +439,6 @@ function NewProjectContent() {
                 />
               )}
 
-              {/* Safety: if somehow at step 4 without blueprint, go back */}
               {step === 4 && !blueprint && (
                 <div className="flex flex-col gap-4 items-center py-12">
                   <p className="text-[var(--text-secondary)]">

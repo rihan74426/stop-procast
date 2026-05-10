@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/Button";
+import { FaRocket } from "react-icons/fa";
 
 export function StepCommit({ blueprint, onBack, onConfirm }) {
   const [deadline, setDeadline] = useState("");
@@ -218,7 +219,8 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
           disabled={!committed || submitting}
           onClick={handleConfirm}
         >
-          {submitting ? "Starting… 🚀" : "Start project 🚀"}
+          {submitting ? "Starting…" : "Start project"}{" "}
+          <FaRocket className="inline" />
         </Button>
       </div>
     </div>

@@ -1,6 +1,8 @@
 import { auth } from "@clerk/nextjs/server";
-import { connectDB } from "@/lib/db/mongoose";
+import { tryConnectDB } from "@/lib/db/mongoose"; // was connectDB — throws on failure
 import Project from "@/lib/models/Project";
+
+const MAX_PAYLOAD_BYTES = 500 * 1024; // 500 KB
 
 // GET /project/[id]/export?format=json|markdown&data=<base64>
 export async function GET(request, { params }) {
@@ -15,21 +17,27 @@ export async function GET(request, { params }) {
     try {
       const { userId } = await auth();
       if (userId) {
-        await connectDB();
-        const doc = await Project.findOne({ id, userId }).lean();
-        if (doc) {
-          const { _id, __v, ...clean } = doc;
-          project = clean;
+        const db = await tryConnectDB(); // graceful — never throws
+        if (db) {
+          const doc = await Project.findOne({ id, userId }).lean();
+          if (doc) {
+            const { _id, __v, ...clean } = doc;
+            project = clean;
+          }
         }
       }
     } catch {
-      // Not authenticated or DB unavailable — fall through
+      // Not authenticated or DB unavailable — fall through to client data
     }
 
     // 2. Fall back to client-passed base64 data
     if (!project) {
       const encoded = searchParams.get("data");
       if (encoded) {
+        // Guard against excessively large payloads
+        if (encoded.length > MAX_PAYLOAD_BYTES) {
+          return new Response("Payload too large", { status: 413 });
+        }
         project = decodeProjectData(encoded);
       }
     }
@@ -49,7 +57,6 @@ export async function GET(request, { params }) {
       });
     }
 
-    // Default: JSON
     return new Response(JSON.stringify(project, null, 2), {
       headers: {
         "Content-Type": "application/json",
@@ -62,17 +69,11 @@ export async function GET(request, { params }) {
   }
 }
 
-/**
- * Decode base64-encoded project data from client.
- * Handles both encoding strategies used in the app.
- */
 function decodeProjectData(encoded) {
-  // Strategy 1: encodeURIComponent-then-btoa (used by toBase64Safe in page.jsx)
   try {
     const decoded = Buffer.from(encoded, "base64").toString("utf-8");
     return JSON.parse(decodeURIComponent(decoded));
   } catch {
-    // Strategy 2: plain base64 JSON
     try {
       return JSON.parse(Buffer.from(encoded, "base64").toString("utf-8"));
     } catch {
@@ -92,7 +93,6 @@ function slug(title) {
 
 function toMarkdown(p) {
   const lines = [];
-
   lines.push(`# ${p.projectTitle || "Untitled"}`);
   lines.push("");
   if (p.oneLineGoal) lines.push(`> ${p.oneLineGoal}`);
@@ -104,18 +104,15 @@ function toMarkdown(p) {
     lines.push(p.problemStatement);
     lines.push("");
   }
-
   if (p.targetUser) {
     lines.push(`**Target user:** ${p.targetUser}`);
     lines.push("");
   }
-
   if (p.successCriteria?.length) {
     lines.push("## Success Criteria");
     p.successCriteria.forEach((c) => lines.push(`- ${c}`));
     lines.push("");
   }
-
   if (p.scope) {
     const { mustHave = [], niceToHave = [], outOfScope = [] } = p.scope;
     if (mustHave.length || niceToHave.length || outOfScope.length) {
@@ -135,59 +132,50 @@ function toMarkdown(p) {
       lines.push("");
     }
   }
-
   p.phases?.forEach((phase, i) => {
     lines.push(`## Phase ${i + 1}: ${phase.name}`);
     if (phase.objective) lines.push(phase.objective);
     lines.push("");
-
     phase.milestones?.forEach((m) => {
       lines.push(`### ${m.name}`);
       if (m.deadline) lines.push(`**Deadline:** ${m.deadline}`);
       if (m.doneWhen) lines.push(`**Done when:** ${m.doneWhen}`);
       if (m.risk) lines.push(`**Risk:** ${m.risk}`);
       lines.push("");
-
-      // Tasks linked to this milestone
       const milestoneTasks =
         p.tasks?.filter((t) => t.milestoneId === m.id) ?? [];
-      milestoneTasks.forEach((t) => {
-        lines.push(`- [${t.status === "done" ? "x" : " "}] ${t.title}`);
-      });
+      milestoneTasks.forEach((t) =>
+        lines.push(`- [${t.status === "done" ? "x" : " "}] ${t.title}`)
+      );
       if (milestoneTasks.length) lines.push("");
     });
-
-    // Tasks in phase but not linked to a milestone
-    const phaseTasks =
+    const looseTasks =
       p.tasks?.filter((t) => t.phaseId === phase.id && !t.milestoneId) ?? [];
-    if (phaseTasks.length) {
+    if (looseTasks.length) {
       lines.push("**Tasks**");
-      phaseTasks.forEach((t) => {
-        lines.push(`- [${t.status === "done" ? "x" : " "}] ${t.title}`);
-      });
+      looseTasks.forEach((t) =>
+        lines.push(`- [${t.status === "done" ? "x" : " "}] ${t.title}`)
+      );
       lines.push("");
     }
   });
 
-  const activeblockers = p.blockers?.filter((b) => b.status === "active") ?? [];
-  if (activeblockers.length) {
+  const activeBlockers = p.blockers?.filter((b) => b.status === "active") ?? [];
+  if (activeBlockers.length) {
     lines.push("## Active Blockers");
-    activeblockers.forEach((b) => lines.push(`- ${b.description}`));
+    activeBlockers.forEach((b) => lines.push(`- ${b.description}`));
     lines.push("");
   }
-
   if (p.toolsSuggested?.length) {
     lines.push("## Suggested Tools");
     p.toolsSuggested.forEach((t) => lines.push(`- ${t}`));
     lines.push("");
   }
-
   if (p.dailyNextAction) {
     lines.push("## Today's Next Action");
     lines.push(p.dailyNextAction);
     lines.push("");
   }
-
   if (p.postmortem?.answers?.length) {
     lines.push("## Retrospective");
     p.postmortem.answers.forEach((a) => {
@@ -196,6 +184,5 @@ function toMarkdown(p) {
       lines.push("");
     });
   }
-
   return lines.join("\n");
 }
