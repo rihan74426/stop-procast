@@ -45,7 +45,7 @@ export function TopBar() {
             }}
           />
         </div>
-        <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)] hidden sm:block">
+        <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)] block">
           Momentum
         </span>
       </Link>
