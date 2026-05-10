@@ -506,3 +506,7 @@ RESEND_API_KEY=...          # required in production for email export (returns 5
 - [ ] Redis/Upstash rate limiting for hard cross-instance enforcement
 - [ ] Extract `ConfirmModal` to `components/ui/ConfirmModal.jsx` for reuse
 - [ ] Model picker in Settings: map `model1/2/3` IDs to real OpenRouter model strings
+
+the AI is still returning invalid json and the parser couldn't do anything about it.
+
+the steps and the new/page are not connected very well. the changes should work for step-2 as well. the review still generating automatically when navigated to it. it's not working right. seems like they're not connected like one page with all the component working together.

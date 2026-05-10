@@ -178,21 +178,89 @@ export function StepReview({
   const hasStarted = useRef(false);
   const mountedRef = useRef(true);
   const loadingToastId = useRef(null);
+  const prevToastStageRef = useRef(null); // tracks what we've last shown in the loading toast
   const retryCount = useRef(0);
   const MAX_RETRIES = 2;
+
+  // --- New: fallback toast sequence while waiting for any AI response ---
+  const FALLBACK_MESSAGES = [
+    "Still waiting for AI — sometimes it takes a moment.",
+    "Trying a different AI model for a better response…",
+    "Preparing a fallback response — we'll have something soon.",
+    "Thanks for your patience — almost there!",
+  ];
+  const fallbackTimerRef = useRef(null); // single timeout id controlling sequencing
+  const fallbackIndexRef = useRef(0); // which fallback message to show next
+  const fallbackToastIdsRef = useRef([]); // ids of shown fallback toasts so we can dismiss them
+
+  function stopFallbackSequence() {
+    if (fallbackTimerRef.current) {
+      clearTimeout(fallbackTimerRef.current);
+      fallbackTimerRef.current = null;
+    }
+    // dismiss any fallback toasts shown
+    if (fallbackToastIdsRef.current.length > 0) {
+      for (const id of fallbackToastIdsRef.current) {
+        try {
+          toast.dismiss(id);
+        } catch {
+          /* ignore */
+        }
+      }
+      fallbackToastIdsRef.current = [];
+    }
+    fallbackIndexRef.current = 0;
+  }
+
+  function startFallbackSequence() {
+    // guard: don't start if already running
+    if (fallbackTimerRef.current) return;
+
+    // show messages one by one; each toast auto-closes after 3000ms
+    const showNext = () => {
+      if (!mountedRef.current) {
+        stopFallbackSequence();
+        return;
+      }
+      // Only run fallback while stream is still pending
+      if (!streamPending) {
+        stopFallbackSequence();
+        return;
+      }
+
+      const i = fallbackIndexRef.current % FALLBACK_MESSAGES.length;
+      const id = toast.info(FALLBACK_MESSAGES[i], {
+        autoClose: 3000,
+        pauseOnHover: false,
+      });
+      fallbackToastIdsRef.current.push(id);
+      fallbackIndexRef.current = i + 1;
+
+      // schedule next message slightly after the toast auto-closes
+      fallbackTimerRef.current = setTimeout(showNext, 3500);
+    };
+
+    // kick off
+    showNext();
+  }
+  // --- end fallback sequence additions ---
 
   const dismissLoadingToast = useCallback(() => {
     if (loadingToastId.current) {
       toast.dismiss(loadingToastId.current);
       loadingToastId.current = null;
+      prevToastStageRef.current = null;
     }
-  }, []);
+    // ensure fallback sequence toasts are also cleaned up
+    stopFallbackSequence();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
       dismissLoadingToast();
+      stopFallbackSequence();
       try {
         readerRef.current?.cancel();
       } catch {
@@ -240,6 +308,47 @@ export function StepReview({
     setError(null);
   }, [cachedBlueprint, dismissLoadingToast]);
 
+  // Update loading toast content as generation progresses.
+  // Sequence: initial "Thinking about your plan…" -> "Building your plan…" -> per-stage texts.
+  useEffect(() => {
+    if (!loadingToastId.current) return;
+    if (status !== "streaming") return;
+
+    // compute stage index (highest index where charCount >= at)
+    let stageIndex = 0;
+    for (let i = STREAM_STAGES.length - 1; i >= 0; i--) {
+      if (charCount >= STREAM_STAGES[i].at) {
+        stageIndex = i;
+        break;
+      }
+    }
+
+    // Decide which toast message to show
+    const showThinking = charCount === 0;
+    const showBuilding = charCount > 0 && charCount < 200;
+
+    if (showThinking && prevToastStageRef.current !== "thinking") {
+      toast.loading("Thinking about your plan…", {
+        id: loadingToastId.current,
+      });
+      prevToastStageRef.current = "thinking";
+      return;
+    }
+
+    if (showBuilding && prevToastStageRef.current !== "building") {
+      toast.loading("Building your plan…", { id: loadingToastId.current });
+      prevToastStageRef.current = "building";
+      return;
+    }
+
+    // Otherwise show per-stage message (avoid updating if same stage)
+    if (prevToastStageRef.current !== stageIndex) {
+      const text = STREAM_STAGES[stageIndex]?.text ?? "Building your plan…";
+      toast.loading(text, { id: loadingToastId.current });
+      prevToastStageRef.current = stageIndex;
+    }
+  }, [charCount, status]);
+
   // Limit gate
   useEffect(() => {
     if (cachedBlueprint) return;
@@ -275,11 +384,12 @@ export function StepReview({
     rawRef.current = "";
 
     dismissLoadingToast();
-    loadingToastId.current = toast.loading(
-      scopeLevel === "ambitious"
-        ? "Starting deep analysis…"
-        : "Building your plan…"
-    );
+    // Start with "Thinking…" to hook users, then progress via the charCount effect
+    loadingToastId.current = toast.loading("Thinking about your plan…");
+    prevToastStageRef.current = "thinking";
+
+    // Start the fallback message sequence while waiting for the first AI chunk
+    startFallbackSequence();
 
     try {
       const profile = loadUserProfile();
@@ -314,7 +424,11 @@ export function StepReview({
             ? value
             : "";
 
-        if (streamPending && chunk?.length > 0) setStreamPending(false);
+        // As soon as we get a non-empty chunk, stop fallback sequence
+        if (streamPending && chunk?.length > 0) {
+          setStreamPending(false);
+          stopFallbackSequence(); // <-- ensure fallback toasts stop immediately
+        }
         rawRef.current += chunk;
 
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -334,6 +448,7 @@ export function StepReview({
       if (!mountedRef.current) return;
 
       retryCount.current = 0;
+      // Dismiss loading toast before showing success
       dismissLoadingToast();
 
       // Signal 100% before transitioning to "done" state
@@ -348,6 +463,7 @@ export function StepReview({
     } catch (e) {
       if (!mountedRef.current) return;
       dismissLoadingToast();
+      stopFallbackSequence();
       readerRef.current = null;
       setStreamPending(false);
 
