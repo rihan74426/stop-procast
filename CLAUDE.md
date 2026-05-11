@@ -510,3 +510,11 @@ RESEND_API_KEY=...          # required in production for email export (returns 5
 the AI is still returning invalid json and the parser couldn't do anything about it.
 
 the steps and the new/page are not connected very well. the changes should work for step-2 as well. the review still generating automatically when navigated to it. it's not working right. seems like they're not connected like one page with all the component working together.
+
+Export via email is not working for the lean and standard.
+
+the toast timeout is not working properly in the review. it should go away by time.
+
+logout should clear the local storage too.
+
+we need to make the prompt on the language the user has selected. we need to add the bengali language there too. also connect the prompts to the language and engineer them carefully to respond with the exact language properly.
