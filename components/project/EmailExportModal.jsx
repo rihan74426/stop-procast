@@ -6,6 +6,25 @@ import { useI18n } from "@/lib/i18n";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 
+/**
+ * Encode project data to base64 safely — handles full Unicode (Bengali, Arabic, etc.)
+ * Uses TextEncoder → binary string → btoa instead of the broken
+ * btoa(encodeURIComponent(...).replace(...)) pattern.
+ */
+function encodeProjectData(project) {
+  try {
+    const json = JSON.stringify(project);
+    const bytes = new TextEncoder().encode(json);
+    let binary = "";
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  } catch {
+    return null;
+  }
+}
+
 export function EmailExportModal({ open, onClose, project }) {
   const { t } = useI18n();
   const { isSignedIn, user } = useUser();
@@ -14,19 +33,22 @@ export function EmailExportModal({ open, onClose, project }) {
   );
   const [format, setFormat] = useState("markdown");
   const [status, setStatus] = useState("idle");
+  const [errorMsg, setErrorMsg] = useState("");
 
-  const isValidEmail = email.includes("@") && email.includes(".");
+  const isValidEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 
   const handleSend = async () => {
     if (!isValidEmail || !project) return;
     setStatus("sending");
+    setErrorMsg("");
     try {
-      const encoded = btoa(
-        encodeURIComponent(JSON.stringify(project)).replace(
-          /%([0-9A-F]{2})/g,
-          (_, p1) => String.fromCharCode(parseInt(p1, 16))
-        )
-      );
+      const encoded = encodeProjectData(project);
+      if (!encoded) {
+        setStatus("error");
+        setErrorMsg("Failed to encode project data. Try JSON export instead.");
+        return;
+      }
+
       const res = await fetch("/api/export-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -37,15 +59,30 @@ export function EmailExportModal({ open, onClose, project }) {
           projectData: encoded,
         }),
       });
-      setStatus(res.ok ? "success" : "error");
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok) {
+        setStatus("success");
+      } else {
+        setStatus("error");
+        setErrorMsg(
+          data.error ||
+            (res.status === 503
+              ? "Email service not configured. Please use PDF or Markdown export."
+              : "Failed to send. Please try again.")
+        );
+      }
     } catch {
       setStatus("error");
+      setErrorMsg("Network error. Please check your connection and try again.");
     }
   };
 
   const handleClose = () => {
     setStatus("idle");
-    setEmail("");
+    setErrorMsg("");
+    setEmail(user?.emailAddresses?.[0]?.emailAddress || "");
     onClose();
   };
 
@@ -55,7 +92,6 @@ export function EmailExportModal({ open, onClose, project }) {
     { id: "both", label: "Both" },
   ];
 
-  // Auth gate for non-signed-in users
   if (!isSignedIn) {
     return (
       <Modal
@@ -74,11 +110,10 @@ export function EmailExportModal({ open, onClose, project }) {
                 Sign in to export
               </p>
               <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-xs">
-                Create a free account to export your plan — and keep all your
-                work saved across devices.
+                Create a free account to export your plan and keep your work
+                saved across devices.
               </p>
             </div>
-
             <div className="flex flex-col gap-2 w-full mt-1">
               <SignUpButton mode="modal">
                 <button
@@ -97,7 +132,6 @@ export function EmailExportModal({ open, onClose, project }) {
                 </button>
               </SignInButton>
             </div>
-
             <p className="text-xs text-[var(--text-tertiary)]">
               Free forever. No credit card required.
             </p>
@@ -107,7 +141,6 @@ export function EmailExportModal({ open, onClose, project }) {
     );
   }
 
-  // Signed-in: show full export form
   return (
     <Modal
       open={open}
@@ -170,7 +203,10 @@ export function EmailExportModal({ open, onClose, project }) {
                 value={email}
                 onChange={(e) => {
                   setEmail(e.target.value);
-                  setStatus("idle");
+                  if (status === "error") {
+                    setStatus("idle");
+                    setErrorMsg("");
+                  }
                 }}
                 placeholder={t("export_email_placeholder")}
                 onKeyDown={(e) =>
@@ -181,9 +217,9 @@ export function EmailExportModal({ open, onClose, project }) {
             </div>
 
             {status === "error" && (
-              <p className="text-sm text-[var(--coral)]">
-                {t("export_email_error")}
-              </p>
+              <div className="rounded-[var(--r-md)] border border-[var(--coral)] bg-[var(--coral-bg)] px-3 py-2.5 text-sm text-[var(--coral)]">
+                {errorMsg || t("export_email_error")}
+              </div>
             )}
 
             <div className="rounded-[var(--r-md)] bg-[var(--bg-subtle)] px-3 py-2.5 flex items-center gap-3">

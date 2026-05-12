@@ -5,18 +5,49 @@ import Image from "next/image";
 import { useState, useRef, useEffect } from "react";
 import { useTheme } from "@/lib/theme";
 import { Button } from "@/components/ui/Button";
-import { useUser, SignInButton, UserButton } from "@clerk/nextjs";
+import { useUser, SignInButton, useClerk } from "@clerk/nextjs";
 import { useI18n } from "@/lib/i18n";
 import { LANGUAGES } from "@/lib/i18n/translations";
+import { useRouter } from "next/navigation";
+import { useProjectStore } from "@/lib/store/projectStore";
+
+/** Momentum-specific localStorage keys to wipe on sign-out */
+const MOMENTUM_STORAGE_KEYS = [
+  "stopprocast_projects_v1",
+  "momentum_user_profile",
+  "momentum_locale",
+  "sp_theme",
+  "sp_save_nudge_seen",
+  "momentum_ai_model",
+  "momentum_ai_usage",
+  "momentum_session_id",
+  "momentum_reminder_prefs",
+  "puter.app.id",
+  "puter.auth.token",
+];
+
+function clearMomentumStorage() {
+  if (typeof window === "undefined") return;
+  try {
+    MOMENTUM_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k));
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith("stopprocast_projects_"))
+      .forEach((k) => localStorage.removeItem(k));
+  } catch {
+    /* ignore */
+  }
+}
 
 export function TopBar() {
   const { theme, toggle } = useTheme();
-  const { isSignedIn, isLoaded } = useUser();
+  const { isSignedIn, isLoaded, user } = useUser();
+  const { signOut } = useClerk();
   const { t, locale, changeLocale } = useI18n();
+  const router = useRouter();
   const [langOpen, setLangOpen] = useState(false);
   const langRef = useRef(null);
 
-  // Close on outside click
+  // Close language dropdown on outside click
   useEffect(() => {
     function handleClick(e) {
       if (langRef.current && !langRef.current.contains(e.target)) {
@@ -28,6 +59,15 @@ export function TopBar() {
   }, []);
 
   const currentLang = LANGUAGES.find((l) => l.code === locale) || LANGUAGES[0];
+
+  const handleSignOut = async () => {
+    // Clear Momentum data BEFORE Clerk clears its session
+    clearMomentumStorage();
+    // Reset Zustand store
+    useProjectStore.setState({ projects: [], hydrated: false });
+    // Then sign out via Clerk
+    await signOut({ redirectUrl: "/" });
+  };
 
   return (
     <header className="h-14 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex items-center px-3 sm:px-4 gap-2 sm:gap-3 sticky top-0 z-30">
@@ -120,7 +160,31 @@ export function TopBar() {
       {/* Auth */}
       {isLoaded &&
         (isSignedIn ? (
-          <UserButton afterSignOutUrl="/" />
+          <div className="flex items-center gap-2">
+            {/* Avatar + sign-out button */}
+            <button
+              onClick={handleSignOut}
+              className="h-8 px-2.5 flex items-center gap-2 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all"
+              title="Sign out"
+            >
+              {user?.imageUrl ? (
+                <img
+                  src={user.imageUrl}
+                  alt={user.firstName || "User"}
+                  className="w-5 h-5 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-[var(--violet-bg)] flex items-center justify-center text-[10px] font-bold text-[var(--violet-dim)]">
+                  {(
+                    user?.firstName?.[0] ||
+                    user?.emailAddresses?.[0]?.emailAddress?.[0] ||
+                    "U"
+                  ).toUpperCase()}
+                </div>
+              )}
+              <span className="hidden sm:inline">Sign out</span>
+            </button>
+          </div>
         ) : (
           <SignInButton mode="modal">
             <button className="h-8 px-2 sm:px-3 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all whitespace-nowrap">

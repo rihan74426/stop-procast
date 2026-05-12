@@ -1,16 +1,51 @@
-import { connectDB } from "@/lib/db/mongoose";
+import { tryConnectDB } from "@/lib/db/mongoose";
 import Project from "@/lib/models/Project";
 import { auth } from "@clerk/nextjs/server";
 
 const isDev = process.env.NODE_ENV !== "production";
 
-// POST /api/export-email
+/**
+ * Decode the Unicode-safe base64 encoding produced by EmailExportModal.
+ * The client encodes with TextEncoder → binary string → btoa, so we
+ * reverse: atob → Uint8Array → TextDecoder.
+ */
+function decodeProjectData(encoded) {
+  if (!encoded) return null;
+  try {
+    // First try the Unicode-safe path (new encoding)
+    const binary = atob(encoded);
+    const bytes = new Uint8Array(binary.length);
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i);
+    }
+    const json = new TextDecoder().decode(bytes);
+    return JSON.parse(json);
+  } catch {
+    // Fallback: try old encoding (encodeURIComponent + btoa)
+    try {
+      const binary = atob(encoded);
+      return JSON.parse(decodeURIComponent(binary));
+    } catch {
+      // Last resort: plain base64 JSON
+      try {
+        return JSON.parse(atob(encoded));
+      } catch {
+        return null;
+      }
+    }
+  }
+}
+
 export async function POST(request) {
   try {
-    const body = await request.json();
+    const body = await request.json().catch(() => null);
+    if (!body) {
+      return Response.json({ error: "Invalid request body" }, { status: 400 });
+    }
+
     const { email, projectId, format = "markdown", projectData } = body;
 
-    if (!email || !email.includes("@")) {
+    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
       return Response.json({ error: "Valid email required" }, { status: 400 });
     }
 
@@ -20,34 +55,22 @@ export async function POST(request) {
     try {
       const { userId } = await auth();
       if (userId && projectId) {
-        await connectDB();
-        const doc = await Project.findOne({ id: projectId, userId }).lean();
-        if (doc) {
-          const { _id, __v, ...clean } = doc;
-          project = clean;
+        const db = await tryConnectDB();
+        if (db) {
+          const doc = await Project.findOne({ id: projectId, userId }).lean();
+          if (doc) {
+            const { _id, __v, ...clean } = doc;
+            project = clean;
+          }
         }
       }
     } catch {
-      // Not authenticated — fall through to projectData
+      // Not authenticated or DB unavailable — fall through to projectData
     }
 
-    // Guests pass project data directly (base64)
+    // Decode client-passed project data (works for all users including guests)
     if (!project && projectData) {
-      try {
-        const decoded = Buffer.from(projectData, "base64").toString("utf-8");
-        project = JSON.parse(decodeURIComponent(decoded));
-      } catch {
-        try {
-          project = JSON.parse(
-            Buffer.from(projectData, "base64").toString("utf-8")
-          );
-        } catch {
-          return Response.json(
-            { error: "Invalid project data" },
-            { status: 400 }
-          );
-        }
-      }
+      project = decodeProjectData(projectData);
     }
 
     if (!project) {
@@ -58,7 +81,6 @@ export async function POST(request) {
 
     if (!RESEND_API_KEY) {
       if (isDev) {
-        // Dev-only: log and return success so devs can test the flow without Resend
         console.log(`[export-email] DEV MODE — would send to ${email}:`, {
           project: project.projectTitle,
           format,
@@ -69,18 +91,16 @@ export async function POST(request) {
             "Dev mode — configure RESEND_API_KEY to actually send email.",
         });
       }
-      // Production: the key is genuinely missing — tell the client honestly
       console.error("[export-email] RESEND_API_KEY is not set in production");
       return Response.json(
         {
           error:
-            "Email service is not configured. Please try exporting as PDF or Markdown instead.",
+            "Email service is not configured. Please export as PDF or Markdown instead.",
         },
         { status: 503 }
       );
     }
 
-    // Generate content
     const markdownContent = toMarkdown(project);
     const jsonContent = JSON.stringify(project, null, 2);
 
@@ -129,10 +149,12 @@ export async function POST(request) {
 }
 
 function slug(title) {
-  return (title || "project")
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
+  return (
+    (title || "project")
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-|-$/g, "") || "momentum-project"
+  );
 }
 
 function buildEmailHtml(p) {
@@ -184,7 +206,7 @@ function toMarkdown(p) {
   const lines = [];
   lines.push(`# ${p.projectTitle}`);
   lines.push("");
-  lines.push(`> ${p.oneLineGoal}`);
+  if (p.oneLineGoal) lines.push(`> ${p.oneLineGoal}`);
   lines.push(`*Exported from Momentum on ${new Date().toLocaleDateString()}*`);
   lines.push("");
   if (p.problemStatement) {
@@ -199,7 +221,7 @@ function toMarkdown(p) {
   }
   p.phases?.forEach((phase, i) => {
     lines.push(`## Phase ${i + 1}: ${phase.name}`);
-    lines.push(phase.objective || "");
+    if (phase.objective) lines.push(phase.objective);
     lines.push("");
     const phaseTasks = p.tasks?.filter((t) => t.phaseId === phase.id) || [];
     phaseTasks.forEach((t) =>
@@ -207,5 +229,11 @@ function toMarkdown(p) {
     );
     if (phaseTasks.length) lines.push("");
   });
+  const activeBlockers = p.blockers?.filter((b) => b.status === "active") ?? [];
+  if (activeBlockers.length) {
+    lines.push("## Active Blockers");
+    activeBlockers.forEach((b) => lines.push(`- ${b.description}`));
+    lines.push("");
+  }
   return lines.join("\n");
 }

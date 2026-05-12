@@ -1,39 +1,80 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { useUser } from "@clerk/nextjs";
+import { useUser, useClerk } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { claimAnonymousProjects } from "@/lib/persistence";
 
 /**
- * Wrap every page that reads project data.
+ * DataProvider — wraps pages that read project data.
  *
- * Sign-in flow:
- *   1. claimAnonymousProjects() — links sessionId docs to userId in MongoDB
- *   2. hydrateFromServer()      — merges remote + local into the store
+ * Responsibilities:
+ * 1. On sign-in:  claim anonymous projects → hydrate from server
+ * 2. On sign-out: clear localStorage so the next session starts clean
  *
- * Fixes:
- *   - syncStarted ref is reset when user signs out so re-sign-in works
- *   - Avoids race between hydrated state check and syncStarted ref
- *   - Mounts only once per sign-in session
+ * Sign-out clearing is safe because:
+ *  - Signed-in users have their data in MongoDB (not just localStorage)
+ *  - Anonymous sessions each generate a fresh sessionId on next visit
+ *  - We only clear Momentum-specific keys, not all of localStorage
  */
+
+/** Keys managed by Momentum that should be wiped on sign-out */
+const MOMENTUM_STORAGE_KEYS = [
+  "stopprocast_projects_v1",
+  "momentum_user_profile",
+  "momentum_locale",
+  "sp_theme",
+  "sp_save_nudge_seen",
+  "momentum_ai_model",
+  "momentum_ai_usage",
+  "momentum_session_id",
+  "momentum_reminder_prefs",
+  "puter.app.id",
+  "puter.auth.token",
+];
+
+function clearMomentumStorage() {
+  if (typeof window === "undefined") return;
+  try {
+    MOMENTUM_STORAGE_KEYS.forEach((key) => localStorage.removeItem(key));
+    // Also clear any versioned project keys (stopprocast_projects_v2, etc.)
+    Object.keys(localStorage)
+      .filter((k) => k.startsWith("stopprocast_projects_"))
+      .forEach((k) => localStorage.removeItem(k));
+    console.log("[DataProvider] localStorage cleared on sign-out");
+  } catch {
+    // localStorage might be blocked in some environments — ignore
+  }
+}
+
 export function DataProvider({ children }) {
   const { isSignedIn, isLoaded, user } = useUser();
+  const { addListener } = useClerk();
   const hydrated = useProjectStore((s) => s.hydrated);
   const hydrateFromServer = useProjectStore((s) => s.hydrateFromServer);
-  // Use userId as the key so this re-runs if user changes (sign out → sign in)
   const syncedUserId = useRef(null);
 
+  // ── Listen for Clerk sign-out and clear storage ─────────────────
+  useEffect(() => {
+    // addListener returns an unsubscribe function
+    const unsubscribe = addListener(({ user: clerkUser }) => {
+      // When user transitions from signed-in to null → sign-out occurred
+      if (!clerkUser && syncedUserId.current !== null) {
+        clearMomentumStorage();
+        syncedUserId.current = null;
+        // Reset the Zustand store to empty state
+        useProjectStore.setState({ projects: [], hydrated: false });
+      }
+    });
+    return () => unsubscribe();
+  }, [addListener]);
+
+  // ── Hydrate from server on sign-in ──────────────────────────────
   useEffect(() => {
     if (!isLoaded) return;
-
-    // Not signed in — nothing to sync
     if (!isSignedIn || !user?.id) return;
-
-    // Already synced for this user in this session
     if (syncedUserId.current === user.id) return;
 
-    // Mark as started for this userId to prevent duplicate calls
     syncedUserId.current = user.id;
 
     (async () => {
@@ -43,7 +84,6 @@ export function DataProvider({ children }) {
           console.log(`[DataProvider] claimed ${count} anonymous projects`);
         }
       } catch (err) {
-        // Non-fatal — hydrate anyway
         console.warn("[DataProvider] claim failed:", err.message);
       } finally {
         hydrateFromServer();

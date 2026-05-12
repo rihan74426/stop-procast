@@ -30,6 +30,7 @@ import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { toast } from "@/lib/toast";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { BiSolidPencil } from "react-icons/bi";
+import { FaRocket } from "react-icons/fa";
 
 const STEP_LABELS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
 
@@ -222,7 +223,11 @@ function NewProjectContent() {
 
       const id = await addProject(projectData);
       toast.dismiss(toastId);
-      toast.success("Project created! Let's get to work. 🚀");
+      toast.success(
+        `Project created! Let's get to work. ${(
+          <FaRocket className="inline" />
+        )}`
+      );
       router.push(`/project/${id}`);
     } catch (err) {
       toast.dismiss(toastId);
