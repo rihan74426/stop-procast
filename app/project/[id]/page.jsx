@@ -28,7 +28,13 @@ import {
 } from "@/lib/utils/exportMarkdown";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
-import { FaJs, FaMailBulk, FaRocket } from "react-icons/fa";
+import {
+  FaFilePdf,
+  FaJs,
+  FaMailBulk,
+  FaMarkdown,
+  FaRocket,
+} from "react-icons/fa";
 import { MdDelete } from "react-icons/md";
 
 // ─── ConfirmModal ─────────────────────────────────────────────────────
@@ -377,14 +383,14 @@ function ProjectContent({ id }) {
                     onClick={handleExportPDF}
                     className="w-full justify-center"
                   >
-                    {t("project_export_pdf")}
+                    <FaFilePdf /> {t("project_export_pdf")}
                   </Button>
                   <Button
                     variant="ghost"
                     onClick={handleExportMarkdown}
                     className="w-full justify-center"
                   >
-                    {t("project_export_md")}
+                    <FaMarkdown /> {t("project_export_md")}
                   </Button>
                   <Button
                     variant="ghost"

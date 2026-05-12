@@ -53,21 +53,6 @@ const SCOPE_META = {
   },
 };
 
-// Fallback messages shown while waiting for the first AI chunk
-const FALLBACK_MESSAGES = [
-  "Still waiting for AI — sometimes it takes a moment.",
-  "Trying a different model for a better response…",
-  "Almost there — preparing your blueprint…",
-  "Thanks for your patience — nearly done!",
-];
-
-// How long the fallback toast is visible (ms)
-const FALLBACK_TOAST_MS = 3000;
-// Gap before showing the first fallback (ms)
-const FALLBACK_FIRST_DELAY = 3000;
-// Gap between messages (ms) — slightly longer than toast duration to avoid overlap
-const FALLBACK_GAP_MS = 3500;
-
 const StreamingProgress = memo(function StreamingProgress({
   charCount,
   scopeLevel,
@@ -79,6 +64,7 @@ const StreamingProgress = memo(function StreamingProgress({
     [...STREAM_STAGES].reverse().find((s) => charCount >= s.at) ??
     STREAM_STAGES[0];
   const Icon = stage.icon;
+  // Show 100% only when charCount signals completion (set to Infinity by caller)
   const pct =
     charCount === Infinity
       ? 100
@@ -186,120 +172,95 @@ export function StepReview({
   const [showAuthGate, setShowAuthGate] = useState(false);
   const [streamPending, setStreamPending] = useState(false);
 
-  // ── Refs that must NOT cause re-renders ──────────────────────────
   const rawRef = useRef("");
   const readerRef = useRef(null);
   const rafRef = useRef(null);
   const hasStarted = useRef(false);
   const mountedRef = useRef(true);
+  const loadingToastId = useRef(null);
+  const prevToastStageRef = useRef(null); // tracks what we've last shown in the loading toast
   const retryCount = useRef(0);
-
-  // Toast refs — track IDs so we can dismiss them reliably
-  const loadingToastRef = useRef(null); // the persistent "Building…" loading toast
-  const fallbackTimerRef = useRef(null); // setTimeout handle for next fallback message
-  const fallbackIndexRef = useRef(0); // which fallback message to show next
-  const fallbackIdRef = useRef(null); // ID of current visible fallback toast
-
-  // Ref mirror of streamPending to avoid stale closures in timers
-  const streamPendingRef = useRef(false);
-
   const MAX_RETRIES = 2;
 
-  // Keep ref in sync with state
-  useEffect(() => {
-    streamPendingRef.current = streamPending;
-  }, [streamPending]);
-
-  // ── Toast helpers ─────────────────────────────────────────────────
-
-  /** Dismiss the loading toast and all fallback toasts. */
-  const clearAllToasts = useCallback(() => {
-    if (loadingToastRef.current !== null) {
-      toast.dismiss(loadingToastRef.current);
-      loadingToastRef.current = null;
-    }
-    stopFallbackSequence();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  // --- New: fallback toast sequence while waiting for any AI response ---
+  const FALLBACK_MESSAGES = [
+    "Still waiting for AI — sometimes it takes a moment.",
+    "Trying a different AI model for a better response…",
+    "Preparing a fallback response — we'll have something soon.",
+    "Thanks for your patience — almost there!",
+  ];
+  const fallbackTimerRef = useRef(null); // single timeout id controlling sequencing
+  const fallbackIndexRef = useRef(0); // which fallback message to show next
+  const fallbackToastIdsRef = useRef([]); // ids of shown fallback toasts so we can dismiss them
 
   function stopFallbackSequence() {
     if (fallbackTimerRef.current) {
       clearTimeout(fallbackTimerRef.current);
       fallbackTimerRef.current = null;
     }
-    if (fallbackIdRef.current !== null) {
-      try {
-        toast.dismiss(fallbackIdRef.current);
-      } catch {
-        /* ignore */
+    // dismiss any fallback toasts shown
+    if (fallbackToastIdsRef.current.length > 0) {
+      for (const id of fallbackToastIdsRef.current) {
+        try {
+          toast.dismiss(id);
+        } catch {
+          /* ignore */
+        }
       }
-      fallbackIdRef.current = null;
+      fallbackToastIdsRef.current = [];
     }
     fallbackIndexRef.current = 0;
   }
 
   function startFallbackSequence() {
-    // Don't start if already scheduled
+    // guard: don't start if already running
     if (fallbackTimerRef.current) return;
 
-    // show one message at a time as a temporary toast, dismissing it after FALLBACK_TOAST_MS
+    // show messages one by one; each toast auto-closes after 3000ms
     const showNext = () => {
       if (!mountedRef.current) {
         stopFallbackSequence();
         return;
       }
-      if (!streamPendingRef.current) {
+      // Only run fallback while stream is still pending
+      if (!streamPending) {
         stopFallbackSequence();
         return;
       }
 
-      // Dismiss any previous fallback toast before showing the next
-      if (fallbackIdRef.current !== null) {
-        try {
-          toast.dismiss(fallbackIdRef.current);
-        } catch {
-          /* ignore */
-        }
-        fallbackIdRef.current = null;
-      }
-
       const i = fallbackIndexRef.current % FALLBACK_MESSAGES.length;
-      // Use the same toast API (loading) so we don't rely on methods that might not exist.
-      fallbackIdRef.current = toast.loading(FALLBACK_MESSAGES[i]);
+      const id = toast.info(FALLBACK_MESSAGES[i], {
+        duration: 3000,
+        pauseOnHover: false,
+      });
+      fallbackToastIdsRef.current.push(id);
       fallbackIndexRef.current = i + 1;
 
-      // Dismiss this temporary fallback after the visible duration
-      fallbackTimerRef.current = setTimeout(() => {
-        fallbackTimerRef.current = null;
-        if (fallbackIdRef.current !== null) {
-          try {
-            toast.dismiss(fallbackIdRef.current);
-          } catch {
-            /* ignore */
-          }
-          fallbackIdRef.current = null;
-        }
-        // Schedule next message if still pending
-        if (streamPendingRef.current && mountedRef.current) {
-          // small gap before next to avoid visual overlap
-          fallbackTimerRef.current = setTimeout(showNext, FALLBACK_GAP_MS - FALLBACK_TOAST_MS);
-        }
-      }, FALLBACK_TOAST_MS);
+      // schedule next message slightly after the toast auto-closes
+      fallbackTimerRef.current = setTimeout(showNext, 3500);
     };
 
-    // Kick off after the initial delay
-    fallbackTimerRef.current = setTimeout(() => {
-      fallbackTimerRef.current = null;
-      if (streamPendingRef.current && mountedRef.current) showNext();
-    }, FALLBACK_FIRST_DELAY);
+    // kick off
+    showNext();
   }
+  // --- end fallback sequence additions ---
 
-  // ── Lifecycle ─────────────────────────────────────────────────────
+  const dismissLoadingToast = useCallback(() => {
+    if (loadingToastId.current) {
+      toast.dismiss(loadingToastId.current);
+      loadingToastId.current = null;
+      prevToastStageRef.current = null;
+    }
+    // ensure fallback sequence toasts are also cleaned up
+    stopFallbackSequence();
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      clearAllToasts();
+      dismissLoadingToast();
+      stopFallbackSequence();
       try {
         readerRef.current?.cancel();
       } catch {
@@ -309,11 +270,15 @@ export function StepReview({
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [dismissLoadingToast]);
 
-  // Sync with cachedBlueprint prop
+  // Keep local blueprint/status in sync with cachedBlueprint prop changes.
+  // If a cached blueprint appears, cancel any in-progress generation and show it immediately.
+  // If cachedBlueprint becomes null, reset generation state so runGeneration can start.
   useEffect(() => {
+    // If a cached blueprint is provided, stop any streaming and show it
     if (cachedBlueprint) {
+      // cancel any active reader/stream
       try {
         readerRef.current?.cancel();
       } catch {
@@ -324,22 +289,65 @@ export function StepReview({
         cancelAnimationFrame(rafRef.current);
         rafRef.current = null;
       }
-      clearAllToasts();
+      dismissLoadingToast();
       rawRef.current = "";
-      streamPendingRef.current = false;
-      setStreamPending(false);
       setCharCount(Infinity);
+      setStreamPending(false);
       setBlueprint(cachedBlueprint);
       setStatus("done");
       setError(null);
       return;
     }
+
+    // cachedBlueprint cleared → prepare to run a fresh generation
+    // Leave hasStarted gating / runGeneration to existing effects, but reset local state
     setBlueprint(null);
     setStatus("idle");
     setCharCount(0);
     rawRef.current = "";
     setError(null);
-  }, [cachedBlueprint]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cachedBlueprint, dismissLoadingToast]);
+
+  // Update loading toast content as generation progresses.
+  // Sequence: initial "Thinking about your plan…" -> "Building your plan…" -> per-stage texts.
+  useEffect(() => {
+    if (!loadingToastId.current) return;
+    if (status !== "streaming") return;
+
+    // compute stage index (highest index where charCount >= at)
+    let stageIndex = 0;
+    for (let i = STREAM_STAGES.length - 1; i >= 0; i--) {
+      if (charCount >= STREAM_STAGES[i].at) {
+        stageIndex = i;
+        break;
+      }
+    }
+
+    // Decide which toast message to show
+    const showThinking = charCount === 0;
+    const showBuilding = charCount > 0 && charCount < 200;
+
+    if (showThinking && prevToastStageRef.current !== "thinking") {
+      toast.loading("Thinking about your plan…", {
+        id: loadingToastId.current,
+      });
+      prevToastStageRef.current = "thinking";
+      return;
+    }
+
+    if (showBuilding && prevToastStageRef.current !== "building") {
+      toast.loading("Building your plan…", { id: loadingToastId.current });
+      prevToastStageRef.current = "building";
+      return;
+    }
+
+    // Otherwise show per-stage message (avoid updating if same stage)
+    if (prevToastStageRef.current !== stageIndex) {
+      const text = STREAM_STAGES[stageIndex]?.text ?? "Building your plan…";
+      toast.loading(text, { id: loadingToastId.current });
+      prevToastStageRef.current = stageIndex;
+    }
+  }, [charCount, status]);
 
   // Limit gate
   useEffect(() => {
@@ -351,7 +359,7 @@ export function StepReview({
     }
   }, [limitLoading, limitAllowed, cachedBlueprint]);
 
-  // Start generation
+  // Start generation when limit confirmed as OK
   useEffect(() => {
     if (cachedBlueprint) return;
     if (hasStarted.current) return;
@@ -359,9 +367,8 @@ export function StepReview({
     if (!limitAllowed) return;
     hasStarted.current = true;
     runGeneration();
-  }, [cachedBlueprint, limitLoading, limitAllowed]); // eslint-disable-line react-hooks/exhaustive-deps
-
-  // ── Core generation ───────────────────────────────────────────────
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cachedBlueprint, limitLoading, limitAllowed]);
 
   async function runGeneration() {
     if (!mountedRef.current) return;
@@ -373,17 +380,15 @@ export function StepReview({
     setStatus("streaming");
     setCharCount(0);
     setError(null);
-    streamPendingRef.current = true;
     setStreamPending(true);
     rawRef.current = "";
 
-    // Clear any previous toasts
-    clearAllToasts();
+    dismissLoadingToast();
+    // Start with "Thinking…" to hook users, then progress via the charCount effect
+    loadingToastId.current = toast.loading("Thinking about your plan…");
+    prevToastStageRef.current = "thinking";
 
-    // Show a persistent loading toast (duration:0 = never auto-dismisses)
-    loadingToastRef.current = toast.loading("Building your blueprint…");
-
-    // Start fallback sequence for when AI is slow
+    // Start the fallback message sequence while waiting for the first AI chunk
     startFallbackSequence();
 
     try {
@@ -419,13 +424,11 @@ export function StepReview({
             ? value
             : "";
 
-        // First chunk received — stop fallback sequence
-        if (streamPendingRef.current && chunk.length > 0) {
-          streamPendingRef.current = false;
+        // As soon as we get a non-empty chunk, stop fallback sequence
+        if (streamPending && chunk?.length > 0) {
           setStreamPending(false);
-          stopFallbackSequence();
+          stopFallbackSequence(); // <-- ensure fallback toasts stop immediately
         }
-
         rawRef.current += chunk;
 
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
@@ -445,11 +448,10 @@ export function StepReview({
       if (!mountedRef.current) return;
 
       retryCount.current = 0;
-      streamPendingRef.current = false;
-      setStreamPending(false);
+      // Dismiss loading toast before showing success
+      dismissLoadingToast();
 
-      // Dismiss loading toast, show 100%, then transition
-      clearAllToasts();
+      // Signal 100% before transitioning to "done" state
       setCharCount(Infinity);
       await new Promise((r) => setTimeout(r, 300));
 
@@ -457,13 +459,13 @@ export function StepReview({
       toast.success("Your plan is ready!");
       setBlueprint(parsed);
       setStatus("done");
+      setStreamPending(false);
     } catch (e) {
       if (!mountedRef.current) return;
-
-      clearAllToasts();
-      streamPendingRef.current = false;
-      setStreamPending(false);
+      dismissLoadingToast();
+      stopFallbackSequence();
       readerRef.current = null;
+      setStreamPending(false);
 
       if (
         (e.code === "RATE_LIMITED" || e.status === 429) &&
@@ -496,15 +498,20 @@ export function StepReview({
   }
 
   const handleRetry = useCallback(() => {
+    // Reset ALL generation state so the useEffect gate and runGeneration
+    // both start from scratch — critical after back-nav + error + retry.
     retryCount.current = 0;
-    hasStarted.current = false;
+    hasStarted.current = false; // ← was missing: gate was permanently closed
     setError(null);
     setStatus("idle");
     setCharCount(0);
     rawRef.current = "";
+    // The useEffect watching [cachedBlueprint, limitLoading, limitAllowed]
+    // will NOT re-fire because those haven't changed. Trigger directly:
     hasStarted.current = true;
     runGeneration();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleCommitClick = useCallback(() => {
     if (!isSignedIn) {
@@ -519,8 +526,6 @@ export function StepReview({
     onCommit(blueprint);
   }, [onCommit, blueprint]);
 
-  // ── Greeting banner ───────────────────────────────────────────────
-
   function GreetingBanner() {
     const name = user?.firstName || user?.fullName || user?.username || null;
     const text = isSignedIn
@@ -534,8 +539,6 @@ export function StepReview({
       </div>
     );
   }
-
-  // ── Render states ─────────────────────────────────────────────────
 
   if (status === "limited") {
     return (
@@ -552,7 +555,7 @@ export function StepReview({
             <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-sm mx-auto mb-5">
               {isSignedIn
                 ? "You've created 4 projects. Sign up for more."
-                : "Sign up free to create unlimited projects and save your work."}
+                : "Sign up free to create unlimited projects, save your work, and access deeper AI planning."}
             </p>
             <div className="flex flex-col gap-2 max-w-xs mx-auto">
               <Button
@@ -629,7 +632,7 @@ export function StepReview({
     );
   }
 
-  // ── Done state ────────────────────────────────────────────────────
+  // ── Done ──────────────────────────────────────────────────────────
   const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
 
   return (
@@ -769,7 +772,7 @@ export function StepReview({
               </p>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">
                 This is your free project. Create a free account to build
-                unlimited projects.{" "}
+                unlimited projects and never lose your work.{" "}
                 <button
                   onClick={() => setShowAuthGate(true)}
                   className="text-[var(--violet)] hover:underline font-medium"

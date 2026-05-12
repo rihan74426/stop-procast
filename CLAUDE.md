@@ -507,10 +507,10 @@ RESEND_API_KEY=...          # required in production for email export (returns 5
 - [ ] Extract `ConfirmModal` to `components/ui/ConfirmModal.jsx` for reuse
 - [ ] Model picker in Settings: map `model1/2/3` IDs to real OpenRouter model strings
 
-the AI is still returning invalid json and the parser couldn't do anything about it.
-
 the steps and the new/page are not connected very well. the ai regeneration for the changes with user's permission. should work for step-2 as well. the review still generating automatically when navigated to it. it's not working right. seems like they're not connected like one page with all the component working together.
 
 the keeping user engaged with a toast about what's happening in the back while waiting for the ai response, telling why it's taking so long, or changing ai, we'll have a fallback working response soon, not to worry. untill an ai responds with 200 and starts building. this thing isn't working at all. show the toast one by one, and they'll fade away after 3 seconds.
+
+we have to improve the pdf export writer to be better and improved and soothing and productive view to work on something properly.
 
 we need to make the prompt on the language the user has selected. we need to add the bengali language there too. also connect the prompts to the language and engineer them carefully to respond with the exact language properly.
