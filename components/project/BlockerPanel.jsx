@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { Button } from "@/components/ui/Button";
 import { timeAgo } from "@/lib/utils/date";
+import { PiConfetti } from "react-icons/pi";
 
 export function BlockerPanel({ project }) {
   const addBlocker = useProjectStore((s) => s.addBlocker);
@@ -88,7 +89,7 @@ export function BlockerPanel({ project }) {
 
       {active.length === 0 && !adding && (
         <p className="text-sm text-[var(--text-tertiary)]">
-          No active blockers. 🎉
+          No active blockers. <PiConfetti className="inline" />
         </p>
       )}
 

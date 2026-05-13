@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/Button";
 import { generateClarifyQuestions } from "@/lib/ai/clientGenerate";
 import { parseClarifyQuestions } from "@/lib/ai/parser";
 import { toast } from "@/lib/toast";
+import { createToastSequence } from "@/lib/toastSequence";
 
 // ─── GhostInput ───────────────────────────────────────────────────────
 //
@@ -266,21 +267,17 @@ export function StepClarify({
   onChange,
   onNext,
   onBack,
-  cachedQuestions, // null = not yet fetched; Question[] = already have them
-  onQuestionsLoaded, // parent callback to persist questions across remounts
+  cachedQuestions,
+  onQuestionsLoaded,
 }) {
-  // If we have cached questions use them directly — no fetch needed.
   const [questions, setQuestions] = useState(cachedQuestions ?? []);
-  // Only show loading state when we actually need to fetch (no cache).
   const [loading, setLoading] = useState(cachedQuestions === null);
   const [error, setError] = useState(null);
 
-  // hasFetched prevents double-fetch within ONE mount (e.g. Strict Mode).
-  // It does NOT prevent a fetch on remount when cachedQuestions is still
-  // null — that's intentional and correct.
   const hasFetched = useRef(false);
-
   const inputRefs = useRef([]);
+  const toastSequenceRef = useRef(null);
+  const mountedRef = useRef(true);
 
   // Sync if parent provides questions after initial render
   useEffect(() => {
@@ -300,16 +297,46 @@ export function StepClarify({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // intentionally only on mount
 
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (toastSequenceRef.current) {
+        toastSequenceRef.current.unmount();
+      }
+    };
+  }, []);
+
+  function startEngagementSequence() {
+    if (toastSequenceRef.current) {
+      toastSequenceRef.current.unmount();
+    }
+    toastSequenceRef.current = createToastSequence("questions");
+    toastSequenceRef.current.start();
+  }
+
+  function stopEngagementSequence() {
+    if (toastSequenceRef.current) {
+      toastSequenceRef.current.stop();
+      toastSequenceRef.current = null;
+    }
+  }
+
   async function fetchQuestions() {
     setLoading(true);
     setError(null);
+
+    startEngagementSequence();
+
     try {
       const text = await generateClarifyQuestions(idea);
       const parsed = parseClarifyQuestions(text);
       setQuestions(parsed);
-      onQuestionsLoaded?.(parsed); // persist in parent for remount stability
-    } catch {
+      onQuestionsLoaded?.(parsed);
+      toastSequenceRef.current?.success("Questions ready!");
+    } catch (err) {
       setError("Couldn't load questions. You can retry or skip this step.");
+      toastSequenceRef.current?.error("Failed to generate questions");
     } finally {
       setLoading(false);
     }
@@ -317,7 +344,8 @@ export function StepClarify({
 
   function handleRetry() {
     hasFetched.current = false;
-    hasFetched.current = true; // set synchronously before async call
+    hasFetched.current = true;
+    stopEngagementSequence();
     fetchQuestions();
   }
 

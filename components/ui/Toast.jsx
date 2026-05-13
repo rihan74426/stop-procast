@@ -117,63 +117,79 @@ export function ToastContainer() {
       className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"
       style={{ maxWidth: "min(380px, calc(100vw - 32px))" }}
     >
-      {toasts.map((t) => (
-        <div
-          key={t.id}
-          className={[
-            "pointer-events-auto flex items-start gap-3 px-4 py-3",
-            "rounded-[var(--r-lg)] border bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)]",
-            "animate-[toastIn_200ms_var(--ease-spring)_both]",
-            BORDER[t.type] ?? BORDER.info,
-          ].join(" ")}
-        >
-          <span className="shrink-0 mt-0.5">{ICONS[t.type]}</span>
+      {toasts.map((t) => {
+        // Use custom icon if provided, otherwise use default
+        const displayIcon = t.customIcon
+          ? (() => {
+              const IconComponent = t.customIcon;
+              return (
+                <IconComponent
+                  size={16}
+                  className="text-[var(--violet)]"
+                  aria-hidden
+                />
+              );
+            })()
+          : ICONS[t.type];
 
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-[var(--text-primary)] leading-snug">
-              {t.message}
-            </p>
-
-            {/* Feedback link — shown on error toasts automatically */}
-            {t.type === "error" && !t.action && (
-              <a
-                href="/feedback"
-                className="inline-flex items-center gap-1 mt-1 text-xs text-[var(--violet)] hover:underline"
-              >
-                Report this issue →
-              </a>
-            )}
-
-            {/* Optional explicit action */}
-            {t.action && (
-              <button
-                onClick={() => {
-                  t.action.onClick();
-                  dismiss(t.id);
-                }}
-                className="mt-1 text-xs font-medium text-[var(--violet)] hover:underline"
-              >
-                {t.action.label} →
-              </button>
-            )}
-          </div>
-
-          <button
-            onClick={() => dismiss(t.id)}
-            className="shrink-0 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors mt-0.5"
-            aria-label="Dismiss"
+        return (
+          <div
+            key={t.id}
+            className={[
+              "pointer-events-auto flex items-start gap-3 px-4 py-3",
+              "rounded-[var(--r-lg)] border bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)]",
+              "animate-[toastIn_200ms_var(--ease-spring)_both]",
+              BORDER[t.type] ?? BORDER.info,
+            ].join(" ")}
           >
-            <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path
-                d="M9 3L3 9M3 3l6 6"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-              />
-            </svg>
-          </button>
-        </div>
-      ))}
+            <span className="shrink-0 mt-0.5">{displayIcon}</span>
+
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-[var(--text-primary)] leading-snug">
+                {t.message}
+              </p>
+
+              {/* Feedback link — shown on error toasts automatically */}
+              {t.type === "error" && !t.action && (
+                <a
+                  href="/feedback"
+                  className="inline-flex items-center gap-1 mt-1 text-xs text-[var(--violet)] hover:underline"
+                >
+                  Report this issue →
+                </a>
+              )}
+
+              {/* Optional explicit action */}
+              {t.action && (
+                <button
+                  onClick={() => {
+                    t.action.onClick();
+                    dismiss(t.id);
+                  }}
+                  className="mt-1 text-xs font-medium text-[var(--violet)] hover:underline"
+                >
+                  {t.action.label} →
+                </button>
+              )}
+            </div>
+
+            <button
+              onClick={() => dismiss(t.id)}
+              className="shrink-0 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors mt-0.5"
+              aria-label="Dismiss"
+            >
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+                <path
+                  d="M9 3L3 9M3 3l6 6"
+                  stroke="currentColor"
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                />
+              </svg>
+            </button>
+          </div>
+        );
+      })}
 
       <style>{`
         @keyframes toastIn {

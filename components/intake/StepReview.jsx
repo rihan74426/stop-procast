@@ -1,16 +1,32 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useCallback, memo } from "react";
+/**
+ * components/intake/StepReview.jsx
+ *
+ * PURE DISPLAY COMPONENT — does NOT self-start AI generation.
+ * All generation state (genStatus, genCharCount, genError, blueprint)
+ * is owned by new/page.jsx and passed in as props.
+ *
+ * Props:
+ *   blueprint       - parsed blueprint object or null
+ *   genStatus       - "idle" | "streaming" | "done" | "error" | "limited"
+ *   genCharCount    - chars received so far (Infinity = complete)
+ *   genError        - error string or null
+ *   scopeLevel      - "lean" | "standard" | "ambitious"
+ *   onBack          - go back to scope step
+ *   onRetry         - retry generation
+ *   onCommit(bp)    - called with blueprint when user clicks "Commit"
+ *   limitAllowed    - boolean
+ *   limitLoading    - boolean
+ */
+
+import React, { useState, useCallback, memo, useEffect, useRef } from "react";
 import { useUser } from "@clerk/nextjs";
-import { parseBlueprint } from "@/lib/ai/parser";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
 import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { useI18n } from "@/lib/i18n";
-import { loadUserProfile, buildProfileContext } from "@/lib/userProfile";
-import { generateBlueprint } from "@/lib/ai/clientGenerate";
-import { toast } from "@/lib/toast";
-
+import { createToastSequence } from "@/lib/toastSequence";
 import {
   FiCpu,
   FiMap,
@@ -53,10 +69,11 @@ const SCOPE_META = {
   },
 };
 
+// ─── Streaming progress UI ────────────────────────────────────────────
+
 const StreamingProgress = memo(function StreamingProgress({
   charCount,
   scopeLevel,
-  isPending,
 }) {
   const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
   const isDeep = scopeLevel === "ambitious";
@@ -64,7 +81,6 @@ const StreamingProgress = memo(function StreamingProgress({
     [...STREAM_STAGES].reverse().find((s) => charCount >= s.at) ??
     STREAM_STAGES[0];
   const Icon = stage.icon;
-  // Show 100% only when charCount signals completion (set to Infinity by caller)
   const pct =
     charCount === Infinity
       ? 100
@@ -73,7 +89,7 @@ const StreamingProgress = memo(function StreamingProgress({
   return (
     <div className="flex flex-col gap-5">
       <div>
-        <div className="flex items-center gap-3 mb-1">
+        <div className="flex items-center gap-3 mb-1 flex-wrap">
           <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)]">
             Building your blueprint…
           </h1>
@@ -87,7 +103,7 @@ const StreamingProgress = memo(function StreamingProgress({
         </p>
       </div>
 
-      {isPending && charCount === 0 && (
+      {charCount === 0 && (
         <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
           <div className="w-3 h-3 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin" />
           <span>Contacting AI…</span>
@@ -100,7 +116,7 @@ const StreamingProgress = memo(function StreamingProgress({
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-[var(--violet-dim)]">
-            {pct === 100 ? "Done!" : `${stage.text}…`}
+            {pct === 100 ? "Done!" : stage.text}
           </p>
           <div className="mt-1.5 h-1.5 rounded-full bg-[var(--bg-muted)] overflow-hidden">
             <div
@@ -114,11 +130,7 @@ const StreamingProgress = memo(function StreamingProgress({
         </span>
       </div>
 
-      <div
-        className={`grid grid-cols-2 gap-2 ${
-          isPending && charCount === 0 ? "animate-pulse opacity-80" : ""
-        }`}
-      >
+      <div className="grid grid-cols-2 gap-2">
         {STREAM_STAGES.map((s) => {
           const done = charCount >= s.at;
           const active = stage.at === s.at;
@@ -152,366 +164,46 @@ const StreamingProgress = memo(function StreamingProgress({
   );
 });
 
+// ─── Main component ───────────────────────────────────────────────────
+
 export function StepReview({
-  idea,
-  clarifications,
+  blueprint,
+  genStatus,
+  genCharCount,
+  genError,
   scopeLevel,
-  cachedBlueprint,
   onBack,
+  onRetry,
   onCommit,
   limitAllowed,
   limitLoading,
 }) {
   const { isSignedIn, user } = useUser();
   const { t } = useI18n();
-
-  const [blueprint, setBlueprint] = useState(cachedBlueprint ?? null);
-  const [charCount, setCharCount] = useState(0);
-  const [status, setStatus] = useState(cachedBlueprint ? "done" : "idle");
-  const [error, setError] = useState(null);
   const [showAuthGate, setShowAuthGate] = useState(false);
-  const [streamPending, setStreamPending] = useState(false);
+  const toastSequenceRef = useRef(null);
 
-  const rawRef = useRef("");
-  const readerRef = useRef(null);
-  const rafRef = useRef(null);
-  const hasStarted = useRef(false);
-  const mountedRef = useRef(true);
-  const loadingToastId = useRef(null);
-  const prevToastStageRef = useRef(null); // tracks what we've last shown in the loading toast
-  const retryCount = useRef(0);
-  const MAX_RETRIES = 2;
-
-  // --- New: fallback toast sequence while waiting for any AI response ---
-  const FALLBACK_MESSAGES = [
-    "Still waiting for AI — sometimes it takes a moment.",
-    "Trying a different AI model for a better response…",
-    "Preparing a fallback response — we'll have something soon.",
-    "Thanks for your patience — almost there!",
-  ];
-  const fallbackTimerRef = useRef(null); // single timeout id controlling sequencing
-  const fallbackIndexRef = useRef(0); // which fallback message to show next
-  const fallbackToastIdsRef = useRef([]); // ids of shown fallback toasts so we can dismiss them
-
-  function stopFallbackSequence() {
-    if (fallbackTimerRef.current) {
-      clearTimeout(fallbackTimerRef.current);
-      fallbackTimerRef.current = null;
-    }
-    // dismiss any fallback toasts shown
-    if (fallbackToastIdsRef.current.length > 0) {
-      for (const id of fallbackToastIdsRef.current) {
-        try {
-          toast.dismiss(id);
-        } catch {
-          /* ignore */
-        }
-      }
-      fallbackToastIdsRef.current = [];
-    }
-    fallbackIndexRef.current = 0;
-  }
-
-  function startFallbackSequence() {
-    // guard: don't start if already running
-    if (fallbackTimerRef.current) return;
-
-    // show messages one by one; each toast auto-closes after 3000ms
-    const showNext = () => {
-      if (!mountedRef.current) {
-        stopFallbackSequence();
-        return;
-      }
-      // Only run fallback while stream is still pending
-      if (!streamPending) {
-        stopFallbackSequence();
-        return;
-      }
-
-      const i = fallbackIndexRef.current % FALLBACK_MESSAGES.length;
-      const id = toast.info(FALLBACK_MESSAGES[i], {
-        duration: 3000,
-        pauseOnHover: false,
-      });
-      fallbackToastIdsRef.current.push(id);
-      fallbackIndexRef.current = i + 1;
-
-      // schedule next message slightly after the toast auto-closes
-      fallbackTimerRef.current = setTimeout(showNext, 3500);
-    };
-
-    // kick off
-    showNext();
-  }
-  // --- end fallback sequence additions ---
-
-  const dismissLoadingToast = useCallback(() => {
-    if (loadingToastId.current) {
-      toast.dismiss(loadingToastId.current);
-      loadingToastId.current = null;
-      prevToastStageRef.current = null;
-    }
-    // ensure fallback sequence toasts are also cleaned up
-    stopFallbackSequence();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
+  // Manage toast sequence during generation
   useEffect(() => {
-    mountedRef.current = true;
+    if (genStatus === "streaming" && !toastSequenceRef.current) {
+      toastSequenceRef.current = createToastSequence("blueprint");
+      toastSequenceRef.current.start();
+    } else if (genStatus === "done") {
+      toastSequenceRef.current?.success("Blueprint ready!");
+      toastSequenceRef.current = null;
+    } else if (genStatus === "error") {
+      toastSequenceRef.current?.error(
+        genError || "Failed to generate blueprint"
+      );
+      toastSequenceRef.current = null;
+    }
+
     return () => {
-      mountedRef.current = false;
-      dismissLoadingToast();
-      stopFallbackSequence();
-      try {
-        readerRef.current?.cancel();
-      } catch {
-        /* ignore */
+      if (toastSequenceRef.current) {
+        toastSequenceRef.current.unmount();
       }
-      readerRef.current = null;
-      if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      rafRef.current = null;
     };
-  }, [dismissLoadingToast]);
-
-  // Keep local blueprint/status in sync with cachedBlueprint prop changes.
-  // If a cached blueprint appears, cancel any in-progress generation and show it immediately.
-  // If cachedBlueprint becomes null, reset generation state so runGeneration can start.
-  useEffect(() => {
-    // If a cached blueprint is provided, stop any streaming and show it
-    if (cachedBlueprint) {
-      // cancel any active reader/stream
-      try {
-        readerRef.current?.cancel();
-      } catch {
-        /* ignore */
-      }
-      readerRef.current = null;
-      if (rafRef.current) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      dismissLoadingToast();
-      rawRef.current = "";
-      setCharCount(Infinity);
-      setStreamPending(false);
-      setBlueprint(cachedBlueprint);
-      setStatus("done");
-      setError(null);
-      return;
-    }
-
-    // cachedBlueprint cleared → prepare to run a fresh generation
-    // Leave hasStarted gating / runGeneration to existing effects, but reset local state
-    setBlueprint(null);
-    setStatus("idle");
-    setCharCount(0);
-    rawRef.current = "";
-    setError(null);
-  }, [cachedBlueprint, dismissLoadingToast]);
-
-  // Update loading toast content as generation progresses.
-  // Sequence: initial "Thinking about your plan…" -> "Building your plan…" -> per-stage texts.
-  useEffect(() => {
-    if (!loadingToastId.current) return;
-    if (status !== "streaming") return;
-
-    // compute stage index (highest index where charCount >= at)
-    let stageIndex = 0;
-    for (let i = STREAM_STAGES.length - 1; i >= 0; i--) {
-      if (charCount >= STREAM_STAGES[i].at) {
-        stageIndex = i;
-        break;
-      }
-    }
-
-    // Decide which toast message to show
-    const showThinking = charCount === 0;
-    const showBuilding = charCount > 0 && charCount < 200;
-
-    if (showThinking && prevToastStageRef.current !== "thinking") {
-      toast.loading("Thinking about your plan…", {
-        id: loadingToastId.current,
-      });
-      prevToastStageRef.current = "thinking";
-      return;
-    }
-
-    if (showBuilding && prevToastStageRef.current !== "building") {
-      toast.loading("Building your plan…", { id: loadingToastId.current });
-      prevToastStageRef.current = "building";
-      return;
-    }
-
-    // Otherwise show per-stage message (avoid updating if same stage)
-    if (prevToastStageRef.current !== stageIndex) {
-      const text = STREAM_STAGES[stageIndex]?.text ?? "Building your plan…";
-      toast.loading(text, { id: loadingToastId.current });
-      prevToastStageRef.current = stageIndex;
-    }
-  }, [charCount, status]);
-
-  // Limit gate
-  useEffect(() => {
-    if (cachedBlueprint) return;
-    if (limitLoading) return;
-    if (!limitAllowed) {
-      setStatus("limited");
-      hasStarted.current = true;
-    }
-  }, [limitLoading, limitAllowed, cachedBlueprint]);
-
-  // Start generation when limit confirmed as OK
-  useEffect(() => {
-    if (cachedBlueprint) return;
-    if (hasStarted.current) return;
-    if (limitLoading) return;
-    if (!limitAllowed) return;
-    hasStarted.current = true;
-    runGeneration();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cachedBlueprint, limitLoading, limitAllowed]);
-
-  async function runGeneration() {
-    if (!mountedRef.current) return;
-    if (!limitAllowed) {
-      setStatus("limited");
-      return;
-    }
-
-    setStatus("streaming");
-    setCharCount(0);
-    setError(null);
-    setStreamPending(true);
-    rawRef.current = "";
-
-    dismissLoadingToast();
-    // Start with "Thinking…" to hook users, then progress via the charCount effect
-    loadingToastId.current = toast.loading("Thinking about your plan…");
-    prevToastStageRef.current = "thinking";
-
-    // Start the fallback message sequence while waiting for the first AI chunk
-    startFallbackSequence();
-
-    try {
-      const profile = loadUserProfile();
-      const profileContext = buildProfileContext(profile);
-
-      const stream = await generateBlueprint({
-        idea,
-        clarifications,
-        scopeLevel,
-        profileContext,
-      });
-      const reader = stream.getReader();
-      readerRef.current = reader;
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        if (!mountedRef.current) {
-          try {
-            reader.cancel();
-          } catch {
-            /* ignore */
-          }
-          return;
-        }
-
-        const chunk =
-          value instanceof Uint8Array
-            ? decoder.decode(value, { stream: true })
-            : typeof value === "string"
-            ? value
-            : "";
-
-        // As soon as we get a non-empty chunk, stop fallback sequence
-        if (streamPending && chunk?.length > 0) {
-          setStreamPending(false);
-          stopFallbackSequence(); // <-- ensure fallback toasts stop immediately
-        }
-        rawRef.current += chunk;
-
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        rafRef.current = requestAnimationFrame(() => {
-          if (mountedRef.current) setCharCount(rawRef.current.length);
-        });
-      }
-
-      rafRef.current = null;
-      readerRef.current = null;
-
-      if (rawRef.current.trim().length < 50) {
-        throw new Error("AI returned incomplete response. Please try again.");
-      }
-
-      const parsed = parseBlueprint(rawRef.current);
-      if (!mountedRef.current) return;
-
-      retryCount.current = 0;
-      // Dismiss loading toast before showing success
-      dismissLoadingToast();
-
-      // Signal 100% before transitioning to "done" state
-      setCharCount(Infinity);
-      await new Promise((r) => setTimeout(r, 300));
-
-      if (!mountedRef.current) return;
-      toast.success("Your plan is ready!");
-      setBlueprint(parsed);
-      setStatus("done");
-      setStreamPending(false);
-    } catch (e) {
-      if (!mountedRef.current) return;
-      dismissLoadingToast();
-      stopFallbackSequence();
-      readerRef.current = null;
-      setStreamPending(false);
-
-      if (
-        (e.code === "RATE_LIMITED" || e.status === 429) &&
-        retryCount.current < MAX_RETRIES
-      ) {
-        retryCount.current += 1;
-        const delay = 3000 * retryCount.current;
-        toast.warn(
-          `Rate limited — retrying in ${delay / 1000}s… (${
-            retryCount.current
-          }/${MAX_RETRIES})`
-        );
-        await new Promise((r) => setTimeout(r, delay));
-        if (mountedRef.current) runGeneration();
-        return;
-      }
-
-      const message =
-        e.code === "RATE_LIMITED" || e.status === 429
-          ? "Rate limit reached. Please wait a moment and try again."
-          : e.code === "QUOTA_EXCEEDED" || e.status === 402
-          ? "AI quota exceeded for today. Try again tomorrow."
-          : e.code === "TIMEOUT" || e.status === 504
-          ? "Request timed out. Please try again."
-          : e?.message ?? "Generation failed. Please try again.";
-
-      setError(message);
-      setStatus("error");
-    }
-  }
-
-  const handleRetry = useCallback(() => {
-    // Reset ALL generation state so the useEffect gate and runGeneration
-    // both start from scratch — critical after back-nav + error + retry.
-    retryCount.current = 0;
-    hasStarted.current = false; // ← was missing: gate was permanently closed
-    setError(null);
-    setStatus("idle");
-    setCharCount(0);
-    rawRef.current = "";
-    // The useEffect watching [cachedBlueprint, limitLoading, limitAllowed]
-    // will NOT re-fire because those haven't changed. Trigger directly:
-    hasStarted.current = true;
-    runGeneration();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [genStatus, genError]);
 
   const handleCommitClick = useCallback(() => {
     if (!isSignedIn) {
@@ -526,21 +218,41 @@ export function StepReview({
     onCommit(blueprint);
   }, [onCommit, blueprint]);
 
+  // Greeting bar
+  const name = user?.firstName || user?.username || null;
+  const greeting = isSignedIn
+    ? name
+      ? `Hi ${name}! Let's build something great.`
+      : "Let's do this — onward!"
+    : "Hello there — ready to explore?";
+
   function GreetingBanner() {
-    const name = user?.firstName || user?.fullName || user?.username || null;
-    const text = isSignedIn
-      ? name
-        ? `Hi ${name}! Let's get to work.`
-        : "Let's do this — onward!"
-      : "Hello there — ready to explore?";
     return (
       <div className="rounded-[var(--r-md)] px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border)] mb-4">
-        <p className="text-sm text-[var(--text-primary)] font-medium">{text}</p>
+        <p className="text-sm text-[var(--text-primary)] font-medium">
+          {greeting}
+        </p>
       </div>
     );
   }
 
-  if (status === "limited") {
+  // ── Loading while checking limit ──────────────────────────────────
+  if (limitLoading && genStatus === "idle") {
+    return (
+      <>
+        <GreetingBanner />
+        <div className="flex flex-col gap-4 items-center py-12">
+          <div className="w-8 h-8 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin" />
+          <p className="text-sm text-[var(--text-secondary)]">
+            Checking access…
+          </p>
+        </div>
+      </>
+    );
+  }
+
+  // ── Limit gate ────────────────────────────────────────────────────
+  if (genStatus === "limited" || (!limitLoading && !limitAllowed)) {
     return (
       <>
         <GreetingBanner />
@@ -554,8 +266,8 @@ export function StepReview({
             </h2>
             <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-sm mx-auto mb-5">
               {isSignedIn
-                ? "You've created 4 projects. Sign up for more."
-                : "Sign up free to create unlimited projects, save your work, and access deeper AI planning."}
+                ? "Sign up for a higher tier to create more projects."
+                : "Sign up free to create unlimited projects and never lose your work."}
             </p>
             <div className="flex flex-col gap-2 max-w-xs mx-auto">
               <Button
@@ -585,54 +297,54 @@ export function StepReview({
     );
   }
 
-  if (limitLoading && status === "idle") {
-    return (
-      <>
-        <GreetingBanner />
-        <div className="flex flex-col gap-4 items-center py-12">
-          <div className="w-8 h-8 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin" />
-          <p className="text-sm text-[var(--text-secondary)]">
-            Checking access…
-          </p>
-        </div>
-      </>
-    );
-  }
-
-  if (status === "error") {
+  // ── Error ─────────────────────────────────────────────────────────
+  if (genStatus === "error") {
     return (
       <>
         <GreetingBanner />
         <div className="flex flex-col gap-6">
           <div className="rounded-[var(--r-lg)] border border-[var(--coral)] bg-[var(--coral-bg)] p-5 text-[var(--coral)]">
             <p className="font-medium mb-1">Couldn't generate your plan</p>
-            <p className="text-sm opacity-80">{error}</p>
+            <p className="text-sm opacity-80">{genError}</p>
           </div>
           <div className="flex gap-3">
             <Button variant="ghost" onClick={onBack}>
               {t("common_back")}
             </Button>
-            <Button onClick={handleRetry}>{t("common_retry")}</Button>
+            <Button onClick={onRetry}>{t("common_retry")}</Button>
           </div>
         </div>
       </>
     );
   }
 
-  if (status === "streaming" || status === "idle") {
+  // ── Streaming / idle (waiting) ────────────────────────────────────
+  if (genStatus === "streaming" || genStatus === "idle") {
     return (
       <>
         <GreetingBanner />
-        <StreamingProgress
-          charCount={charCount}
-          scopeLevel={scopeLevel}
-          isPending={streamPending}
-        />
+        <StreamingProgress charCount={genCharCount} scopeLevel={scopeLevel} />
       </>
     );
   }
 
-  // ── Done ──────────────────────────────────────────────────────────
+  // ── Done — show blueprint ─────────────────────────────────────────
+  if (!blueprint) {
+    return (
+      <>
+        <GreetingBanner />
+        <div className="flex flex-col gap-4 items-center py-12">
+          <p className="text-[var(--text-secondary)]">
+            Blueprint missing. Please go back and try again.
+          </p>
+          <Button variant="ghost" onClick={onBack}>
+            ← Back
+          </Button>
+        </div>
+      </>
+    );
+  }
+
   const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
 
   return (
@@ -658,6 +370,7 @@ export function StepReview({
           </p>
         </div>
 
+        {/* Meta strip */}
         <div
           className="rounded-[var(--r-lg)] border px-4 py-3 flex flex-wrap gap-x-5 gap-y-2 text-sm"
           style={{
@@ -686,6 +399,7 @@ export function StepReview({
           )}
         </div>
 
+        {/* Phases */}
         <div>
           <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
             Phases & milestones
@@ -721,6 +435,7 @@ export function StepReview({
           </div>
         </div>
 
+        {/* Success criteria */}
         {blueprint.successCriteria?.length > 0 && (
           <div>
             <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
@@ -742,6 +457,7 @@ export function StepReview({
           </div>
         )}
 
+        {/* Blockers */}
         {blueprint.blockers?.length > 0 && (
           <div>
             <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
@@ -761,6 +477,7 @@ export function StepReview({
           </div>
         )}
 
+        {/* Sign-in nudge */}
         {!isSignedIn && (
           <div className="rounded-[var(--r-md)] bg-[var(--violet-bg)] border border-[var(--violet)] px-4 py-3 flex items-start gap-3">
             <span className="text-lg shrink-0">
@@ -771,8 +488,8 @@ export function StepReview({
                 Sign in to save this project
               </p>
               <p className="text-xs text-[var(--text-secondary)] mt-0.5">
-                This is your free project. Create a free account to build
-                unlimited projects and never lose your work.{" "}
+                Create a free account to build unlimited projects and never lose
+                your work.{" "}
                 <button
                   onClick={() => setShowAuthGate(true)}
                   className="text-[var(--violet)] hover:underline font-medium"
@@ -784,6 +501,7 @@ export function StepReview({
           </div>
         )}
 
+        {/* Actions */}
         <div className="flex items-center justify-between pt-2">
           <Button variant="ghost" size="sm" onClick={onBack}>
             ← Change scope

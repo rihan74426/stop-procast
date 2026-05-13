@@ -4,6 +4,15 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/Button";
 import { useI18n } from "@/lib/i18n";
 
+// ─── Personalization prefixes ─────────────────────────────────────────
+const PREFIXES = [
+  "I want to",
+  "I need to",
+  "I'll",
+  "I'm going to",
+  "I'd like to",
+];
+
 // ─── Ghost suggestion engine ──────────────────────────────────────────
 //
 // Each entry has:
@@ -16,11 +25,13 @@ const SUGGESTION_RULES = [
   {
     triggers: ["learn", "learning", "study", "studying", "master", "mastering"],
     completions: [
-      " conversational Spanish through daily 20-minute practice sessions",
-      " Python programming from scratch and build 3 real projects",
-      " music theory and apply it to composing original pieces",
-      " data analysis with hands-on projects and a final portfolio",
-      " web development and ship my first app in 60 days",
+      "conversational Spanish through daily 20-minute practice sessions",
+      "Python programming and build 3 real projects",
+      "music theory and compose original pieces",
+      "data analysis with hands-on projects",
+      "web development and ship my first app",
+      "JavaScript deeply and become job-ready",
+      "graphic design fundamentals through daily practice",
     ],
     weight: 2,
   },
@@ -28,10 +39,12 @@ const SUGGESTION_RULES = [
   {
     triggers: ["write", "writing", "draft", "drafting"],
     completions: [
-      " a 30,000-word first draft of my novel in 90 days",
-      " a technical book on system design with weekly chapters",
-      " a blog series on productivity and grow to 1,000 subscribers",
-      " a screenplay for a short film and submit to 3 festivals",
+      "a 30,000-word first draft of my novel",
+      "a technical guide on system design",
+      "a blog series and grow my audience",
+      "a screenplay and submit to 3 festivals",
+      "100 essays about my ideas and learnings",
+      "a weekly newsletter and reach 1,000 subscribers",
     ],
     weight: 2,
   },
@@ -48,10 +61,13 @@ const SUGGESTION_RULES = [
       "making",
     ],
     completions: [
-      " a SaaS product that solves a real problem and get 10 paying customers",
-      " an e-commerce store and reach $1,000 in monthly revenue",
-      " a mobile app and launch it on the App Store within 3 months",
-      " a portfolio website that showcases my best work and lands me freelance clients",
+      "a SaaS product that solves a real problem",
+      "an e-commerce store and hit $1,000 revenue",
+      "a mobile app and launch on the App Store",
+      "a portfolio website and land freelance clients",
+      "a tool that saves people time",
+      "an API that other developers can use",
+      "a browser extension that gains 1,000 users",
     ],
     weight: 2,
   },
@@ -64,11 +80,15 @@ const SUGGESTION_RULES = [
       "shipping",
       "release",
       "releasing",
+      "publish",
+      "publishing",
     ],
     completions: [
-      " my side project publicly and acquire the first 100 users",
-      " a paid online course and sell 50 seats in the first month",
-      " a podcast and publish 10 episodes before promoting it",
+      "my side project and get the first 100 users",
+      "a paid course and sell 50 seats in month one",
+      "a podcast with 10 episodes before promoting",
+      "my app to production this month",
+      "a beta version and gather feedback",
     ],
     weight: 2,
   },
@@ -84,10 +104,12 @@ const SUGGESTION_RULES = [
       "exercise",
     ],
     completions: [
-      " a 5K race in under 30 minutes by following a 12-week plan",
-      " for a half marathon with 4 sessions per week",
-      " consistently 4 days a week and build a sustainable routine",
-      " and lose 10kg over 4 months through progressive overload",
+      "a 5K race in under 30 minutes",
+      "for a half marathon with 4 sessions weekly",
+      "consistently 4 days a week and build momentum",
+      "and lose 10kg in 4 months",
+      "and get stronger with progressive overload",
+      "and improve my endurance by 50%",
     ],
     weight: 2,
   },
@@ -102,10 +124,11 @@ const SUGGESTION_RULES = [
       "preparing",
     ],
     completions: [
-      " a destination wedding for 80 guests within budget",
-      " a complete home renovation with contractors, timeline and budget",
-      " a product roadmap for Q3 with clear milestones and owners",
-      " my career transition into product management over the next 6 months",
+      "a destination wedding within budget",
+      "a home renovation with clear milestones",
+      "a Q3 roadmap with owners and deadlines",
+      "my career transition into product management",
+      "a family trip and book everything by month-end",
     ],
     weight: 2,
   },
@@ -120,10 +143,12 @@ const SUGGESTION_RULES = [
       "consistently",
     ],
     completions: [
-      " of writing 500 words every morning before work",
-      " of meditating for 10 minutes and journaling daily",
-      " of reading 20 pages a day and finish 24 books this year",
-      " of cold outreach — 5 contacts per day — to grow my network",
+      "a habit of writing 500 words every morning",
+      "a routine of meditating and journaling daily",
+      "a reading habit — 20 pages daily",
+      "a habit of reaching out to 5 new people weekly",
+      "a morning routine that sets me up for success",
+      "an exercise routine I actually stick to",
     ],
     weight: 2,
   },
@@ -133,14 +158,17 @@ const SUGGESTION_RULES = [
       "research",
       "researching",
       "investigate",
-      "investigate",
+      "investigating",
       "analyse",
       "analyze",
+      "validate",
     ],
     completions: [
-      " the competitive landscape for my SaaS idea and validate demand",
-      " machine learning techniques for time-series forecasting",
-      " customer pain points through 20 user interviews",
+      "the market for my SaaS idea",
+      "machine learning techniques for my use case",
+      "customer pain points through 20 interviews",
+      "my competitor landscape thoroughly",
+      "what my target audience actually wants",
     ],
     weight: 2,
   },
@@ -155,9 +183,11 @@ const SUGGESTION_RULES = [
       "kickoff",
     ],
     completions: [
-      " a freelance design practice and land my first 3 clients",
-      " a YouTube channel focused on personal finance for beginners",
-      " a small newsletter business and grow to 500 subscribers",
+      "a freelance design practice",
+      "a YouTube channel focused on my expertise",
+      "a newsletter about ideas I care about",
+      "a side project that could become a business",
+      "a community around my passion",
     ],
     weight: 2,
   },
@@ -165,10 +195,12 @@ const SUGGESTION_RULES = [
   {
     triggers: ["improve", "improving", "grow", "growing", "increase", "boost"],
     completions: [
-      " my public speaking skills and deliver a talk at a local meetup",
-      " my team's deployment frequency from weekly to daily",
-      " my drawing skills from beginner to portfolio-ready",
-      " organic traffic to my site by 3x in 6 months",
+      "my public speaking and deliver talks",
+      "my team's deployment frequency",
+      "my design skills to portfolio-ready",
+      "organic traffic to my site by 3x",
+      "my network through meaningful conversations",
+      "my leadership skills and guide my team better",
     ],
     weight: 2,
   },
@@ -176,9 +208,11 @@ const SUGGESTION_RULES = [
   {
     triggers: ["complete", "completing", "finish", "finishing"],
     completions: [
-      " my thesis and submit it 2 weeks before the deadline",
-      " the online course I started 3 months ago and get certified",
-      " my open-source project and publish it with documentation",
+      "my thesis before the deadline",
+      "the online course I started months ago",
+      "my open-source project with full docs",
+      "that side project I've been procrastinating on",
+      "the backlog and have a clean slate",
     ],
     weight: 2,
   },
@@ -186,9 +220,10 @@ const SUGGESTION_RULES = [
   {
     triggers: ["i want", "i need", "i'd like", "i would like"],
     completions: [
-      " to build something people actually pay for",
-      " to finally finish a project I've been putting off",
-      " to develop a skill that opens new career opportunities",
+      "to build something people actually use",
+      "to finish something I've started",
+      "to develop a skill that matters",
+      "to make an impact in my field",
     ],
     weight: 1,
   },
@@ -206,29 +241,41 @@ const DOMAIN_HINTS = [
       "mandarin",
       "language",
     ],
-    append: " — focusing on speaking, listening, and practical conversation",
+    append: " — with daily conversation practice and immersion",
   },
   {
-    keywords: ["startup", "saas", "product", "mvp"],
-    append: " — validating the idea before building, then iterating fast",
+    keywords: ["startup", "saas", "product", "mvp", "business"],
+    append: " — validate demand first, then build the MVP",
   },
   {
-    keywords: ["book", "novel", "nonfiction"],
-    append: " — with a weekly chapter target and an accountability partner",
+    keywords: ["book", "novel", "nonfiction", "writing"],
+    append: " — with weekly milestones and accountability",
   },
   {
     keywords: ["podcast"],
-    append: " — researching format, recording 5 pilot episodes, then launching",
+    append: " — record 5 pilots, then launch publicly",
   },
   {
-    keywords: ["youtube", "channel", "video"],
-    append: " — producing 10 videos before optimising for growth",
+    keywords: ["youtube", "channel", "video", "content"],
+    append: " — produce 10 videos before worrying about growth",
+  },
+  {
+    keywords: ["course", "training", "certification"],
+    append: " — dedicate 1 hour daily and track progress",
+  },
+  {
+    keywords: ["freelance", "client", "contract"],
+    append: " — land 3 clients and build a portfolio",
+  },
+  {
+    keywords: ["app", "software", "code"],
+    append: " — ship an MVP in 4 weeks",
   },
 ];
 
 /**
  * Returns a ghost completion string for the current input value.
- * Returns "" if no good match found.
+ * Smarter matching: checks for trigger words even in mid-phrase context.
  */
 function getGhostCompletion(value) {
   if (!value || value.trim().length < 6) return "";
@@ -237,9 +284,9 @@ function getGhostCompletion(value) {
   const words = lower.split(/\s+/);
   const lastWord = words[words.length - 1];
   const lastTwoWords = words.slice(-2).join(" ");
+  const lastThreeWords = words.slice(-3).join(" ");
 
   // 1. Check for mid-word trigger (user is mid-typing a trigger word)
-  //    e.g. "le" → matches "learn" trigger, suggests rest of trigger + completion
   for (const rule of SUGGESTION_RULES) {
     for (const trigger of rule.triggers) {
       if (
@@ -247,24 +294,25 @@ function getGhostCompletion(value) {
         lastWord.length >= 3 &&
         lastWord.length < trigger.length
       ) {
-        // Suggest completing the trigger word + first completion
         const completion = rule.completions[0];
-        return trigger.slice(lastWord.length) + completion;
+        return trigger.slice(lastWord.length) + " " + completion;
       }
     }
   }
 
-  // 2. Check for complete trigger word (user finished typing the trigger)
-  //    e.g. "I want to learn" → suggest completion
+  // 2. Check for complete trigger word in various positions
   let bestRule = null;
   let bestWeight = -1;
 
   for (const rule of SUGGESTION_RULES) {
     for (const trigger of rule.triggers) {
+      // Match at end of input
       if (
         lower.endsWith(" " + trigger) ||
         lower === trigger ||
-        lastTwoWords === trigger
+        lastWord === trigger ||
+        lastTwoWords === trigger ||
+        lastThreeWords === trigger
       ) {
         if (rule.weight > bestWeight) {
           bestRule = rule;
@@ -275,16 +323,15 @@ function getGhostCompletion(value) {
   }
 
   if (bestRule) {
-    // Pick completion deterministically based on text length (varies suggestion without randomness)
     const idx = value.length % bestRule.completions.length;
-    return bestRule.completions[idx];
+    return " " + bestRule.completions[idx];
   }
 
-  // 3. Domain hint — if text is long enough and contains a domain keyword, suggest a suffix
+  // 3. Domain hint — contextual suffix based on keywords
   if (value.trim().length > 20 && !value.trim().endsWith(".")) {
     for (const hint of DOMAIN_HINTS) {
       if (hint.keywords.some((kw) => lower.includes(kw))) {
-        // Only suggest if the append text isn't already in the value
+        // Only suggest if not already present
         if (!lower.includes(hint.append.toLowerCase().slice(3))) {
           return hint.append;
         }
@@ -297,12 +344,14 @@ function getGhostCompletion(value) {
 
 // ─── Curated examples ─────────────────────────────────────────────────
 const EXAMPLES = [
-  "Learn conversational Spanish in 3 months through daily 20-minute practice",
-  "Build a SaaS product, validate it with 10 users, and launch in 8 weeks",
-  "Train for a half marathon following a progressive 16-week plan",
-  "Write and self-publish a 30,000-word non-fiction book this year",
-  "Organise a 3-day community event with 200 attendees and 5 sponsors",
-  "Study for the AWS Solutions Architect exam and pass within 6 weeks",
+  "I want to learn conversational Spanish through daily 20-minute practice",
+  "I need to build a SaaS product and get my first 10 paying customers",
+  "I'll train for a half marathon with a structured 16-week plan",
+  "I'd like to write and publish a 30,000-word non-fiction book",
+  "I'm going to start a YouTube channel about product design",
+  "I need to complete my online course and get certified",
+  "I want to improve my public speaking by delivering 3 talks",
+  "I'll launch my side project and acquire the first 100 users",
 ];
 
 // ─── Component ────────────────────────────────────────────────────────

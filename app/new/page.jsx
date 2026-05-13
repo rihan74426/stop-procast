@@ -1,16 +1,15 @@
 "use client";
 
 /**
- * app/new/page.jsx
+ * app/new/page.jsx — Intake wizard (fully connected, centrally controlled)
  *
- * Changes in this version:
- * 1. Edit detection: when user goes back to Step 0 or 1 and changes
- *    idea/clarifications, a banner appears on Step 2/3 asking permission
- *    to regenerate (instead of silently marking stale).
- * 2. Permission dialog: a clear modal/banner with "Keep current plan" vs
- *    "Regenerate" — no surprise regenerations.
- * 3. StepReview receives the permission state so it knows whether to
- *    re-run generation or show the cached blueprint.
+ * Key architecture decisions:
+ * 1. Generation is NEVER triggered automatically by navigation.
+ *    It only fires when `shouldGenerate` changes to true (set explicitly).
+ * 2. The regen permission banner appears on Step 2 (Scope) AND Step 3 (Review).
+ * 3. StepReview is a pure display component — it receives a stream/blueprint,
+ *    does NOT self-start generation. All AI calls live here.
+ * 4. Going back never resets blueprint unless user explicitly chooses "Regen".
  */
 
 import { useState, useCallback, useEffect, useRef } from "react";
@@ -27,10 +26,13 @@ import { DataProvider } from "@/components/providers/DataProvider";
 import { SavePromptModal } from "@/components/ui/SavePromptModal";
 import { TopBar } from "@/components/layout/Topbar";
 import { AuthGateModal } from "@/components/auth/AuthGateModal";
-import { toast } from "@/lib/toast";
 import { Sidebar } from "@/components/layout/Sidebar";
-import { BiSolidPencil } from "react-icons/bi";
+import { toast } from "@/lib/toast";
+import { generateBlueprint } from "@/lib/ai/clientGenerate";
+import { parseBlueprint } from "@/lib/ai/parser";
+import { loadUserProfile, buildProfileContext } from "@/lib/userProfile";
 import { FaRocket } from "react-icons/fa";
+import { BiSolidPencil } from "react-icons/bi";
 
 const STEP_LABELS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
 
@@ -42,7 +44,7 @@ export default function NewProjectPage() {
   );
 }
 
-// ─── Regeneration permission banner ──────────────────────────────────
+// ─── Regen permission banner ──────────────────────────────────────────
 
 function RegenPermissionBanner({ onKeep, onRegenerate }) {
   return (
@@ -54,9 +56,8 @@ function RegenPermissionBanner({ onKeep, onRegenerate }) {
             Your inputs changed
           </p>
           <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-3">
-            You edited your idea or answers after generating your plan. Do you
-            want to regenerate with the updated inputs, or keep your current
-            plan?
+            You edited your idea, answers, or scope after generating your plan.
+            Regenerate with the new inputs, or keep your current plan.
           </p>
           <div className="flex gap-2 flex-wrap">
             <button
@@ -78,6 +79,36 @@ function RegenPermissionBanner({ onKeep, onRegenerate }) {
   );
 }
 
+// ─── Fallback toast sequencer ─────────────────────────────────────────
+// Shows one toast every 4s while waiting. Returns a stop function.
+
+function startFallbackToasts() {
+  const MESSAGES = [
+    "AI is thinking — this can take 15–40 seconds…",
+    "Switching to a backup model for a faster response…",
+    "Still building — complex plans take a little longer.",
+    "Almost there — finalising your blueprint…",
+  ];
+  let index = 0;
+  let timer = null;
+  let stopped = false;
+
+  function showNext() {
+    if (stopped) return;
+    toast.info(MESSAGES[index % MESSAGES.length], { duration: 3200 });
+    index++;
+    timer = setTimeout(showNext, 4000);
+  }
+
+  // First message after 8s (give AI a fair chance to start)
+  timer = setTimeout(showNext, 8000);
+
+  return function stop() {
+    stopped = true;
+    if (timer) clearTimeout(timer);
+  };
+}
+
 // ─── Main content ─────────────────────────────────────────────────────
 
 function NewProjectContent() {
@@ -88,58 +119,44 @@ function NewProjectContent() {
 
   const [showEarlyAuthGate, setShowEarlyAuthGate] = useState(false);
 
-  useEffect(() => {
-    if (!limitLoading && !limitAllowed && !isSignedIn) {
-      setShowEarlyAuthGate(true);
-    }
-  }, [limitLoading, limitAllowed, isSignedIn]);
-
-  // ── Wizard state ─────────────────────────────────────────────────
+  // ── Wizard navigation ─────────────────────────────────────────────
   const [step, setStep] = useState(0);
-  const [maxStep, setMaxStep] = useState(0);
+  const [maxReached, setMaxReached] = useState(0);
 
+  // ── Inputs ────────────────────────────────────────────────────────
   const [idea, setIdea] = useState("");
   const [clarifyAnswers, setClarifyAnswers] = useState({});
   const [cachedQuestions, setCachedQuestions] = useState(null);
   const [scopeLevel, setScopeLevel] = useState("standard");
 
-  // Blueprint + change tracking
+  // ── Blueprint & generation state ──────────────────────────────────
   const [blueprint, setBlueprint] = useState(null);
+  // The input fingerprint when the blueprint was last generated
   const [blueprintKey, setBlueprintKey] = useState(null);
-  // null = no conflict; 'pending' = waiting for user decision; 'keep' | 'regen'
-  const [regenDecision, setRegenDecision] = useState(null);
 
-  // The key that was used to generate the current blueprint
+  // Generation stream state (owned here, passed down to StepReview)
+  const [genStatus, setGenStatus] = useState("idle"); // idle | streaming | done | error
+  const [genCharCount, setGenCharCount] = useState(0);
+  const [genError, setGenError] = useState(null);
+
+  const rawRef = useRef("");
+  const readerRef = useRef(null);
+  const rafRef = useRef(null);
+  const stopFallbackRef = useRef(null);
+  const retryCount = useRef(0);
+  const MAX_RETRIES = 2;
+
+  // ── Input fingerprint ─────────────────────────────────────────────
   const inputKey = `${idea.trim()}||${scopeLevel}||${JSON.stringify(
     clarifyAnswers
   )}`;
   const blueprintIsStale =
     blueprint !== null && blueprintKey !== null && inputKey !== blueprintKey;
 
-  // When blueprint becomes stale and user is on step 2 or 3 (Scope or Review), show banner
-  const showRegenBanner =
-    blueprintIsStale && (step === 2 || step === 3) && regenDecision === null;
+  // Show regen banner on steps 2 and 3 when stale
+  const showRegenBanner = blueprintIsStale && (step === 2 || step === 3);
 
-  // ── Navigation ───────────────────────────────────────────────────
-  const maxReached = blueprint !== null && !blueprintIsStale ? 4 : maxStep;
-
-  const goTo = useCallback(
-    (target) => {
-      if (target < 0 || target > maxReached) return;
-      // If navigating to step 2 or 3 and blueprint is stale, reset decision so user must choose
-      if ((target === 2 || target === 3) && blueprintIsStale) {
-        setRegenDecision(null);
-      }
-      setStep(target);
-    },
-    [maxReached, blueprintIsStale]
-  );
-
-  const advance = useCallback((target) => {
-    setStep(target);
-    setMaxStep((prev) => Math.max(prev, target));
-  }, []);
-
+  // ── Puter credential injection ────────────────────────────────────
   useEffect(() => {
     const appId = process.env.NEXT_PUBLIC_PUTER_APP_ID;
     const authToken = process.env.NEXT_PUBLIC_PUTER_AUTH_TOKEN;
@@ -149,54 +166,220 @@ function NewProjectContent() {
       localStorage.setItem("puter.auth.token", authToken);
   }, []);
 
-  // ── Input handlers ───────────────────────────────────────────────
-  const handleIdeaChange = useCallback((v) => setIdea(v), []);
+  // ── Early limit gate ──────────────────────────────────────────────
+  useEffect(() => {
+    if (!limitLoading && !limitAllowed && !isSignedIn) {
+      setShowEarlyAuthGate(true);
+    }
+  }, [limitLoading, limitAllowed, isSignedIn]);
 
+  // ── Navigation helpers ────────────────────────────────────────────
+  const goTo = useCallback(
+    (target) => {
+      if (target < 0 || target > maxReached) return;
+      setStep(target);
+    },
+    [maxReached]
+  );
+
+  const advance = useCallback((target) => {
+    setStep(target);
+    setMaxReached((prev) => Math.max(prev, target));
+  }, []);
+
+  // ── Input handlers ────────────────────────────────────────────────
+  const handleIdeaChange = useCallback((v) => setIdea(v), []);
   const handleClarifyChange = useCallback(
     (i, v) => setClarifyAnswers((prev) => ({ ...prev, [i]: v })),
     []
   );
-
   const handleScopeChange = useCallback((v) => setScopeLevel(v), []);
 
-  /**
-   * Called by StepReview when blueprint is ready (fresh generation).
-   * Advances to step 4 (Commit) and caches the blueprint.
-   */
-  const handleBlueprintReady = useCallback(
-    (bp) => {
-      setBlueprint(bp);
-      setBlueprintKey(inputKey);
-      setRegenDecision(null);
-      advance(4);
-    },
-    [inputKey, advance]
-  );
+  // ── Generation ────────────────────────────────────────────────────
+  // Cleanup helper
+  function stopGeneration() {
+    if (stopFallbackRef.current) {
+      stopFallbackRef.current();
+      stopFallbackRef.current = null;
+    }
+    try {
+      readerRef.current?.cancel();
+    } catch {
+      /* ignore */
+    }
+    readerRef.current = null;
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    rafRef.current = null;
+  }
 
-  // User chose to keep the stale plan
-  const handleKeepPlan = useCallback(() => {
-    setBlueprintKey(inputKey); // treat current inputs as "accepted"
-    setRegenDecision("keep");
-    // small UX feedback
-    toast.success("Kept current plan. Your inputs are accepted.");
-  }, [inputKey]);
-
-  // User chose to regenerate
-  const handleRegenerate = useCallback(() => {
-    setBlueprint(null);
-    setBlueprintKey(null);
-    setRegenDecision("regen");
+  useEffect(() => {
+    return () => stopGeneration();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  /**
-   * Called by StepCommit when user commits.
-   */
+  async function runGeneration() {
+    if (!limitAllowed) {
+      setGenStatus("limited");
+      return;
+    }
+
+    stopGeneration();
+    setBlueprint(null);
+    setGenStatus("streaming");
+    setGenCharCount(0);
+    setGenError(null);
+    rawRef.current = "";
+
+    // Start fallback toast sequence
+    stopFallbackRef.current = startFallbackToasts();
+
+    try {
+      const profile = loadUserProfile();
+      const profileContext = buildProfileContext(profile);
+      const clarifications = Object.entries(clarifyAnswers)
+        .map(([i, answer]) => ({ question: `Q${parseInt(i) + 1}`, answer }))
+        .filter((c) => c.answer?.trim());
+
+      const stream = await generateBlueprint({
+        idea,
+        clarifications,
+        scopeLevel,
+        profileContext,
+      });
+
+      const reader = stream.getReader();
+      readerRef.current = reader;
+      const decoder = new TextDecoder();
+      let firstChunk = true;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk =
+          value instanceof Uint8Array
+            ? decoder.decode(value, { stream: true })
+            : typeof value === "string"
+            ? value
+            : "";
+
+        if (firstChunk && chunk.length > 0) {
+          firstChunk = false;
+          // Stop fallback toasts once AI starts responding
+          if (stopFallbackRef.current) {
+            stopFallbackRef.current();
+            stopFallbackRef.current = null;
+          }
+          toast.success("AI is responding — building your plan!", {
+            duration: 2500,
+          });
+        }
+
+        rawRef.current += chunk;
+
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        rafRef.current = requestAnimationFrame(() => {
+          setGenCharCount(rawRef.current.length);
+        });
+      }
+
+      rafRef.current = null;
+      readerRef.current = null;
+
+      if (rawRef.current.trim().length < 50) {
+        throw new Error("AI returned incomplete response. Please try again.");
+      }
+
+      const parsed = parseBlueprint(rawRef.current);
+
+      retryCount.current = 0;
+      if (stopFallbackRef.current) {
+        stopFallbackRef.current();
+        stopFallbackRef.current = null;
+      }
+
+      // Signal completion
+      setGenCharCount(Infinity);
+      await new Promise((r) => setTimeout(r, 300));
+
+      toast.success("Your blueprint is ready! 🎯", { duration: 3000 });
+      setBlueprint(parsed);
+      setBlueprintKey(inputKey);
+      setGenStatus("done");
+
+      // Auto-advance to step 4 (Commit) when generation completes
+      setStep(4);
+      setMaxReached((prev) => Math.max(prev, 4));
+    } catch (e) {
+      if (stopFallbackRef.current) {
+        stopFallbackRef.current();
+        stopFallbackRef.current = null;
+      }
+      readerRef.current = null;
+
+      if (
+        (e.code === "RATE_LIMITED" || e.status === 429) &&
+        retryCount.current < MAX_RETRIES
+      ) {
+        retryCount.current++;
+        const delay = 3000 * retryCount.current;
+        toast.warn(
+          `Rate limited — retrying in ${delay / 1000}s… (${
+            retryCount.current
+          }/${MAX_RETRIES})`
+        );
+        await new Promise((r) => setTimeout(r, delay));
+        runGeneration();
+        return;
+      }
+
+      const message =
+        e.code === "RATE_LIMITED" || e.status === 429
+          ? "Rate limit reached. Please wait a moment and try again."
+          : e.code === "QUOTA_EXCEEDED" || e.status === 402
+          ? "AI quota exceeded for today. Try again tomorrow."
+          : e.code === "TIMEOUT" || e.status === 504
+          ? "Request timed out. Please try again."
+          : e?.message ?? "Generation failed. Please try again.";
+
+      setGenError(message);
+      setGenStatus("error");
+    }
+  }
+
+  // Called when user clicks "Generate plan →" on StepScope
+  const handleStartGeneration = useCallback(() => {
+    retryCount.current = 0;
+    advance(3);
+    runGeneration();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idea, clarifyAnswers, scopeLevel, limitAllowed, advance]);
+
+  const handleRetryGeneration = useCallback(() => {
+    retryCount.current = 0;
+    runGeneration();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idea, clarifyAnswers, scopeLevel, limitAllowed]);
+
+  // User keeps the stale plan
+  const handleKeepPlan = useCallback(() => {
+    setBlueprintKey(inputKey);
+    toast.success("Keeping current plan.", { duration: 2000 });
+  }, [inputKey]);
+
+  // User wants a fresh plan
+  const handleRegeneratePlan = useCallback(() => {
+    retryCount.current = 0;
+    runGeneration();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [idea, clarifyAnswers, scopeLevel, limitAllowed]);
+
+  // Called by StepCommit
   const handleCommit = async ({ deadline }) => {
     if (!blueprint) {
       toast.error("Blueprint is missing. Please go back and regenerate.");
       return;
     }
-
     const toastId = toast.loading("Creating your project…");
     try {
       const projectData = {
@@ -220,14 +403,8 @@ function NewProjectContent() {
         timeline: deadline || blueprint.timeline || "",
         reviewQuestions: blueprint.reviewQuestions ?? [],
       };
-
       const id = await addProject(projectData);
       toast.dismiss(toastId);
-      toast.success(
-        `Project created! Let's get to work. ${(
-          <FaRocket className="inline" />
-        )}`
-      );
       router.push(`/project/${id}`);
     } catch (err) {
       toast.dismiss(toastId);
@@ -237,23 +414,7 @@ function NewProjectContent() {
     }
   };
 
-  const clarifications = Object.entries(clarifyAnswers)
-    .map(([i, answer]) => ({ question: `Q${parseInt(i) + 1}`, answer }))
-    .filter((c) => c.answer?.trim());
-
-  // The blueprint to pass to StepReview:
-  // - null if we want fresh generation (no cached blueprint OR user explicitly chose regen)
-  // - blueprint if we want to show cached (either not stale, or stale but user hasn't chosen regen yet OR user chose keep)
-  const reviewBlueprint =
-    blueprint === null
-      ? null
-      : blueprintIsStale
-      ? regenDecision === "regen"
-        ? null
-        : blueprint
-      : blueprint;
-
-  // ── Early gate ───────────────────────────────────────────────────
+  // ── Early gate screen ─────────────────────────────────────────────
   if (!limitLoading && !limitAllowed && !isSignedIn) {
     return (
       <div className="flex h-screen overflow-hidden">
@@ -261,7 +422,7 @@ function NewProjectContent() {
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <TopBar />
           <main className="flex-1 overflow-y-auto">
-            <div className="flex-1 flex items-center justify-center px-4 py-12">
+            <div className="flex items-center justify-center px-4 py-12">
               <div className="w-full max-w-md text-center flex flex-col gap-6">
                 <div className="text-5xl">🎯</div>
                 <div>
@@ -287,9 +448,6 @@ function NewProjectContent() {
                     Back to dashboard
                   </button>
                 </div>
-                <p className="text-xs text-[var(--text-tertiary)]">
-                  Free account · No credit card · Unlimited projects
-                </p>
               </div>
             </div>
           </main>
@@ -309,80 +467,81 @@ function NewProjectContent() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopBar />
 
-        <main className="flex-1 overflow-y-auto">
-          {/* Step breadcrumb */}
-          <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-4 sm:px-6 py-3 sm:py-4 sticky top-0 z-10">
-            <div className="max-w-2xl mx-auto">
-              <div className="flex items-center gap-1.5 sm:gap-2">
-                {STEP_LABELS.map((label, i) => {
-                  const isActive = i === step;
-                  const isVisited = i <= maxReached;
-                  const isDone = isVisited && !isActive;
-                  const isClickable = isVisited && !isActive;
+        {/* ── Breadcrumb ── */}
+        <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-4 sm:px-6 py-3 sm:py-4 sticky top-0 z-10">
+          <div className="max-w-2xl mx-auto">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              {STEP_LABELS.map((label, i) => {
+                const isActive = i === step;
+                const isVisited = i <= maxReached;
+                const isDonePast = isVisited && i < step;
+                const isDoneAhead = isVisited && i > step;
+                const isClickable = isVisited && !isActive;
 
-                  return (
-                    <div key={i} className="flex items-center gap-1.5 sm:gap-2">
-                      <button
-                        onClick={() => isClickable && goTo(i)}
-                        disabled={!isClickable}
+                return (
+                  <div key={i} className="flex items-center gap-1.5 sm:gap-2">
+                    <button
+                      onClick={() => isClickable && goTo(i)}
+                      disabled={!isClickable}
+                      className={[
+                        "flex items-center gap-1.5 sm:gap-2 transition-all",
+                        isClickable
+                          ? "cursor-pointer hover:opacity-80"
+                          : "cursor-default",
+                      ].join(" ")}
+                    >
+                      <div
                         className={[
-                          "flex items-center gap-1.5 sm:gap-2 transition-all",
-                          isClickable
-                            ? "cursor-pointer hover:opacity-80"
-                            : "cursor-default",
+                          "w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300",
+                          isDonePast
+                            ? "bg-[var(--emerald)] text-white"
+                            : isActive
+                            ? "bg-[var(--violet)] text-white"
+                            : isDoneAhead
+                            ? "bg-[var(--bg-muted)] text-[var(--violet-dim)] ring-1 ring-[var(--violet)]"
+                            : "bg-[var(--bg-muted)] text-[var(--text-tertiary)]",
                         ].join(" ")}
                       >
-                        <div
-                          className={[
-                            "w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300",
-                            isDone && i < step
-                              ? "bg-[var(--emerald)] text-white"
-                              : isActive
-                              ? "bg-[var(--violet)] text-white"
-                              : isDone && i > step
-                              ? "bg-[var(--bg-muted)] text-[var(--violet-dim)] ring-1 ring-[var(--violet)]"
-                              : "bg-[var(--bg-muted)] text-[var(--text-tertiary)]",
-                          ].join(" ")}
-                        >
-                          {isDone && i < step ? "✓" : i + 1}
-                        </div>
-                        <span
-                          className={`text-xs font-medium hidden sm:block transition-colors ${
-                            isActive
-                              ? "text-[var(--text-primary)]"
-                              : isDone
-                              ? "text-[var(--text-secondary)]"
-                              : "text-[var(--text-tertiary)]"
-                          }`}
-                        >
-                          {label}
-                        </span>
-                      </button>
-                      {i < STEP_LABELS.length - 1 && (
-                        <div
-                          className={`h-px w-4 sm:w-8 transition-colors duration-300 ${
-                            i < step
-                              ? "bg-[var(--emerald)]"
-                              : "bg-[var(--border)]"
-                          }`}
-                        />
-                      )}
-                    </div>
-                  );
-                })}
+                        {isDonePast ? "✓" : i + 1}
+                      </div>
+                      <span
+                        className={`text-xs font-medium hidden sm:block transition-colors ${
+                          isActive
+                            ? "text-[var(--text-primary)]"
+                            : isVisited
+                            ? "text-[var(--text-secondary)]"
+                            : "text-[var(--text-tertiary)]"
+                        }`}
+                      >
+                        {label}
+                      </span>
+                    </button>
+                    {i < STEP_LABELS.length - 1 && (
+                      <div
+                        className={`h-px w-4 sm:w-8 transition-colors duration-300 ${
+                          i < step
+                            ? "bg-[var(--emerald)]"
+                            : "bg-[var(--border)]"
+                        }`}
+                      />
+                    )}
+                  </div>
+                );
+              })}
 
-                {/* Compact stale indicator in breadcrumb (not a decision point) */}
-                {blueprintIsStale && step !== 2 && step !== 3 && (
-                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber)] whitespace-nowrap shrink-0">
-                    <BiSolidPencil /> Edited
-                  </span>
-                )}
-              </div>
+              {/* Stale badge on non-review steps */}
+              {blueprintIsStale && step !== 2 && step !== 3 && (
+                <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber)] whitespace-nowrap shrink-0 flex items-center gap-1">
+                  <BiSolidPencil size={9} /> Edited
+                </span>
+              )}
             </div>
           </div>
+        </div>
 
-          {/* Step content */}
-          <div className="flex-1 flex items-start justify-center px-4 sm:px-6 py-8 sm:py-12">
+        {/* ── Step content ── */}
+        <main className="flex-1 overflow-y-auto">
+          <div className="flex items-start justify-center px-4 sm:px-6 py-8 sm:py-12">
             <div className="w-full max-w-2xl">
               {step === 0 && (
                 <StepCapture
@@ -405,31 +564,42 @@ function NewProjectContent() {
               )}
 
               {step === 2 && (
-                <StepScope
-                  value={scopeLevel}
-                  onChange={handleScopeChange}
-                  onNext={() => advance(3)}
-                  onBack={() => goTo(1)}
-                />
+                <>
+                  {showRegenBanner && (
+                    <RegenPermissionBanner
+                      onKeep={handleKeepPlan}
+                      onRegenerate={handleRegeneratePlan}
+                    />
+                  )}
+                  <StepScope
+                    value={scopeLevel}
+                    onChange={handleScopeChange}
+                    onNext={handleStartGeneration}
+                    onBack={() => goTo(1)}
+                  />
+                </>
               )}
 
               {step === 3 && (
                 <>
-                  {/* Regeneration permission banner (now shown on step 2 or 3; decision controlled by showRegenBanner) */}
                   {showRegenBanner && (
                     <RegenPermissionBanner
                       onKeep={handleKeepPlan}
-                      onRegenerate={handleRegenerate}
+                      onRegenerate={handleRegeneratePlan}
                     />
                   )}
                   <StepReview
-                    idea={idea}
-                    clarifications={clarifications}
+                    blueprint={blueprint}
+                    genStatus={genStatus}
+                    genCharCount={genCharCount}
+                    genError={genError}
                     scopeLevel={scopeLevel}
-                    cachedBlueprint={reviewBlueprint}
-                    regenDecision={regenDecision} // StepReview can reflect permission state
                     onBack={() => goTo(2)}
-                    onCommit={handleBlueprintReady}
+                    onRetry={handleRetryGeneration}
+                    onCommit={(bp) => {
+                      setBlueprint(bp);
+                      advance(4);
+                    }}
                     limitAllowed={limitAllowed}
                     limitLoading={limitLoading}
                   />
