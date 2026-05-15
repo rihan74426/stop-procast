@@ -3,13 +3,14 @@
 import { useState } from "react";
 import { getPressure, PRESSURE_LABELS } from "@/lib/pressure";
 import { generateReengage } from "@/lib/ai/clientGenerate";
+import { useI18n } from "@/lib/i18n";
 
 export function ProjectPressure({ project }) {
+  const { locale } = useI18n();
   const [suggestion, setSuggestion] = useState(null);
   const [loading, setLoading] = useState(false);
 
   const pressure = getPressure(project);
-
   if (pressure.level === "none" || pressure.level === "low") return null;
 
   const colors = {
@@ -34,7 +35,8 @@ export function ProjectPressure({ project }) {
     if (loading || suggestion) return;
     setLoading(true);
     try {
-      const text = await generateReengage(project);
+      // Pass locale so re-engage suggestion is in the user's language
+      const text = await generateReengage(project, locale);
       if (text) setSuggestion(text);
     } catch {
       /* silent */
@@ -67,7 +69,6 @@ export function ProjectPressure({ project }) {
               </p>
             ))}
           </div>
-
           {suggestion ? (
             <p className="mt-2 text-sm text-[var(--text-primary)] italic border-t border-[var(--border)] pt-2">
               💡 {suggestion}

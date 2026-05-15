@@ -1,40 +1,23 @@
 /**
  * app/api/generate/route.js
- *
- * Rate limiter note:
- *   The ipUsage Map lives in module scope. On Vercel (serverless), every
- *   cold start creates a fresh Map — a user can technically exceed the
- *   per-minute limit by hitting different function instances. This is
- *   acceptable for MVP (the server-side limit is a supplement to the
- *   client-side rateLimit.js guard). For hard enforcement at scale, move
- *   to Redis/Upstash. Until then: x-ratelimit-* headers are returned so
- *   clients can self-throttle even when the Map resets.
+ * Accepts optional `locale` in the POST body and passes it to all prompt builders.
  */
 
 import {
-  SYSTEM_PROMPT,
+  buildSystemPrompt,
   buildUserPrompt,
   buildClarifyPrompt,
   buildReengagePrompt,
 } from "@/lib/ai/prompts";
 import { aiGenerate, aiStream } from "@/lib/ai/client";
 
-// ─── Rate limiter (in-memory, per cold-start instance) ────────────────
-
 const ipUsage = new Map();
 const WINDOW_MS = 60_000;
-
-const LIMITS = {
-  generate: 3,
-  clarify: 10,
-  reengage: 20,
-  total: 15,
-};
+const LIMITS = { generate: 3, clarify: 10, reengage: 20, total: 15 };
 
 function checkRateLimit(ip, type) {
   const now = Date.now();
   let entry = ipUsage.get(ip);
-
   if (!entry || now - entry.windowStart > WINDOW_MS) {
     entry = {
       total: 0,
@@ -45,18 +28,14 @@ function checkRateLimit(ip, type) {
     };
     ipUsage.set(ip, entry);
   }
-
-  // Prune stale entries to prevent memory growth on long-lived instances
   if (ipUsage.size > 1000) {
     for (const [k, v] of ipUsage) {
       if (now - v.windowStart > WINDOW_MS * 5) ipUsage.delete(k);
     }
   }
-
   const typeLimit = LIMITS[type] ?? 10;
   const typeOk = (entry[type] ?? 0) < typeLimit;
   const totalOk = entry.total < LIMITS.total;
-
   if (typeOk && totalOk) {
     entry[type] = (entry[type] ?? 0) + 1;
     entry.total++;
@@ -66,7 +45,6 @@ function checkRateLimit(ip, type) {
       reset: Math.ceil((entry.windowStart + WINDOW_MS - now) / 1000),
     };
   }
-
   const retryAfter = Math.ceil((entry.windowStart + WINDOW_MS - now) / 1000);
   return { allowed: false, retryAfter, remaining: 0, reset: retryAfter };
 }
@@ -79,10 +57,7 @@ function getIP(req) {
   );
 }
 
-// ─── Route timeout ────────────────────────────────────────────────────
-
 const ROUTE_TIMEOUT_MS = 55_000;
-
 function withRouteTimeout(promise) {
   return Promise.race([
     promise,
@@ -101,8 +76,6 @@ function withRouteTimeout(promise) {
   ]);
 }
 
-// ─── Input validation ─────────────────────────────────────────────────
-
 function validateIdea(idea) {
   if (!idea || typeof idea !== "string") return "Missing idea.";
   const trimmed = idea.trim();
@@ -111,12 +84,9 @@ function validateIdea(idea) {
   return null;
 }
 
-// ─── POST /api/generate ───────────────────────────────────────────────
-
 export async function POST(request) {
   try {
     const ip = getIP(request);
-
     let body;
     try {
       body = await request.json();
@@ -124,25 +94,25 @@ export async function POST(request) {
       return Response.json({ error: "Invalid JSON body" }, { status: 400 });
     }
 
-    const { type, idea, clarifications, scopeLevel, project, profileContext } =
-      body;
+    const {
+      type,
+      idea,
+      clarifications,
+      scopeLevel,
+      project,
+      profileContext,
+      locale = "en",
+    } = body;
 
-    if (!type || typeof type !== "string") {
+    if (!type || typeof type !== "string")
       return Response.json(
         { error: "Missing or invalid type field." },
         { status: 400 }
       );
-    }
-
-    const validTypes = ["generate", "clarify", "reengage"];
-    if (!validTypes.includes(type)) {
+    if (!["generate", "clarify", "reengage"].includes(type))
       return Response.json({ error: `Unknown type: ${type}` }, { status: 400 });
-    }
 
     const rl = checkRateLimit(ip, type);
-
-    // Always include rate-limit info in response headers so clients can
-    // self-throttle even when cold starts reset the in-memory counter.
     const rlHeaders = {
       "X-RateLimit-Limit": String(LIMITS[type] ?? 10),
       "X-RateLimit-Remaining": String(rl.remaining),
@@ -163,38 +133,33 @@ export async function POST(request) {
       );
     }
 
-    // ── clarify ──────────────────────────────────────────────────────
     if (type === "clarify") {
       const ideaError = validateIdea(idea);
       if (ideaError)
         return Response.json({ error: ideaError }, { status: 400 });
       const text = await withRouteTimeout(
-        aiGenerate(buildClarifyPrompt(idea.trim()))
+        aiGenerate(buildClarifyPrompt(idea.trim(), locale))
       );
       return Response.json({ questions: text }, { headers: rlHeaders });
     }
 
-    // ── reengage ─────────────────────────────────────────────────────
     if (type === "reengage") {
-      if (!project || typeof project !== "object") {
+      if (!project || typeof project !== "object")
         return Response.json({ error: "Missing project." }, { status: 400 });
-      }
       const text = await withRouteTimeout(
-        aiGenerate(buildReengagePrompt(project))
+        aiGenerate(buildReengagePrompt(project, locale))
       );
       return Response.json({ suggestion: text }, { headers: rlHeaders });
     }
 
-    // ── generate (streaming blueprint) ───────────────────────────────
     if (type === "generate") {
       const ideaError = validateIdea(idea);
       if (ideaError)
         return Response.json({ error: ideaError }, { status: 400 });
-
       const safeScope = ["lean", "standard", "ambitious"].includes(scopeLevel)
         ? scopeLevel
         : "standard";
-
+      const systemPrompt = buildSystemPrompt(locale);
       const userPrompt = buildUserPrompt({
         idea: idea.trim(),
         clarifications: Array.isArray(clarifications) ? clarifications : [],
@@ -203,12 +168,9 @@ export async function POST(request) {
           typeof profileContext === "string"
             ? profileContext.slice(0, 2000)
             : "",
+        locale,
       });
-
-      const stream = await withRouteTimeout(
-        aiStream(SYSTEM_PROMPT, userPrompt)
-      );
-
+      const stream = await withRouteTimeout(aiStream(systemPrompt, userPrompt));
       return new Response(stream, {
         headers: {
           ...rlHeaders,
@@ -219,7 +181,6 @@ export async function POST(request) {
     }
   } catch (err) {
     console.error("[generate] error:", err.message);
-
     const status = err.status ?? 500;
     const code =
       err.code ??
@@ -230,7 +191,6 @@ export async function POST(request) {
         : status === 504
         ? "TIMEOUT"
         : "AI_ERROR");
-
     const message =
       status === 429
         ? "Rate limit hit. Please wait a moment and retry."
@@ -239,7 +199,6 @@ export async function POST(request) {
         : status === 504
         ? "Request timed out. Please try again."
         : err.message ?? "Generation failed. Please try again.";
-
     return Response.json({ error: message, code }, { status });
   }
 }

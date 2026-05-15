@@ -12,13 +12,9 @@ import {
 import { Button } from "@/components/ui/Button";
 import { generateClarifyQuestions } from "@/lib/ai/clientGenerate";
 import { parseClarifyQuestions } from "@/lib/ai/parser";
-import { toast } from "@/lib/toast";
-import { createToastSequence } from "@/lib/toastSequence";
+import { useI18n } from "@/lib/i18n";
 
 // ─── GhostInput ───────────────────────────────────────────────────────
-//
-// Ghost shows the remainder of q.placeholder after the user's typed prefix.
-// Tab or → (at end of input) accepts. Esc dismisses.
 
 const GhostInput = memo(
   forwardRef(function GhostInput(
@@ -32,7 +28,6 @@ const GhostInput = memo(
       focus: () => inputRef.current?.focus(),
     }));
 
-    // Recompute ghost whenever value or placeholder changes
     useEffect(() => {
       if (!placeholder || !value || value.trim().length < 2) {
         setGhost("");
@@ -89,7 +84,6 @@ const GhostInput = memo(
 
     return (
       <div className="relative">
-        {/* Ghost overlay — positioned behind the real input */}
         {ghost && (
           <div
             aria-hidden
@@ -106,7 +100,6 @@ const GhostInput = memo(
             </span>
           </div>
         )}
-
         <input
           id={inputId}
           ref={inputRef}
@@ -114,7 +107,6 @@ const GhostInput = memo(
           value={value}
           onChange={(e) => onChange(e.target.value)}
           onKeyDown={handleKeyDown}
-          // Hide native placeholder while ghost is showing to avoid overlap
           placeholder={ghost ? "" : placeholder}
           autoFocus={autoFocus}
           autoComplete="off"
@@ -122,7 +114,6 @@ const GhostInput = memo(
           className="w-full h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)] transition-all relative z-10"
           style={{ background: "transparent" }}
         />
-
         {ghost && (
           <div className="flex items-center gap-2 mt-1.5">
             <button
@@ -204,8 +195,6 @@ const QuestionCard = memo(function QuestionCard({
   );
 });
 
-// ─── Skeleton ─────────────────────────────────────────────────────────
-
 function SkeletonCard({ index }) {
   return (
     <div
@@ -225,8 +214,6 @@ function SkeletonCard({ index }) {
     </div>
   );
 }
-
-// ─── Progress dots ────────────────────────────────────────────────────
 
 function ProgressDots({ total, answered }) {
   return (
@@ -248,18 +235,6 @@ function ProgressDots({ total, answered }) {
 }
 
 // ─── StepClarify ──────────────────────────────────────────────────────
-//
-// FIX: The old implementation used a `hasFetched` ref that was local to
-// the component instance. When React unmounts and remounts the component
-// (back-nav, Strict Mode double-render in dev), the ref resets to false
-// and questions refetch — even though cachedQuestions was passed in.
-//
-// Fix: derive "should fetch" purely from the cachedQuestions PROP.
-//   - If cachedQuestions is non-null → always use it, never fetch.
-//   - If cachedQuestions is null → fetch exactly once per mount.
-//
-// The parent (new/page.jsx) owns the cache via onQuestionsLoaded, so
-// remounts with a populated cache correctly skip the fetch.
 
 export function StepClarify({
   idea,
@@ -270,13 +245,13 @@ export function StepClarify({
   cachedQuestions,
   onQuestionsLoaded,
 }) {
+  const { locale } = useI18n();
   const [questions, setQuestions] = useState(cachedQuestions ?? []);
   const [loading, setLoading] = useState(cachedQuestions === null);
   const [error, setError] = useState(null);
 
   const hasFetched = useRef(false);
   const inputRefs = useRef([]);
-  const toastSequenceRef = useRef(null);
   const mountedRef = useRef(true);
 
   // Sync if parent provides questions after initial render
@@ -288,64 +263,40 @@ export function StepClarify({
   }, [cachedQuestions]);
 
   useEffect(() => {
-    // Already have questions from cache — nothing to do
     if (cachedQuestions !== null) return;
-    // Already started a fetch in this mount
     if (hasFetched.current) return;
     hasFetched.current = true;
     fetchQuestions();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // intentionally only on mount
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
-      if (toastSequenceRef.current) {
-        toastSequenceRef.current.unmount();
-      }
     };
   }, []);
-
-  function startEngagementSequence() {
-    if (toastSequenceRef.current) {
-      toastSequenceRef.current.unmount();
-    }
-    toastSequenceRef.current = createToastSequence("questions");
-    toastSequenceRef.current.start();
-  }
-
-  function stopEngagementSequence() {
-    if (toastSequenceRef.current) {
-      toastSequenceRef.current.stop();
-      toastSequenceRef.current = null;
-    }
-  }
 
   async function fetchQuestions() {
     setLoading(true);
     setError(null);
-
-    startEngagementSequence();
-
     try {
-      const text = await generateClarifyQuestions(idea);
+      // Pass current locale so questions are generated in user's language
+      const text = await generateClarifyQuestions(idea, locale);
       const parsed = parseClarifyQuestions(text);
+      if (!mountedRef.current) return;
       setQuestions(parsed);
       onQuestionsLoaded?.(parsed);
-      toastSequenceRef.current?.success("Questions ready!");
-    } catch (err) {
+    } catch {
+      if (!mountedRef.current) return;
       setError("Couldn't load questions. You can retry or skip this step.");
-      toastSequenceRef.current?.error("Failed to generate questions");
     } finally {
-      setLoading(false);
+      if (mountedRef.current) setLoading(false);
     }
   }
 
   function handleRetry() {
     hasFetched.current = false;
     hasFetched.current = true;
-    stopEngagementSequence();
     fetchQuestions();
   }
 
@@ -357,7 +308,6 @@ export function StepClarify({
     setTimeout(() => inputRefs.current[target]?.focus(), 80);
   }, [loading]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Enter advances to next question; on last question submits if all filled
   const handleEnter = useCallback(
     (index) => {
       const next = index + 1;
@@ -392,7 +342,6 @@ export function StepClarify({
         </p>
       </div>
 
-      {/* Loading */}
       {loading && (
         <div
           className="flex flex-col gap-3"
@@ -408,7 +357,6 @@ export function StepClarify({
         </div>
       )}
 
-      {/* Error */}
       {error && !loading && (
         <div className="rounded-[var(--r-lg)] border border-[var(--amber)] bg-[var(--amber-bg)] px-4 sm:px-5 py-4">
           <div className="flex items-start gap-3">
@@ -441,7 +389,6 @@ export function StepClarify({
         </div>
       )}
 
-      {/* Questions */}
       {!loading && questions.length > 0 && (
         <div className="flex flex-col gap-3" aria-live="polite">
           {questions.map((q, i) => (
@@ -459,12 +406,10 @@ export function StepClarify({
         </div>
       )}
 
-      {/* Progress */}
       {!loading && questions.length > 0 && (
         <ProgressDots total={questions.length} answered={answeredCount} />
       )}
 
-      {/* All-answered prompt */}
       {canProceed && questions.length > 0 && (
         <p className="text-xs text-center text-[var(--emerald)] font-medium -mt-2">
           ✓ All answered — ready to generate your plan!
