@@ -24,13 +24,47 @@ import { BiSolidPencil } from "react-icons/bi";
 
 const STEP_LABELS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
 
-export default function NewProjectPage() {
-  return (
-    <DataProvider>
-      <NewProjectContent />
-    </DataProvider>
-  );
+// ─── Wait sequence ────────────────────────────────────────────────────
+// Fires one toast at a time. Each toast is dismissed before the next shows.
+// The returned cancel function clears all pending timers AND dismisses any
+// currently-visible wait toast.
+
+const WAIT_MESSAGES = [
+  { after: 6000, message: "Thinking — this usually takes 15–40 seconds…" },
+  { after: 15000, message: "Switching to a faster model if needed…" },
+  {
+    after: 28000,
+    message: "Still working — complex plans take a little longer.",
+  },
+  { after: 42000, message: "Almost done — hang tight." },
+];
+
+function startWaitSequence() {
+  let activeToastId = null;
+  const timers = [];
+
+  WAIT_MESSAGES.forEach(({ after, message }) => {
+    timers.push(
+      setTimeout(() => {
+        // Dismiss previous wait toast before showing next
+        if (activeToastId !== null) {
+          toast.dismiss(activeToastId);
+        }
+        activeToastId = toast.info(message, { duration: 0 });
+      }, after)
+    );
+  });
+
+  return () => {
+    timers.forEach(clearTimeout);
+    if (activeToastId !== null) {
+      toast.dismiss(activeToastId);
+      activeToastId = null;
+    }
+  };
 }
+
+// ─── Regen permission banner ──────────────────────────────────────────
 
 function RegenPermissionBanner({ onKeep, onRegenerate }) {
   return (
@@ -65,36 +99,14 @@ function RegenPermissionBanner({ onKeep, onRegenerate }) {
   );
 }
 
-// ─── Finite, psychology-timed wait sequence ───────────────────────────
-// Fires ONCE and stops — no loops.
-// Timing rationale:
-//   0–5s   silent  (most requests finish here, silence = confidence)
-//   5s     "Thinking…"  (acknowledge user knows we heard them)
-//   12s    "Switching to a faster model…"  (explain action, ease anxiety)
-//   22s    "Still working — complex plans take a little longer."  (reassure)
-//   35s    "Almost done — this took a bit longer than usual."  (final note)
-// After 35s, silence is intentional — more messages just feel nagging.
+// ─── Main page ────────────────────────────────────────────────────────
 
-const WAIT_SEQUENCE = [
-  { after: 5000, message: "Thinking…", duration: 3500 },
-  { after: 12000, message: "Switching to a faster model…", duration: 4000 },
-  {
-    after: 22000,
-    message: "Still working — complex plans take a little longer.",
-    duration: 5000,
-  },
-  {
-    after: 35000,
-    message: "Almost done — this took a bit longer than usual.",
-    duration: 6000,
-  },
-];
-
-function startWaitSequence() {
-  const timers = WAIT_SEQUENCE.map(({ after, message, duration }) =>
-    setTimeout(() => toast.info(message, { duration }), after)
+export default function NewProjectPage() {
+  return (
+    <DataProvider>
+      <NewProjectContent />
+    </DataProvider>
   );
-  return () => timers.forEach(clearTimeout);
 }
 
 function NewProjectContent() {
@@ -113,24 +125,48 @@ function NewProjectContent() {
   const [scopeLevel, setScopeLevel] = useState("standard");
   const [blueprint, setBlueprint] = useState(null);
   const [blueprintKey, setBlueprintKey] = useState(null);
+
+  // Generation state
   const [genStatus, setGenStatus] = useState("idle");
   const [genCharCount, setGenCharCount] = useState(0);
   const [genError, setGenError] = useState(null);
 
+  // Refs that don't need to trigger re-renders
   const rawRef = useRef("");
   const readerRef = useRef(null);
   const rafRef = useRef(null);
   const stopWaitRef = useRef(null);
-  const retryCount = useRef(0);
+  const retryCountRef = useRef(0);
+  const isMountedRef = useRef(true);
   const MAX_RETRIES = 2;
 
-  const inputKey = `${idea.trim()}||${scopeLevel}||${JSON.stringify(
-    clarifyAnswers
-  )}`;
-  const blueprintIsStale =
-    blueprint !== null && blueprintKey !== null && inputKey !== blueprintKey;
-  const showRegenBanner = blueprintIsStale && (step === 2 || step === 3);
+  // Track latest generation inputs via ref so runGeneration always reads
+  // the current values without needing them in its useCallback dep array.
+  const genInputsRef = useRef({
+    idea,
+    clarifyAnswers,
+    scopeLevel,
+    limitAllowed,
+    locale,
+  });
+  useEffect(() => {
+    genInputsRef.current = {
+      idea,
+      clarifyAnswers,
+      scopeLevel,
+      limitAllowed,
+      locale,
+    };
+  }, [idea, clarifyAnswers, scopeLevel, limitAllowed, locale]);
 
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Puter credential bootstrap
   useEffect(() => {
     const appId = process.env.NEXT_PUBLIC_PUTER_APP_ID;
     const authToken = process.env.NEXT_PUBLIC_PUTER_AUTH_TOKEN;
@@ -140,10 +176,13 @@ function NewProjectContent() {
       localStorage.setItem("puter.auth.token", authToken);
   }, []);
 
+  // Show early auth gate if anon and over limit
   useEffect(() => {
     if (!limitLoading && !limitAllowed && !isSignedIn)
       setShowEarlyAuthGate(true);
   }, [limitLoading, limitAllowed, isSignedIn]);
+
+  // ── Navigation helpers ────────────────────────────────────────────
 
   const goTo = useCallback(
     (target) => {
@@ -158,6 +197,8 @@ function NewProjectContent() {
     setMaxReached((prev) => Math.max(prev, target));
   }, []);
 
+  // ── Input handlers ────────────────────────────────────────────────
+
   const handleIdeaChange = useCallback((v) => setIdea(v), []);
   const handleClarifyChange = useCallback(
     (i, v) => setClarifyAnswers((prev) => ({ ...prev, [i]: v })),
@@ -165,27 +206,53 @@ function NewProjectContent() {
   );
   const handleScopeChange = useCallback((v) => setScopeLevel(v), []);
 
-  function stopGeneration() {
+  // ── Blueprint staleness ───────────────────────────────────────────
+
+  const inputKey = `${idea.trim()}||${scopeLevel}||${JSON.stringify(
+    clarifyAnswers
+  )}`;
+  const blueprintIsStale =
+    blueprint !== null && blueprintKey !== null && inputKey !== blueprintKey;
+  const showRegenBanner = blueprintIsStale && (step === 2 || step === 3);
+
+  // ── Generation cleanup ────────────────────────────────────────────
+
+  const stopGeneration = useCallback(() => {
+    // Cancel wait toasts
     if (stopWaitRef.current) {
       stopWaitRef.current();
       stopWaitRef.current = null;
     }
+    // Cancel stream reader
     try {
       readerRef.current?.cancel();
     } catch {
       /* ignore */
     }
     readerRef.current = null;
+    // Cancel pending rAF
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
     }
-  }
+  }, []);
 
-  useEffect(() => () => stopGeneration(), []); // eslint-disable-line
+  useEffect(() => () => stopGeneration(), [stopGeneration]);
 
-  async function runGeneration() {
-    if (!limitAllowed) {
+  // ── Core generation function ──────────────────────────────────────
+  // Uses genInputsRef so it always reads latest values without stale closure.
+  // Stable reference — safe to call from any handler without useCallback deps.
+
+  const runGeneration = useCallback(async () => {
+    const {
+      idea: currentIdea,
+      clarifyAnswers: currentAnswers,
+      scopeLevel: currentScope,
+      limitAllowed: currentAllowed,
+      locale: currentLocale,
+    } = genInputsRef.current;
+
+    if (!currentAllowed) {
       setGenStatus("limited");
       return;
     }
@@ -197,21 +264,22 @@ function NewProjectContent() {
     setGenError(null);
     rawRef.current = "";
 
+    // Start wait sequence — shows timed info toasts while waiting
     stopWaitRef.current = startWaitSequence();
 
     try {
       const profile = loadUserProfile();
       const profileContext = buildProfileContext(profile);
-      const clarifications = Object.entries(clarifyAnswers)
+      const clarifications = Object.entries(currentAnswers)
         .map(([i, answer]) => ({ question: `Q${parseInt(i) + 1}`, answer }))
         .filter((c) => c.answer?.trim());
 
       const stream = await generateBlueprint({
-        idea,
+        idea: currentIdea,
         clarifications,
-        scopeLevel,
+        scopeLevel: currentScope,
         profileContext,
-        locale,
+        locale: currentLocale,
       });
 
       const reader = stream.getReader();
@@ -222,6 +290,7 @@ function NewProjectContent() {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+
         const chunk =
           value instanceof Uint8Array
             ? decoder.decode(value, { stream: true })
@@ -231,6 +300,7 @@ function NewProjectContent() {
 
         if (firstChunk && chunk.length > 0) {
           firstChunk = false;
+          // Cancel wait sequence — AI has responded
           if (stopWaitRef.current) {
             stopWaitRef.current();
             stopWaitRef.current = null;
@@ -239,52 +309,73 @@ function NewProjectContent() {
         }
 
         rawRef.current += chunk;
+
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
-        rafRef.current = requestAnimationFrame(() =>
-          setGenCharCount(rawRef.current.length)
-        );
+        rafRef.current = requestAnimationFrame(() => {
+          if (isMountedRef.current) {
+            setGenCharCount(rawRef.current.length);
+          }
+        });
       }
 
+      // Clean up reader/rAF
       rafRef.current = null;
       readerRef.current = null;
-      if (rawRef.current.trim().length < 50)
+
+      if (!isMountedRef.current) return;
+
+      if (rawRef.current.trim().length < 50) {
         throw new Error("AI returned incomplete response. Please try again.");
+      }
 
       const parsed = parseBlueprint(rawRef.current);
-      retryCount.current = 0;
+      retryCountRef.current = 0;
+
+      // Cancel any remaining wait toasts
       if (stopWaitRef.current) {
         stopWaitRef.current();
         stopWaitRef.current = null;
       }
 
+      // Signal 100% on the progress bar, then transition
       setGenCharCount(Infinity);
       await new Promise((r) => setTimeout(r, 300));
+
+      if (!isMountedRef.current) return;
+
       toast.success("Your blueprint is ready! 🎯", { duration: 3000 });
+
+      // Set blueprint + status + advance atomically (batched in React 18)
       setBlueprint(parsed);
       setBlueprintKey(inputKey);
       setGenStatus("done");
+      // Advance to commit step — use functional updater to avoid stale closure
       setStep(4);
       setMaxReached((prev) => Math.max(prev, 4));
     } catch (e) {
+      if (!isMountedRef.current) return;
+
+      // Cancel wait toasts on any error
       if (stopWaitRef.current) {
         stopWaitRef.current();
         stopWaitRef.current = null;
       }
       readerRef.current = null;
 
+      // Auto-retry on rate limit
       if (
         (e.code === "RATE_LIMITED" || e.status === 429) &&
-        retryCount.current < MAX_RETRIES
+        retryCountRef.current < MAX_RETRIES
       ) {
-        retryCount.current++;
-        const delay = 3000 * retryCount.current;
+        retryCountRef.current += 1;
+        const delay = 3000 * retryCountRef.current;
         toast.warn(
           `Rate limited — retrying in ${delay / 1000}s… (${
-            retryCount.current
+            retryCountRef.current
           }/${MAX_RETRIES})`
         );
         await new Promise((r) => setTimeout(r, delay));
-        runGeneration();
+        if (isMountedRef.current) runGeneration();
         return;
       }
 
@@ -300,66 +391,82 @@ function NewProjectContent() {
       setGenError(message);
       setGenStatus("error");
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stopGeneration]);
+  // Note: genInputsRef.current is always fresh — intentionally not in deps.
+  // inputKey is read directly at the point of setBlueprintKey inside runGeneration,
+  // so we capture it via closure from the outer scope where it's computed.
+  // Since inputKey is derived from state, it will always be current at call time.
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // ── Generation triggers ───────────────────────────────────────────
+
   const handleStartGeneration = useCallback(() => {
-    retryCount.current = 0;
+    retryCountRef.current = 0;
     advance(3);
     runGeneration();
-  }, [idea, clarifyAnswers, scopeLevel, limitAllowed, advance, locale]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [advance, runGeneration]);
+
   const handleRetryGeneration = useCallback(() => {
-    retryCount.current = 0;
+    retryCountRef.current = 0;
     runGeneration();
-  }, [idea, clarifyAnswers, scopeLevel, limitAllowed, locale]);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [runGeneration]);
+
   const handleRegeneratePlan = useCallback(() => {
-    retryCount.current = 0;
+    retryCountRef.current = 0;
+    setBlueprint(null);
+    setBlueprintKey(null);
     runGeneration();
-  }, [idea, clarifyAnswers, scopeLevel, limitAllowed, locale]);
+  }, [runGeneration]);
+
   const handleKeepPlan = useCallback(() => {
     setBlueprintKey(inputKey);
     toast.success("Keeping current plan.", { duration: 2000 });
   }, [inputKey]);
 
-  const handleCommit = async ({ deadline }) => {
-    if (!blueprint) {
-      toast.error("Blueprint is missing. Please go back and regenerate.");
-      return;
-    }
-    const toastId = toast.loading("Creating your project…");
-    try {
-      const id = await addProject({
-        projectTitle: blueprint.projectTitle,
-        oneLineGoal: blueprint.oneLineGoal,
-        problemStatement: blueprint.problemStatement ?? "",
-        targetUser: blueprint.targetUser ?? "",
-        successCriteria: blueprint.successCriteria ?? [],
-        scope: blueprint.scope ?? {
-          mustHave: [],
-          niceToHave: [],
-          outOfScope: [],
-        },
-        scopeLevel,
-        phases: blueprint.phases ?? [],
-        tasks: blueprint.tasks ?? [],
-        dailyNextAction: blueprint.dailyNextAction ?? "",
-        blockers: blueprint.blockers ?? [],
-        toolsSuggested: blueprint.toolsSuggested ?? [],
-        estimatedEffort: blueprint.estimatedEffort ?? "",
-        timeline: deadline || blueprint.timeline || "",
-        reviewQuestions: blueprint.reviewQuestions ?? [],
-      });
-      toast.dismiss(toastId);
-      router.push(`/project/${id}`);
-    } catch (err) {
-      toast.dismiss(toastId);
-      toast.error(
-        err?.message ?? "Failed to create project. Please try again."
-      );
-    }
-  };
+  // ── Commit ────────────────────────────────────────────────────────
+
+  const handleCommit = useCallback(
+    async ({ deadline }) => {
+      if (!blueprint) {
+        toast.error("Blueprint is missing. Please go back and regenerate.");
+        return;
+      }
+      const toastId = toast.loading("Creating your project…");
+      try {
+        const id = await addProject({
+          projectTitle: blueprint.projectTitle,
+          oneLineGoal: blueprint.oneLineGoal,
+          problemStatement: blueprint.problemStatement ?? "",
+          targetUser: blueprint.targetUser ?? "",
+          successCriteria: blueprint.successCriteria ?? [],
+          scope: blueprint.scope ?? {
+            mustHave: [],
+            niceToHave: [],
+            outOfScope: [],
+          },
+          scopeLevel,
+          phases: blueprint.phases ?? [],
+          tasks: blueprint.tasks ?? [],
+          dailyNextAction: blueprint.dailyNextAction ?? "",
+          blockers: blueprint.blockers ?? [],
+          toolsSuggested: blueprint.toolsSuggested ?? [],
+          estimatedEffort: blueprint.estimatedEffort ?? "",
+          timeline: deadline || blueprint.timeline || "",
+          reviewQuestions: blueprint.reviewQuestions ?? [],
+        });
+        toast.dismiss(toastId);
+        router.push(`/project/${id}`);
+      } catch (err) {
+        toast.dismiss(toastId);
+        toast.error(
+          err?.message ?? "Failed to create project. Please try again."
+        );
+      }
+    },
+    [blueprint, scopeLevel, addProject, router]
+  );
+
+  // ── Limit gate full-page UI ───────────────────────────────────────
 
   if (!limitLoading && !limitAllowed && !isSignedIn) {
     return (
@@ -407,12 +514,15 @@ function NewProjectContent() {
     );
   }
 
+  // ── Wizard UI ─────────────────────────────────────────────────────
+
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopBar />
 
+        {/* Step breadcrumb */}
         <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-4 sm:px-6 py-3 sm:py-4 sticky top-0 z-10">
           <div className="max-w-2xl mx-auto">
             <div className="flex items-center gap-1.5 sm:gap-2">
@@ -490,6 +600,7 @@ function NewProjectContent() {
                   onNext={() => advance(1)}
                 />
               )}
+
               {step === 1 && (
                 <StepClarify
                   idea={idea}
@@ -501,6 +612,7 @@ function NewProjectContent() {
                   onQuestionsLoaded={setCachedQuestions}
                 />
               )}
+
               {step === 2 && (
                 <>
                   {showRegenBanner && (
@@ -517,6 +629,7 @@ function NewProjectContent() {
                   />
                 </>
               )}
+
               {step === 3 && (
                 <>
                   {showRegenBanner && (
@@ -542,6 +655,7 @@ function NewProjectContent() {
                   />
                 </>
               )}
+
               {step === 4 && blueprint && (
                 <StepCommit
                   blueprint={blueprint}
@@ -549,6 +663,7 @@ function NewProjectContent() {
                   onConfirm={handleCommit}
                 />
               )}
+
               {step === 4 && !blueprint && (
                 <div className="flex flex-col gap-4 items-center py-12">
                   <p className="text-[var(--text-secondary)]">

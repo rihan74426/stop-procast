@@ -10,33 +10,7 @@ import { useI18n } from "@/lib/i18n";
 import { LANGUAGES } from "@/lib/i18n/translations";
 import { useRouter } from "next/navigation";
 import { useProjectStore } from "@/lib/store/projectStore";
-
-/** Momentum-specific localStorage keys to wipe on sign-out */
-const MOMENTUM_STORAGE_KEYS = [
-  "stopprocast_projects_v1",
-  "momentum_user_profile",
-  "momentum_locale",
-  "sp_theme",
-  "sp_save_nudge_seen",
-  "momentum_ai_model",
-  "momentum_ai_usage",
-  "momentum_session_id",
-  "momentum_reminder_prefs",
-  "puter.app.id",
-  "puter.auth.token",
-];
-
-function clearMomentumStorage() {
-  if (typeof window === "undefined") return;
-  try {
-    MOMENTUM_STORAGE_KEYS.forEach((k) => localStorage.removeItem(k));
-    Object.keys(localStorage)
-      .filter((k) => k.startsWith("stopprocast_projects_"))
-      .forEach((k) => localStorage.removeItem(k));
-  } catch {
-    /* ignore */
-  }
-}
+import { clearMomentumStorage } from "@/lib/clearStorage";
 
 export function TopBar() {
   const { theme, toggle } = useTheme();
@@ -161,7 +135,6 @@ export function TopBar() {
       {isLoaded &&
         (isSignedIn ? (
           <div className="flex items-center gap-2">
-            {/* Avatar + sign-out button */}
             <button
               onClick={handleSignOut}
               className="h-8 px-2.5 flex items-center gap-2 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all"

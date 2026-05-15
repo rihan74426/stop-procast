@@ -1,8 +1,5 @@
 "use client";
 
-// components/layout/Sidebar.jsx
-// Added: Feedback nav item
-
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -20,6 +17,8 @@ import {
 } from "react-icons/fi";
 import { FaCloud } from "react-icons/fa";
 
+const FEEDBACK_SEEN_KEY = "momentum_feedback_seen";
+
 export function Sidebar() {
   const { t } = useI18n();
   const pathname = usePathname();
@@ -27,10 +26,34 @@ export function Sidebar() {
   const projects = useProjectStore((s) => s.projects);
   const activeProjects = projects.filter((p) => !p.completionDate);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [feedbackSeen, setFeedbackSeen] = useState(true); // default true to avoid flash
+
+  // Load feedback-seen state from localStorage after mount
+  useEffect(() => {
+    try {
+      setFeedbackSeen(!!localStorage.getItem(FEEDBACK_SEEN_KEY));
+    } catch {
+      setFeedbackSeen(true);
+    }
+  }, []);
+
+  // Mark feedback as seen when on the feedback page
+  useEffect(() => {
+    if (pathname === "/feedback") {
+      try {
+        localStorage.setItem(FEEDBACK_SEEN_KEY, "1");
+        setFeedbackSeen(true);
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [pathname]);
 
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+
+  const showFeedbackBadge = !feedbackSeen && pathname !== "/feedback";
 
   const navItems = [
     { href: "/", label: t("nav_dashboard"), icon: FiGrid },
@@ -108,8 +131,8 @@ export function Sidebar() {
             >
               <Icon />
               {label}
-              {/* Subtle badge for feedback to draw attention */}
-              {href === "/feedback" && !active && (
+              {/* Show "new" badge only until user visits feedback page */}
+              {href === "/feedback" && showFeedbackBadge && (
                 <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium">
                   new
                 </span>

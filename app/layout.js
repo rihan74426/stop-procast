@@ -7,22 +7,24 @@ import { NetworkMonitor } from "@/components/ui/NetworkMonitor";
 import { NotificationInit } from "@/components/ui/NotificationInit";
 
 export const metadata = {
-  title: "Momentum — Finish What You Start",
+  title: "Momentum > Finish What You Start",
   description:
     "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.",
+  icons: {
+    icon: "/favicon.png",
+    apple: "/favicon.png",
+    shortcut: "/favicon.png",
+  },
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 1,
+  },
 };
 
 export default function RootLayout({ children }) {
-  // These are NEXT_PUBLIC_ vars — safe to embed in HTML sent to the browser.
-  // We write them into localStorage via an inline script that runs
-  // BEFORE puter.js loads, so puter picks them up during its own init
-  // and never needs to show an auth popup.
   const puterAppId = process.env.NEXT_PUBLIC_PUTER_APP_ID ?? "";
   const puterAuthToken = process.env.NEXT_PUBLIC_PUTER_AUTH_TOKEN ?? "";
-
-  // Only emit the credential script when both values are present.
-  // If they're missing, puter.js is skipped entirely — we fall back to
-  // the OpenRouter API route for all generation.
   const hasPuterCreds = puterAppId.trim() && puterAuthToken.trim();
 
   return (
@@ -38,12 +40,8 @@ export default function RootLayout({ children }) {
           />
 
           {/*
-           * STEP 1 — Write puter credentials into localStorage.
-           * This inline script is synchronous and runs before ANY other
-           * script on the page, including puter.js below.
-           * Puter reads localStorage["puter.app.id"] and
-           * localStorage["puter.auth.token"] exactly once during its own
-           * init — so they must be present before puter.js executes.
+           * STEP 1 — Write puter credentials into localStorage before puter.js loads.
+           * This must run synchronously before any other script on the page.
            */}
           {hasPuterCreds && (
             <script
@@ -62,11 +60,8 @@ export default function RootLayout({ children }) {
 
           {/*
            * STEP 2 — Load puter.js AFTER credentials are in localStorage.
-           * Using `defer` (not `async`) so execution order relative to
-           * other deferred scripts is predictable, but it still doesn't
-           * block HTML parsing.
-           * Only loaded when credentials are present — no point loading
-           * the SDK if we'd fall back to the API route anyway.
+           * defer preserves execution order relative to other deferred scripts.
+           * Only loaded when credentials are present.
            */}
           {hasPuterCreds && <script src="https://js.puter.com/v2/" defer />}
         </head>
