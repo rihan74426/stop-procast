@@ -22,35 +22,28 @@ import { loadUserProfile, buildProfileContext } from "@/lib/userProfile";
 import { useI18n } from "@/lib/i18n";
 import { BiSolidPencil } from "react-icons/bi";
 
-const STEP_LABELS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
+const STEP_LABELS_KEYS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
 
 // ─── Wait sequence ────────────────────────────────────────────────────
-// Fires one toast at a time. Each toast is dismissed before the next shows.
-// The returned cancel function clears all pending timers AND dismisses any
-// currently-visible wait toast.
+// Each message fires after the previous one's delay has elapsed.
+// Returns a cancel function that dismisses any active toast and clears timers.
 
-const WAIT_MESSAGES = [
-  { after: 6000, message: "Thinking — this usually takes 15–40 seconds…" },
-  { after: 15000, message: "Switching to a faster model if needed…" },
-  {
-    after: 28000,
-    message: "Still working — complex plans take a little longer.",
-  },
-  { after: 42000, message: "Almost done — hang tight." },
-];
+function startWaitSequence(t) {
+  const MESSAGES = [
+    { after: 6000, key: "wait_thinking" },
+    { after: 15000, key: "wait_switching" },
+    { after: 28000, key: "wait_still_working" },
+    { after: 42000, key: "wait_almost" },
+  ];
 
-function startWaitSequence() {
   let activeToastId = null;
   const timers = [];
 
-  WAIT_MESSAGES.forEach(({ after, message }) => {
+  MESSAGES.forEach(({ after, key }) => {
     timers.push(
       setTimeout(() => {
-        // Dismiss previous wait toast before showing next
-        if (activeToastId !== null) {
-          toast.dismiss(activeToastId);
-        }
-        activeToastId = toast.info(message, { duration: 0 });
+        if (activeToastId !== null) toast.dismiss(activeToastId);
+        activeToastId = toast.info(t(key), { duration: 0 });
       }, after)
     );
   });
@@ -66,31 +59,30 @@ function startWaitSequence() {
 
 // ─── Regen permission banner ──────────────────────────────────────────
 
-function RegenPermissionBanner({ onKeep, onRegenerate }) {
+function RegenPermissionBanner({ onKeep, onRegenerate, t }) {
   return (
     <div className="mb-6 rounded-[var(--r-lg)] border-2 border-[var(--amber)] bg-[var(--amber-bg)] px-4 py-4">
       <div className="flex items-start gap-3">
         <span className="text-xl shrink-0 mt-0.5">✏️</span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-semibold text-[var(--text-primary)] mb-1">
-            Your inputs changed
+            {t("regen_banner_title")}
           </p>
           <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-3">
-            You edited your idea, answers, or scope after generating your plan.
-            Regenerate with the new inputs, or keep your current plan.
+            {t("regen_banner_desc")}
           </p>
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={onRegenerate}
               className="h-8 px-4 text-xs font-semibold rounded-[var(--r-md)] bg-[var(--amber)] text-white hover:opacity-90 active:scale-[0.97] transition-all"
             >
-              Regenerate plan ↺
+              {t("regen_regenerate")}
             </button>
             <button
               onClick={onKeep}
               className="h-8 px-4 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all"
             >
-              Keep current plan
+              {t("regen_keep")}
             </button>
           </div>
         </div>
@@ -112,7 +104,7 @@ export default function NewProjectPage() {
 function NewProjectContent() {
   const router = useRouter();
   const { isSignedIn } = useUser();
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const addProject = useProjectStore((s) => s.addProject);
   const { loading: limitLoading, allowed: limitAllowed } = useProjectLimit();
 
@@ -131,7 +123,7 @@ function NewProjectContent() {
   const [genCharCount, setGenCharCount] = useState(0);
   const [genError, setGenError] = useState(null);
 
-  // Refs that don't need to trigger re-renders
+  // Refs
   const rawRef = useRef("");
   const readerRef = useRef(null);
   const rafRef = useRef(null);
@@ -140,8 +132,7 @@ function NewProjectContent() {
   const isMountedRef = useRef(true);
   const MAX_RETRIES = 2;
 
-  // Track latest generation inputs via ref so runGeneration always reads
-  // the current values without needing them in its useCallback dep array.
+  // Keep gen inputs fresh without stale closures
   const genInputsRef = useRef({
     idea,
     clarifyAnswers,
@@ -158,6 +149,12 @@ function NewProjectContent() {
       locale,
     };
   }, [idea, clarifyAnswers, scopeLevel, limitAllowed, locale]);
+
+  // Keep t() fresh
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   useEffect(() => {
     isMountedRef.current = true;
@@ -176,7 +173,6 @@ function NewProjectContent() {
       localStorage.setItem("puter.auth.token", authToken);
   }, []);
 
-  // Show early auth gate if anon and over limit
   useEffect(() => {
     if (!limitLoading && !limitAllowed && !isSignedIn)
       setShowEarlyAuthGate(true);
@@ -207,30 +203,28 @@ function NewProjectContent() {
   const handleScopeChange = useCallback((v) => setScopeLevel(v), []);
 
   // ── Blueprint staleness ───────────────────────────────────────────
-
+  // Key includes idea + scope + clarify answers together
   const inputKey = `${idea.trim()}||${scopeLevel}||${JSON.stringify(
     clarifyAnswers
   )}`;
   const blueprintIsStale =
     blueprint !== null && blueprintKey !== null && inputKey !== blueprintKey;
+  // Show regen banner only on scope (step 2) and review (step 3) steps
   const showRegenBanner = blueprintIsStale && (step === 2 || step === 3);
 
   // ── Generation cleanup ────────────────────────────────────────────
 
   const stopGeneration = useCallback(() => {
-    // Cancel wait toasts
     if (stopWaitRef.current) {
       stopWaitRef.current();
       stopWaitRef.current = null;
     }
-    // Cancel stream reader
     try {
       readerRef.current?.cancel();
     } catch {
       /* ignore */
     }
     readerRef.current = null;
-    // Cancel pending rAF
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
       rafRef.current = null;
@@ -239,9 +233,7 @@ function NewProjectContent() {
 
   useEffect(() => () => stopGeneration(), [stopGeneration]);
 
-  // ── Core generation function ──────────────────────────────────────
-  // Uses genInputsRef so it always reads latest values without stale closure.
-  // Stable reference — safe to call from any handler without useCallback deps.
+  // ── Core generation ───────────────────────────────────────────────
 
   const runGeneration = useCallback(async () => {
     const {
@@ -251,6 +243,8 @@ function NewProjectContent() {
       limitAllowed: currentAllowed,
       locale: currentLocale,
     } = genInputsRef.current;
+
+    const currentT = tRef.current;
 
     if (!currentAllowed) {
       setGenStatus("limited");
@@ -264,8 +258,8 @@ function NewProjectContent() {
     setGenError(null);
     rawRef.current = "";
 
-    // Start wait sequence — shows timed info toasts while waiting
-    stopWaitRef.current = startWaitSequence();
+    // Start wait sequence with translated messages
+    stopWaitRef.current = startWaitSequence(currentT);
 
     try {
       const profile = loadUserProfile();
@@ -305,7 +299,7 @@ function NewProjectContent() {
             stopWaitRef.current();
             stopWaitRef.current = null;
           }
-          toast.success("Building your plan…", { duration: 2000 });
+          toast.success(currentT("toast_building"), { duration: 2000 });
         }
 
         rawRef.current += chunk;
@@ -318,44 +312,43 @@ function NewProjectContent() {
         });
       }
 
-      // Clean up reader/rAF
       rafRef.current = null;
       readerRef.current = null;
 
       if (!isMountedRef.current) return;
 
       if (rawRef.current.trim().length < 50) {
-        throw new Error("AI returned incomplete response. Please try again.");
+        throw new Error(currentT("common_error"));
       }
 
       const parsed = parseBlueprint(rawRef.current);
       retryCountRef.current = 0;
 
-      // Cancel any remaining wait toasts
       if (stopWaitRef.current) {
         stopWaitRef.current();
         stopWaitRef.current = null;
       }
 
-      // Signal 100% on the progress bar, then transition
+      // Signal 100% on progress bar, then transition
       setGenCharCount(Infinity);
       await new Promise((r) => setTimeout(r, 300));
 
       if (!isMountedRef.current) return;
 
-      toast.success("Your blueprint is ready! 🎯", { duration: 3000 });
+      toast.success(currentT("toast_blueprint_ready"), { duration: 3000 });
 
-      // Set blueprint + status + advance atomically (batched in React 18)
       setBlueprint(parsed);
-      setBlueprintKey(inputKey);
+      // Capture current inputKey at the time generation completes
+      const currentInputKey = `${currentIdea.trim()}||${currentScope}||${JSON.stringify(
+        currentAnswers
+      )}`;
+      setBlueprintKey(currentInputKey);
       setGenStatus("done");
-      // Advance to commit step — use functional updater to avoid stale closure
       setStep(4);
       setMaxReached((prev) => Math.max(prev, 4));
     } catch (e) {
       if (!isMountedRef.current) return;
 
-      // Cancel wait toasts on any error
       if (stopWaitRef.current) {
         stopWaitRef.current();
         stopWaitRef.current = null;
@@ -370,9 +363,11 @@ function NewProjectContent() {
         retryCountRef.current += 1;
         const delay = 3000 * retryCountRef.current;
         toast.warn(
-          `Rate limited — retrying in ${delay / 1000}s… (${
-            retryCountRef.current
-          }/${MAX_RETRIES})`
+          currentT("toast_rate_limited", {
+            seconds: delay / 1000,
+            count: retryCountRef.current,
+            max: MAX_RETRIES,
+          })
         );
         await new Promise((r) => setTimeout(r, delay));
         if (isMountedRef.current) runGeneration();
@@ -381,22 +376,18 @@ function NewProjectContent() {
 
       const message =
         e.code === "RATE_LIMITED" || e.status === 429
-          ? "Rate limit reached. Please wait a moment and try again."
+          ? currentT("wait_thinking")
           : e.code === "QUOTA_EXCEEDED" || e.status === 402
           ? "AI quota exceeded for today. Try again tomorrow."
           : e.code === "TIMEOUT" || e.status === 504
           ? "Request timed out. Please try again."
-          : e?.message ?? "Generation failed. Please try again.";
+          : e?.message ?? currentT("common_error");
 
       setGenError(message);
       setGenStatus("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopGeneration]);
-  // Note: genInputsRef.current is always fresh — intentionally not in deps.
-  // inputKey is read directly at the point of setBlueprintKey inside runGeneration,
-  // so we capture it via closure from the outer scope where it's computed.
-  // Since inputKey is derived from state, it will always be current at call time.
 
   // ── Generation triggers ───────────────────────────────────────────
 
@@ -415,23 +406,30 @@ function NewProjectContent() {
     retryCountRef.current = 0;
     setBlueprint(null);
     setBlueprintKey(null);
+    setGenStatus("streaming");
+    setGenCharCount(0);
+    setGenError(null);
+    // Ensure we're on the review step
+    setStep(3);
+    setMaxReached((prev) => Math.max(prev, 3));
     runGeneration();
   }, [runGeneration]);
 
   const handleKeepPlan = useCallback(() => {
+    // Stamp the current input key as accepted — banner won't reappear
     setBlueprintKey(inputKey);
-    toast.success("Keeping current plan.", { duration: 2000 });
-  }, [inputKey]);
+    toast.success(t("toast_keep_plan"), { duration: 2000 });
+  }, [inputKey, t]);
 
   // ── Commit ────────────────────────────────────────────────────────
 
   const handleCommit = useCallback(
     async ({ deadline }) => {
       if (!blueprint) {
-        toast.error("Blueprint is missing. Please go back and regenerate.");
+        toast.error(t("toast_blueprint_missing"));
         return;
       }
-      const toastId = toast.loading("Creating your project…");
+      const toastId = toast.loading(t("toast_creating"));
       try {
         const id = await addProject({
           projectTitle: blueprint.projectTitle,
@@ -458,12 +456,10 @@ function NewProjectContent() {
         router.push(`/project/${id}`);
       } catch (err) {
         toast.dismiss(toastId);
-        toast.error(
-          err?.message ?? "Failed to create project. Please try again."
-        );
+        toast.error(err?.message ?? t("common_error"));
       }
     },
-    [blueprint, scopeLevel, addProject, router]
+    [blueprint, scopeLevel, addProject, router, t]
   );
 
   // ── Limit gate full-page UI ───────────────────────────────────────
@@ -480,11 +476,10 @@ function NewProjectContent() {
                 <div className="text-5xl">🎯</div>
                 <div>
                   <h1 className="font-display font-bold text-2xl text-[var(--text-primary)] mb-2">
-                    You've used your free project
+                    {t("intake_review_limit_title_anon")}
                   </h1>
                   <p className="text-[var(--text-secondary)] leading-relaxed">
-                    Sign up free to create unlimited projects and access deeper
-                    AI planning.
+                    {t("intake_review_limit_desc_anon")}
                   </p>
                 </div>
                 <div className="flex flex-col gap-2 mx-auto w-full max-w-xs">
@@ -492,13 +487,13 @@ function NewProjectContent() {
                     onClick={() => setShowEarlyAuthGate(true)}
                     className="w-full h-12 rounded-[var(--r-md)] bg-[var(--violet)] text-white font-semibold hover:bg-[var(--violet-dim)] transition-colors"
                   >
-                    Create free account
+                    {t("intake_review_limit_signup")}
                   </button>
                   <button
                     onClick={() => router.push("/")}
                     className="w-full h-10 rounded-[var(--r-md)] border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]"
                   >
-                    Back to dashboard
+                    {t("common_back")}
                   </button>
                 </div>
               </div>
@@ -526,7 +521,7 @@ function NewProjectContent() {
         <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-4 sm:px-6 py-3 sm:py-4 sticky top-0 z-10">
           <div className="max-w-2xl mx-auto">
             <div className="flex items-center gap-1.5 sm:gap-2">
-              {STEP_LABELS.map((label, i) => {
+              {STEP_LABELS_KEYS.map((label, i) => {
                 const isActive = i === step;
                 const isVisited = i <= maxReached;
                 const isDonePast = isVisited && i < step;
@@ -569,7 +564,7 @@ function NewProjectContent() {
                         {label}
                       </span>
                     </button>
-                    {i < STEP_LABELS.length - 1 && (
+                    {i < STEP_LABELS_KEYS.length - 1 && (
                       <div
                         className={`h-px w-4 sm:w-8 transition-colors duration-300 ${
                           i < step
@@ -583,7 +578,8 @@ function NewProjectContent() {
               })}
               {blueprintIsStale && step !== 2 && step !== 3 && (
                 <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber)] whitespace-nowrap shrink-0 flex items-center gap-1">
-                  <BiSolidPencil size={9} /> Edited
+                  <BiSolidPencil size={9} />{" "}
+                  {t("regen_banner_title").split(" ").slice(0, 1).join("")}
                 </span>
               )}
             </div>
@@ -619,6 +615,7 @@ function NewProjectContent() {
                     <RegenPermissionBanner
                       onKeep={handleKeepPlan}
                       onRegenerate={handleRegeneratePlan}
+                      t={t}
                     />
                   )}
                   <StepScope
@@ -636,6 +633,7 @@ function NewProjectContent() {
                     <RegenPermissionBanner
                       onKeep={handleKeepPlan}
                       onRegenerate={handleRegeneratePlan}
+                      t={t}
                     />
                   )}
                   <StepReview
@@ -667,13 +665,13 @@ function NewProjectContent() {
               {step === 4 && !blueprint && (
                 <div className="flex flex-col gap-4 items-center py-12">
                   <p className="text-[var(--text-secondary)]">
-                    Something went wrong. Please go back.
+                    {t("intake_review_no_blueprint")}
                   </p>
                   <button
                     onClick={() => goTo(3)}
                     className="text-[var(--violet)] hover:underline text-sm"
                   >
-                    ← Back to review
+                    {t("common_back")}
                   </button>
                 </div>
               )}

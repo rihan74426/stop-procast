@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { Badge } from "@/components/ui/Badge";
 import { Button } from "@/components/ui/Button";
+import { useI18n } from "@/lib/i18n";
 
 const STATUS_CYCLE = {
   todo: "doing",
@@ -13,6 +14,7 @@ const STATUS_CYCLE = {
 };
 
 export function TaskList({ project }) {
+  const { t } = useI18n();
   const updateTask = useProjectStore((s) => s.updateTask);
   const addTask = useProjectStore((s) => s.addTask);
   const deleteTask = useProjectStore((s) => s.deleteTask);
@@ -33,7 +35,6 @@ export function TaskList({ project }) {
     setAddingToPhase(null);
   };
 
-  // Unphased tasks
   const unphasedTasks = project.tasks.filter((t) => !t.phaseId);
 
   return (
@@ -45,7 +46,6 @@ export function TaskList({ project }) {
 
         return (
           <div key={phase.id}>
-            {/* Phase header */}
             <button
               onClick={() => toggle(phase.id)}
               className="w-full flex items-center gap-3 mb-3 group"
@@ -88,7 +88,6 @@ export function TaskList({ project }) {
                   />
                 ))}
 
-                {/* Add task inline */}
                 {addingToPhase === phase.id ? (
                   <div className="flex gap-2 mt-1">
                     <input
@@ -99,11 +98,11 @@ export function TaskList({ project }) {
                         if (e.key === "Enter") handleAddTask(phase.id);
                         if (e.key === "Escape") setAddingToPhase(null);
                       }}
-                      placeholder="Task title…"
+                      placeholder={t("task_add_placeholder")}
                       className="flex-1 h-8 px-3 text-sm rounded-[var(--r-md)] border border-[var(--violet)] bg-[var(--bg-base)] text-[var(--text-primary)] focus:outline-none"
                     />
                     <Button size="sm" onClick={() => handleAddTask(phase.id)}>
-                      Add
+                      {t("task_add_btn")}
                     </Button>
                     <Button
                       size="sm"
@@ -118,7 +117,7 @@ export function TaskList({ project }) {
                     onClick={() => setAddingToPhase(phase.id)}
                     className="flex items-center gap-2 text-xs text-[var(--text-tertiary)] hover:text-[var(--violet)] mt-1 transition-colors"
                   >
-                    + Add task
+                    {t("task_add")}
                   </button>
                 )}
               </div>
@@ -127,11 +126,10 @@ export function TaskList({ project }) {
         );
       })}
 
-      {/* Unphased tasks */}
       {unphasedTasks.length > 0 && (
         <div>
           <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
-            Unassigned
+            {t("task_unassigned")}
           </p>
           <div className="flex flex-col gap-1">
             {unphasedTasks.map((task) => (
@@ -165,7 +163,6 @@ function TaskRow({ task, onToggle, onDelete }) {
       onMouseEnter={() => setHovering(true)}
       onMouseLeave={() => setHovering(false)}
     >
-      {/* Status toggle */}
       <button
         onClick={onToggle}
         className="text-base leading-none transition-transform hover:scale-110"
@@ -175,7 +172,6 @@ function TaskRow({ task, onToggle, onDelete }) {
         {statusIcon.icon}
       </button>
 
-      {/* Title */}
       <p
         className={`flex-1 text-sm transition-colors ${
           task.status === "done"
@@ -186,12 +182,10 @@ function TaskRow({ task, onToggle, onDelete }) {
         {task.title}
       </p>
 
-      {/* Priority badge */}
       {task.priority !== "medium" && (
         <Badge priority={task.priority}>{task.priority}</Badge>
       )}
 
-      {/* Delete */}
       {hovering && (
         <button
           onClick={onDelete}

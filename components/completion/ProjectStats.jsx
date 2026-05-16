@@ -1,37 +1,40 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n";
+
 export function ProjectStats({ project }) {
+  const { t } = useI18n();
   const stats = project.postmortem?.stats ?? {};
 
   const items = [
     {
-      label: "Days to complete",
+      label: t("stats_days"),
       value: stats.daysToComplete ?? 0,
       suffix: "d",
       color: "var(--violet)",
     },
     {
-      label: "Tasks done",
+      label: t("stats_tasks"),
       value: stats.tasksCompleted ?? 0,
       color: "var(--emerald)",
     },
     {
-      label: "Blockers hit",
+      label: t("stats_blockers"),
       value: stats.blockersHit ?? 0,
       color: "var(--coral)",
     },
     {
-      label: "On-time",
+      label: t("stats_on_time"),
       value: stats.milestonesOnTime ?? 0,
       color: "var(--emerald)",
     },
     {
-      label: "Missed",
+      label: t("stats_missed"),
       value: stats.milestonesMissed ?? 0,
       color: "var(--amber)",
     },
     {
-      label: "Peak streak",
+      label: t("stats_streak"),
       value: project.streakDays ?? 0,
       suffix: "d 🔥",
       color: "var(--amber)",

@@ -6,7 +6,7 @@ import { generateReengage } from "@/lib/ai/clientGenerate";
 import { useI18n } from "@/lib/i18n";
 
 export function ProjectPressure({ project }) {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const [suggestion, setSuggestion] = useState(null);
   const [loading, setLoading] = useState(false);
 
@@ -35,7 +35,6 @@ export function ProjectPressure({ project }) {
     if (loading || suggestion) return;
     setLoading(true);
     try {
-      // Pass locale so re-engage suggestion is in the user's language
       const text = await generateReengage(project, locale);
       if (text) setSuggestion(text);
     } catch {
@@ -65,7 +64,7 @@ export function ProjectPressure({ project }) {
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
             {pressure.reasons.map((r, i) => (
               <p key={i} className="text-xs text-[var(--text-secondary)]">
-                {reasonLabel(r)}
+                {reasonLabel(r, t)}
               </p>
             ))}
           </div>
@@ -80,7 +79,9 @@ export function ProjectPressure({ project }) {
               className="mt-2 text-xs font-medium hover:underline disabled:opacity-50 transition-opacity"
               style={{ color: colors.text }}
             >
-              {loading ? "Thinking…" : "Get a suggestion →"}
+              {loading
+                ? t("pressure_suggestion_loading")
+                : t("pressure_get_suggestion")}
             </button>
           )}
         </div>
@@ -89,14 +90,21 @@ export function ProjectPressure({ project }) {
   );
 }
 
-function reasonLabel(r) {
-  if (r.type === "idle") return `${r.days} days without progress`;
+function reasonLabel(r, t) {
+  if (r.type === "idle") return t("pressure_reason_idle", { days: r.days });
   if (r.type === "missed_milestones")
-    return `${r.count} missed milestone${r.count > 1 ? "s" : ""}`;
+    return r.count === 1
+      ? t("pressure_reason_milestones", { count: r.count })
+      : t("pressure_reason_milestones_plural", { count: r.count });
   if (r.type === "blockers")
-    return `${r.count} active blocker${r.count > 1 ? "s" : ""}`;
+    return r.count === 1
+      ? t("pressure_reason_blockers", { count: r.count })
+      : t("pressure_reason_blockers_plural", { count: r.count });
   if (r.type === "low_progress")
-    return `Only ${r.progress}% done after ${r.age} days`;
-  if (r.type === "streak_broken") return "Streak broken";
+    return t("pressure_reason_low_progress", {
+      progress: r.progress,
+      age: r.age,
+    });
+  if (r.type === "streak_broken") return t("pressure_reason_streak");
   return r.type;
 }

@@ -1,8 +1,10 @@
 "use client";
 
 import { daysSince } from "@/lib/utils/date";
+import { useI18n } from "@/lib/i18n";
 
 export function StreakBanner({ project }) {
+  const { t } = useI18n();
   const idle = daysSince(project.lastActivityAt);
   const streak = project.streakDays;
 
@@ -12,10 +14,10 @@ export function StreakBanner({ project }) {
         <span className="text-xl">🔥</span>
         <div>
           <p className="text-sm font-medium text-[var(--amber)]">
-            {streak}-day streak!
+            {t("streak_days", { n: streak })}
           </p>
           <p className="text-xs text-[var(--text-secondary)]">
-            You`re on fire. Keep going.
+            {t("streak_fire_subtitle")}
           </p>
         </div>
       </div>
@@ -27,9 +29,13 @@ export function StreakBanner({ project }) {
       <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
         <span>🔥</span>
         <span>
-          {streak} day{streak !== 1 ? "s" : ""} streak
+          {streak !== 1
+            ? t("streak_days_short_plural", { n: streak })
+            : t("streak_days_short", { n: streak })}
         </span>
-        <span className="text-[var(--text-tertiary)]">— keep it going</span>
+        <span className="text-[var(--text-tertiary)]">
+          {t("streak_keep_going")}
+        </span>
       </div>
     );
   }
@@ -40,11 +46,10 @@ export function StreakBanner({ project }) {
         <span className="text-xl">⚠️</span>
         <div>
           <p className="text-sm font-medium text-[var(--coral)]">
-            {idle} days without progress
+            {t("streak_idle_danger_title", { n: idle })}
           </p>
           <p className="text-xs text-[var(--text-secondary)]">
-            This project is at risk of being abandoned. Do one small thing right
-            now.
+            {t("streak_idle_danger_desc")}
           </p>
         </div>
       </div>
@@ -56,7 +61,7 @@ export function StreakBanner({ project }) {
       <div className="flex items-center gap-3 rounded-[var(--r-lg)] bg-[var(--amber-bg)] border border-[var(--amber)] px-4 py-3">
         <span className="text-lg">⏰</span>
         <p className="text-sm text-[var(--amber)]">
-          {idle} days since last activity — time to get back on track.
+          {t("streak_idle_warning", { n: idle })}
         </p>
       </div>
     );

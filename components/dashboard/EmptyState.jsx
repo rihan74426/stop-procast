@@ -2,19 +2,11 @@
 
 import Link from "next/link";
 import { Button } from "@/components/ui/Button";
-
-const IDEA_EXAMPLES = [
-  "Learn a new language",
-  "Write a book",
-  "Launch a business",
-  "Get fit",
-  "Plan a trip",
-  "Build a habit",
-  "Study for an exam",
-  "Start a side project",
-];
+import { useI18n } from "@/lib/i18n";
 
 export function EmptyState() {
+  const { t } = useI18n();
+
   return (
     <div className="flex flex-col items-center justify-center py-16 sm:py-24 px-6 text-center">
       <Link href="/new">
@@ -34,12 +26,10 @@ export function EmptyState() {
         </div>
       </Link>
       <h2 className="font-display font-semibold text-2xl text-[var(--text-primary)] mb-3">
-        What are you working towards?
+        {t("empty_state_title")}
       </h2>
       <p className="text-[var(--text-secondary)] max-w-sm leading-relaxed mb-8">
-        Whether it's a business idea, a fitness goal, a creative project, or
-        anything else. Drop it in and get a structured plan you can actually
-        follow.
+        {t("empty_state_desc")}
       </p>
 
       <Link href="/new">
@@ -52,12 +42,12 @@ export function EmptyState() {
               strokeLinecap="round"
             />
           </svg>
-          Start your first plan
+          {t("empty_state_cta")}
         </Button>
       </Link>
 
       <p className="mt-6 text-xs text-[var(--text-tertiary)]">
-        Takes 2 minutes. Works for any goal, any domain.
+        {t("empty_state_hint")}
       </p>
     </div>
   );

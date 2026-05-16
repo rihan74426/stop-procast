@@ -1,95 +1,131 @@
 "use client";
 
-import { useState } from "react";
+import { use, useState } from "react";
+import Link from "next/link";
 import { useProjectStore } from "@/lib/store/projectStore";
+import { ConfettiBlast } from "@/components/completion/ConfettiBlast";
+import { ProjectStats } from "@/components/completion/ProjectStats";
+import { Postmortem } from "@/components/completion/Postmortem";
+import { TopBar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";
+import { DataProvider } from "@/components/providers/DataProvider";
+import { useI18n } from "@/lib/i18n";
 
-export function Postmortem({ project, onDone }) {
-  const updateProject = useProjectStore((s) => s.updateProject);
+function CompleteContent({ id }) {
+  const { t } = useI18n();
+  const project = useProjectStore((s) => s.getProject(id));
+  const [section, setSection] = useState("celebrate");
 
-  const questions = project.reviewQuestions?.length
-    ? project.reviewQuestions
-    : [
-        "What was the single hardest thing about this project?",
-        "What would you do differently if you started over?",
-        "What worked surprisingly well?",
-        "What should carry over to your next project?",
-      ];
-
-  const [answers, setAnswers] = useState(
-    project.postmortem?.answers?.length
-      ? Object.fromEntries(
-          project.postmortem.answers.map((a, i) => [i, a.answer])
-        )
-      : {}
-  );
-  const [saving, setSaving] = useState(false);
-
-  const allAnswered = questions.every((_, i) => answers[i]?.trim());
-
-  const handleSave = () => {
-    setSaving(true);
-    const hydratedAnswers = questions.map((q, i) => ({
-      question: q,
-      answer: answers[i] ?? "",
-    }));
-    updateProject(project.id, {
-      postmortem: {
-        ...project.postmortem,
-        completedAt: new Date().toISOString(),
-        answers: hydratedAnswers,
-      },
-    });
-    setTimeout(() => {
-      setSaving(false);
-      onDone?.();
-    }, 400);
-  };
+  if (!project) {
+    return (
+      <div className="flex h-screen items-center justify-center px-4">
+        <p className="text-[var(--text-secondary)]">{t("project_not_found")}</p>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div>
-        <h2 className="font-display font-semibold text-xl text-[var(--text-primary)] mb-1">
-          Retrospective
-        </h2>
-        <p className="text-sm text-[var(--text-secondary)]">
-          5 minutes now makes your next project dramatically better.
-        </p>
-      </div>
+    <div className="min-h-screen bg-[var(--bg-surface)] flex flex-col">
+      <TopBar />
+      <ConfettiBlast />
 
-      <div className="flex flex-col gap-5">
-        {questions.map((q, i) => (
-          <div key={i} className="flex flex-col gap-2">
-            <label className="text-sm font-medium text-[var(--text-primary)]">
-              {i + 1}. {q}
-            </label>
-            <textarea
-              rows={3}
-              value={answers[i] ?? ""}
-              onChange={(e) =>
-                setAnswers((prev) => ({ ...prev, [i]: e.target.value }))
-              }
-              placeholder="Your answer…"
-              className="w-full px-4 py-3 rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)] transition-all"
-            />
-          </div>
-        ))}
-      </div>
+      <main className="flex-1 flex items-start justify-center px-4 sm:px-6 py-8 sm:py-12">
+        <div className="w-full max-w-2xl">
+          {section === "celebrate" && (
+            <div className="flex flex-col gap-6 sm:gap-8 text-center items-center">
+              <div>
+                <div className="text-5xl sm:text-6xl mb-3 sm:mb-4">🚀</div>
+                <h1 className="font-display font-bold text-3xl sm:text-4xl text-[var(--text-primary)] mb-2 sm:mb-3">
+                  {t("completion_shipped")}
+                </h1>
+                <p className="text-base sm:text-lg text-[var(--text-secondary)] max-w-md">
+                  <strong className="text-[var(--text-primary)]">
+                    {project.projectTitle}
+                  </strong>{" "}
+                  {t("completion_desc")}
+                </p>
+              </div>
 
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-[var(--text-tertiary)]">
-          {Object.values(answers).filter((v) => v?.trim()).length}/
-          {questions.length} answered
-        </p>
-        <Button
-          variant="emerald"
-          onClick={handleSave}
-          loading={saving}
-          disabled={!allAnswered}
-        >
-          Save retrospective ✓
-        </Button>
-      </div>
+              <div className="w-full text-left">
+                <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3 sm:mb-4 text-center">
+                  {t("completion_stats_label")}
+                </p>
+                <ProjectStats project={project} />
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <Button
+                  variant="ghost"
+                  onClick={() => setSection("retro")}
+                  className="justify-center"
+                >
+                  {t("completion_write_retro")}
+                </Button>
+                <Button
+                  variant="emerald"
+                  size="lg"
+                  onClick={() => setSection("done")}
+                  className="justify-center"
+                >
+                  {t("completion_all_done")}
+                </Button>
+              </div>
+            </div>
+          )}
+
+          {section === "retro" && (
+            <div className="flex flex-col gap-5 sm:gap-6">
+              <button
+                onClick={() => setSection("celebrate")}
+                className="flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors self-start"
+              >
+                {t("completion_back")}
+              </button>
+              <Postmortem project={project} onDone={() => setSection("done")} />
+            </div>
+          )}
+
+          {section === "done" && (
+            <div className="flex flex-col gap-6 sm:gap-8 text-center items-center">
+              <div>
+                <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">🎯</div>
+                <h2 className="font-display font-bold text-2xl sm:text-3xl text-[var(--text-primary)] mb-2 sm:mb-3">
+                  {t("completion_whats_next")}
+                </h2>
+                <p className="text-[var(--text-secondary)] max-w-sm">
+                  {t("completion_retro_saved")}
+                </p>
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
+                <Link href="/new" className="flex-1">
+                  <Button size="lg" className="w-full justify-center">
+                    {t("completion_start_next")}
+                  </Button>
+                </Link>
+                <Link href="/" className="flex-1">
+                  <Button
+                    variant="ghost"
+                    size="lg"
+                    className="w-full justify-center"
+                  >
+                    {t("completion_dashboard")}
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          )}
+        </div>
+      </main>
     </div>
+  );
+}
+
+export default function CompletePage({ params }) {
+  const { id } = use(params);
+  return (
+    <DataProvider>
+      <CompleteContent id={id} />
+    </DataProvider>
   );
 }

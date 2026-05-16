@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/Button";
 import { generateClarifyQuestions } from "@/lib/ai/clientGenerate";
 import { parseClarifyQuestions } from "@/lib/ai/parser";
+import { createToastSequence } from "@/lib/toastSequence";
 import { useI18n } from "@/lib/i18n";
 
 // ─── GhostInput ───────────────────────────────────────────────────────
@@ -140,7 +141,7 @@ const GhostInput = memo(
   })
 );
 
-// ─── Question card ────────────────────────────────────────────────────
+// ─── QuestionCard ─────────────────────────────────────────────────────
 
 const QuestionCard = memo(function QuestionCard({
   question,
@@ -185,7 +186,7 @@ const QuestionCard = memo(function QuestionCard({
           ref={inputRef}
           inputId={`clarify-${index}`}
           value={value ?? ""}
-          placeholder={question.placeholder ?? "Your answer…"}
+          placeholder={question.placeholder ?? ""}
           onChange={onChange}
           onEnter={onEnter}
           autoFocus={autoFocus}
@@ -245,7 +246,7 @@ export function StepClarify({
   cachedQuestions,
   onQuestionsLoaded,
 }) {
-  const { locale } = useI18n();
+  const { locale, t } = useI18n();
   const [questions, setQuestions] = useState(cachedQuestions ?? []);
   const [loading, setLoading] = useState(cachedQuestions === null);
   const [error, setError] = useState(null);
@@ -253,6 +254,8 @@ export function StepClarify({
   const hasFetched = useRef(false);
   const inputRefs = useRef([]);
   const mountedRef = useRef(true);
+  // Toast sequence ref — one per fetch attempt
+  const toastSeqRef = useRef(null);
 
   // Sync if parent provides questions after initial render
   useEffect(() => {
@@ -273,28 +276,50 @@ export function StepClarify({
     mountedRef.current = true;
     return () => {
       mountedRef.current = false;
+      // Clean up toast sequence on unmount
+      toastSeqRef.current?.unmount();
+      toastSeqRef.current = null;
     };
   }, []);
 
   async function fetchQuestions() {
     setLoading(true);
     setError(null);
+
+    // Start the toast engagement sequence
+    toastSeqRef.current?.unmount();
+    toastSeqRef.current = createToastSequence("questions", locale);
+    toastSeqRef.current.start();
+
     try {
-      // Pass current locale so questions are generated in user's language
       const text = await generateClarifyQuestions(idea, locale);
       const parsed = parseClarifyQuestions(text);
       if (!mountedRef.current) return;
+
+      // Success — stop toast sequence
+      toastSeqRef.current?.success(t("clarify_toast_ready"));
+      toastSeqRef.current = null;
+
       setQuestions(parsed);
       onQuestionsLoaded?.(parsed);
     } catch {
       if (!mountedRef.current) return;
-      setError("Couldn't load questions. You can retry or skip this step.");
+
+      // Error — stop toast sequence
+      toastSeqRef.current?.error(t("clarify_toast_error"));
+      toastSeqRef.current = null;
+
+      setError(t("intake_clarify_error_desc"));
     } finally {
       if (mountedRef.current) setLoading(false);
     }
   }
 
   function handleRetry() {
+    // Clean up previous sequence if any
+    toastSeqRef.current?.unmount();
+    toastSeqRef.current = null;
+
     hasFetched.current = false;
     hasFetched.current = true;
     fetchQuestions();
@@ -334,11 +359,10 @@ export function StepClarify({
     <div className="flex flex-col gap-6 sm:gap-8">
       <div>
         <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)] mb-2">
-          A few quick questions
+          {t("intake_clarify_title")}
         </h1>
         <p className="text-sm sm:text-base text-[var(--text-secondary)]">
-          These help shape a plan that fits your actual situation. Answer in
-          your own words — rough is fine.
+          {t("intake_clarify_desc")}
         </p>
       </div>
 
@@ -346,13 +370,13 @@ export function StepClarify({
         <div
           className="flex flex-col gap-3"
           role="status"
-          aria-label="Loading questions"
+          aria-label={t("intake_clarify_loading")}
         >
           {[0, 1, 2].map((i) => (
             <SkeletonCard key={i} index={i} />
           ))}
           <p className="text-xs text-center text-[var(--text-tertiary)] mt-1 animate-pulse">
-            Generating questions tailored to your idea…
+            {t("intake_clarify_loading")}
           </p>
         </div>
       )}
@@ -363,7 +387,7 @@ export function StepClarify({
             <span className="text-lg shrink-0">⚠️</span>
             <div className="flex-1 min-w-0">
               <p className="text-sm font-medium text-[var(--amber)] mb-1">
-                Couldn't load questions
+                {t("intake_clarify_error_title")}
               </p>
               <p className="text-xs text-[var(--text-secondary)] mb-3">
                 {error}
@@ -374,14 +398,14 @@ export function StepClarify({
                   onClick={handleRetry}
                   className="h-7 px-3 text-xs font-medium rounded-[var(--r-md)] bg-[var(--amber)] text-white hover:opacity-90 transition-opacity"
                 >
-                  Retry
+                  {t("common_retry")}
                 </button>
                 <button
                   type="button"
                   onClick={onNext}
                   className="h-7 px-3 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] transition-colors"
                 >
-                  Skip this step
+                  {t("intake_skip")}
                 </button>
               </div>
             </div>
@@ -412,13 +436,13 @@ export function StepClarify({
 
       {canProceed && questions.length > 0 && (
         <p className="text-xs text-center text-[var(--emerald)] font-medium -mt-2">
-          ✓ All answered — ready to generate your plan!
+          {t("intake_clarify_all_answered")}
         </p>
       )}
 
       <div className="flex items-center justify-between gap-3">
         <Button variant="ghost" onClick={onBack} type="button">
-          ← Back
+          {t("common_back")}
         </Button>
         <div className="flex items-center gap-2">
           <Button
@@ -428,12 +452,15 @@ export function StepClarify({
             type="button"
             className="text-[var(--text-tertiary)]"
           >
-            Skip
+            {t("intake_skip")}
           </Button>
           <Button onClick={onNext} size="lg" type="button" disabled={loading}>
             {canProceed
-              ? "Build my plan →"
-              : `Answer all (${answeredCount}/${questions.length})`}
+              ? t("intake_clarify_build")
+              : t("intake_clarify_answer_count", {
+                  answered: answeredCount,
+                  total: questions.length,
+                })}
           </Button>
         </div>
       </div>

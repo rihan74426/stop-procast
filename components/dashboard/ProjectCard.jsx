@@ -7,8 +7,10 @@ import { overallProgress, activePhase, nextAction } from "@/lib/utils/progress";
 import { projectAgeLabel, timeAgo } from "@/lib/utils/date";
 import { FaFire } from "react-icons/fa";
 import { getPressure, PRESSURE_COLORS, PRESSURE_LABELS } from "@/lib/pressure";
+import { useI18n } from "@/lib/i18n";
 
 export function ProjectCard({ project }) {
+  const { t } = useI18n();
   const progress = overallProgress(project);
   const phase = activePhase(project);
   const next = nextAction(project);
@@ -53,7 +55,7 @@ export function ProjectCard({ project }) {
         {/* Phase + pressure badges */}
         <div className="flex flex-wrap gap-1.5 sm:gap-2 mb-3 sm:mb-4">
           {isCompleted ? (
-            <Badge status="completed">✓ Shipped</Badge>
+            <Badge status="completed">✓ {t("project_done")}</Badge>
           ) : (
             <>
               {phase && <Badge variant="violet">{phase.name}</Badge>}
@@ -73,7 +75,7 @@ export function ProjectCard({ project }) {
         {next && !isCompleted && (
           <div className="rounded-[var(--r-md)] bg-[var(--bg-surface)] border border-[var(--border)] px-3 py-2 mb-3 sm:mb-4">
             <p className="text-xs text-[var(--text-tertiary)] mb-0.5">
-              Next action
+              {t("card_next_action")}
             </p>
             <p className="text-xs sm:text-sm text-[var(--text-primary)] line-clamp-1">
               {next}
@@ -85,7 +87,7 @@ export function ProjectCard({ project }) {
         <div className="flex items-center justify-between text-xs text-[var(--text-tertiary)]">
           <span>
             {project.tasks.filter((t) => t.status === "done").length}/
-            {project.tasks.length} tasks
+            {project.tasks.length} {t("intake_tasks")}
           </span>
           <div className="flex items-center gap-2 sm:gap-3">
             {project.streakDays > 0 && (

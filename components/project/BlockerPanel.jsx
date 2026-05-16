@@ -4,9 +4,11 @@ import { useState } from "react";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { Button } from "@/components/ui/Button";
 import { timeAgo } from "@/lib/utils/date";
+import { useI18n } from "@/lib/i18n";
 import { PiConfetti } from "react-icons/pi";
 
 export function BlockerPanel({ project }) {
+  const { t } = useI18n();
   const addBlocker = useProjectStore((s) => s.addBlocker);
   const resolveBlocker = useProjectStore((s) => s.resolveBlocker);
   const [text, setText] = useState("");
@@ -26,7 +28,7 @@ export function BlockerPanel({ project }) {
     <div>
       <div className="flex items-center justify-between mb-3">
         <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider">
-          Blockers{" "}
+          {t("blocker_title")}{" "}
           {active.length > 0 && (
             <span className="text-[var(--coral)]">({active.length})</span>
           )}
@@ -35,11 +37,10 @@ export function BlockerPanel({ project }) {
           onClick={() => setAdding((a) => !a)}
           className="text-xs text-[var(--violet)] hover:underline"
         >
-          + Add blocker
+          {t("blocker_add")}
         </button>
       </div>
 
-      {/* Add form */}
       {adding && (
         <div className="flex gap-2 mb-3">
           <input
@@ -50,16 +51,15 @@ export function BlockerPanel({ project }) {
               if (e.key === "Enter") handleAdd();
               if (e.key === "Escape") setAdding(false);
             }}
-            placeholder="Describe what's blocking you…"
+            placeholder={t("blocker_placeholder")}
             className="flex-1 h-9 px-3 text-sm rounded-[var(--r-md)] border border-[var(--coral)] bg-[var(--bg-base)] text-[var(--text-primary)] focus:outline-none"
           />
           <Button size="sm" variant="danger" onClick={handleAdd}>
-            Add
+            {t("blocker_add_btn")}
           </Button>
         </div>
       )}
 
-      {/* Active blockers */}
       {active.length > 0 && (
         <div className="flex flex-col gap-2 mb-3">
           {active.map((b) => (
@@ -80,7 +80,7 @@ export function BlockerPanel({ project }) {
                 onClick={() => resolveBlocker(project.id, b.id)}
                 className="text-xs text-[var(--emerald)] hover:underline shrink-0"
               >
-                Resolve
+                {t("blocker_resolve")}
               </button>
             </div>
           ))}
@@ -89,15 +89,14 @@ export function BlockerPanel({ project }) {
 
       {active.length === 0 && !adding && (
         <p className="text-sm text-[var(--text-tertiary)]">
-          No active blockers. <PiConfetti className="inline" />
+          {t("blocker_none")} <PiConfetti className="inline" />
         </p>
       )}
 
-      {/* Resolved (collapsed) */}
       {resolved.length > 0 && (
         <details className="mt-2">
           <summary className="text-xs text-[var(--text-tertiary)] cursor-pointer hover:text-[var(--text-secondary)]">
-            {resolved.length} resolved
+            {t("blocker_resolved_count", { n: resolved.length })}
           </summary>
           <div className="mt-2 flex flex-col gap-1">
             {resolved.map((b) => (

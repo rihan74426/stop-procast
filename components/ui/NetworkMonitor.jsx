@@ -2,21 +2,21 @@
 
 import { useEffect, useRef } from "react";
 import { useToastStore } from "@/lib/toast";
+import { useI18n } from "@/lib/i18n";
 
 export function NetworkMonitor() {
   const offlineToastId = useRef(null);
   const show = useToastStore((s) => s.show);
   const dismiss = useToastStore((s) => s.dismiss);
+  const { t } = useI18n();
 
   useEffect(() => {
     const handleOffline = () => {
-      if (offlineToastId.current) return; // already showing
-      // Use 'warn' instead of 'error' so the "Report this issue" link
-      // doesn't appear — going offline is expected, not a bug
-      offlineToastId.current = show(
-        "No internet connection — changes will sync when you're back online.",
-        { type: "warn", duration: 0 }
-      );
+      if (offlineToastId.current) return;
+      offlineToastId.current = show(t("network_offline"), {
+        type: "warn",
+        duration: 0,
+      });
     };
 
     const handleOnline = () => {
@@ -24,20 +24,19 @@ export function NetworkMonitor() {
         dismiss(offlineToastId.current);
         offlineToastId.current = null;
       }
-      show("Back online — syncing your changes.", { type: "success" });
+      show(t("network_online"), { type: "success" });
     };
 
     window.addEventListener("offline", handleOffline);
     window.addEventListener("online", handleOnline);
 
-    // Check initial state
     if (!navigator.onLine) handleOffline();
 
     return () => {
       window.removeEventListener("offline", handleOffline);
       window.removeEventListener("online", handleOnline);
     };
-  }, [show, dismiss]);
+  }, [show, dismiss, t]);
 
   return null;
 }

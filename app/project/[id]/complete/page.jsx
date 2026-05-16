@@ -6,18 +6,20 @@ import { useProjectStore } from "@/lib/store/projectStore";
 import { ConfettiBlast } from "@/components/completion/ConfettiBlast";
 import { ProjectStats } from "@/components/completion/ProjectStats";
 import { Postmortem } from "@/components/completion/Postmortem";
-import { TopBar } from "@/components/layout/Topbar"; // Fixed casing
+import { TopBar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";
 import { DataProvider } from "@/components/providers/DataProvider";
+import { useI18n } from "@/lib/i18n";
 
 function CompleteContent({ id }) {
+  const { t } = useI18n();
   const project = useProjectStore((s) => s.getProject(id));
   const [section, setSection] = useState("celebrate");
 
   if (!project) {
     return (
       <div className="flex h-screen items-center justify-center px-4">
-        <p className="text-[var(--text-secondary)]">Project not found.</p>
+        <p className="text-[var(--text-secondary)]">{t("project_not_found")}</p>
       </div>
     );
   }
@@ -34,19 +36,19 @@ function CompleteContent({ id }) {
               <div>
                 <div className="text-5xl sm:text-6xl mb-3 sm:mb-4">🚀</div>
                 <h1 className="font-display font-bold text-3xl sm:text-4xl text-[var(--text-primary)] mb-2 sm:mb-3">
-                  You shipped it.
+                  {t("completion_shipped")}
                 </h1>
                 <p className="text-base sm:text-lg text-[var(--text-secondary)] max-w-md">
                   <strong className="text-[var(--text-primary)]">
                     {project.projectTitle}
                   </strong>{" "}
-                  is done. Most people never finish what they start. You did.
+                  {t("completion_desc")}
                 </p>
               </div>
 
               <div className="w-full text-left">
                 <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3 sm:mb-4 text-center">
-                  Project stats
+                  {t("completion_stats_label")}
                 </p>
                 <ProjectStats project={project} />
               </div>
@@ -57,7 +59,7 @@ function CompleteContent({ id }) {
                   onClick={() => setSection("retro")}
                   className="justify-center"
                 >
-                  Write retrospective →
+                  {t("completion_write_retro")}
                 </Button>
                 <Button
                   variant="emerald"
@@ -65,7 +67,7 @@ function CompleteContent({ id }) {
                   onClick={() => setSection("done")}
                   className="justify-center"
                 >
-                  All done ✓
+                  {t("completion_all_done")}
                 </Button>
               </div>
             </div>
@@ -77,7 +79,7 @@ function CompleteContent({ id }) {
                 onClick={() => setSection("celebrate")}
                 className="flex items-center gap-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors self-start"
               >
-                ← Back
+                {t("completion_back")}
               </button>
               <Postmortem project={project} onDone={() => setSection("done")} />
             </div>
@@ -88,17 +90,17 @@ function CompleteContent({ id }) {
               <div>
                 <div className="text-4xl sm:text-5xl mb-3 sm:mb-4">🎯</div>
                 <h2 className="font-display font-bold text-2xl sm:text-3xl text-[var(--text-primary)] mb-2 sm:mb-3">
-                  What's next?
+                  {t("completion_whats_next")}
                 </h2>
                 <p className="text-[var(--text-secondary)] max-w-sm">
-                  Your retrospective is saved. Build on this momentum.
+                  {t("completion_retro_saved")}
                 </p>
               </div>
 
               <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
                 <Link href="/new" className="flex-1">
                   <Button size="lg" className="w-full justify-center">
-                    Start next project
+                    {t("completion_start_next")}
                   </Button>
                 </Link>
                 <Link href="/" className="flex-1">
@@ -107,7 +109,7 @@ function CompleteContent({ id }) {
                     size="lg"
                     className="w-full justify-center"
                   >
-                    Dashboard
+                    {t("completion_dashboard")}
                   </Button>
                 </Link>
               </div>
