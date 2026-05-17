@@ -425,5 +425,12 @@ intake_scope_standard
 are appearing in the stepReview. we need to optimize it properly.
 then the feedback page hasn't translated at all.
 
+we have to confirm before logging out. warning their getting out of their saved projects.
+
 1. Use an i18n library for the app UI
    Use an npm i18n package such as i18next or, in Next.js, next-intl. These libraries are designed for locale routing, translation keys, and structured message loading, so your interface can swap languages smoothly without calling an external API for every label. next-intl also handles locale-based routing and localized pathnames in Next.js.
+
+check the lean and ambitious plans and their flows if they're working properly. I choose ambitious and the ai returned the 6 week plan but the project was set in two phases only.
+
+project publicization for to see everyone. and the search can refer to that project not to regenerate. keep this into the next version plan.
+also the bengali and arabic choosen font will be added in the next version.
