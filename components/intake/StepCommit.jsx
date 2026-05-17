@@ -2,9 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Button } from "@/components/ui/Button";
+import { useI18n } from "@/lib/i18n";
 import { FaRocket } from "react-icons/fa";
 
 export function StepCommit({ blueprint, onBack, onConfirm }) {
+  const { t } = useI18n();
   const [deadline, setDeadline] = useState("");
   const [committed, setCommitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -26,7 +28,6 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
     };
   }, []);
 
-  // Suggest a deadline based on blueprint timeline
   const suggestDeadline = useCallback(() => {
     const weeks = parseInt(blueprint.timeline) || 6;
     const d = new Date();
@@ -60,17 +61,15 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
     if (!committed || submitting) return;
     setError(null);
     setSubmitting(true);
-    setStatusMessage("Creating your project…");
+    setStatusMessage(t("intake_commit_creating"));
     startProgress();
 
     try {
       await onConfirm({ deadline: deadline || null });
-      // If navigation happens, this component unmounts — that's fine
-      // If it doesn't navigate (error in parent), we reset
       if (mountedRef.current) {
         stopProgress();
         setProgress(100);
-        setStatusMessage("Project created — redirecting…");
+        setStatusMessage(t("toast_project_created"));
         setTimeout(() => {
           if (mountedRef.current) setSubmitting(false);
         }, 500);
@@ -81,18 +80,22 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
       setSubmitting(false);
       setStatusMessage("");
       setProgress(0);
-      setError(e?.message ?? "Failed to create project. Please try again.");
+      setError(e?.message ?? t("common_error"));
     }
   };
+
+  const daysUntilDeadline = deadline
+    ? Math.max(1, Math.ceil((new Date(deadline) - Date.now()) / 86400000))
+    : null;
 
   return (
     <div className="flex flex-col gap-8">
       <div>
         <h1 className="text-3xl font-display font-semibold text-[var(--text-primary)] mb-2">
-          Make it real
+          {t("intake_commit_title")}
         </h1>
         <p className="text-[var(--text-secondary)]">
-          A plan without a deadline is just a wish. Set one now.
+          {t("intake_commit_desc")}
         </p>
       </div>
 
@@ -105,9 +108,13 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
           {blueprint.oneLineGoal}
         </p>
         <div className="mt-4 flex flex-wrap gap-3 text-xs text-[var(--text-tertiary)]">
-          <span>{blueprint.phases?.length ?? 0} phases</span>
+          <span>
+            {blueprint.phases?.length ?? 0} {t("intake_phases")}
+          </span>
           <span>·</span>
-          <span>{blueprint.tasks?.length ?? 0} tasks</span>
+          <span>
+            {blueprint.tasks?.length ?? 0} {t("intake_tasks")}
+          </span>
           {blueprint.estimatedEffort && (
             <>
               <span>·</span>
@@ -120,7 +127,7 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
       {/* Deadline picker */}
       <div className="flex flex-col gap-3">
         <label className="text-sm font-medium text-[var(--text-primary)]">
-          Target completion date
+          {t("intake_deadline")}
         </label>
         <div className="flex gap-3">
           <input
@@ -137,17 +144,12 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
             size="md"
             disabled={submitting}
           >
-            Suggest
+            {t("intake_suggest")}
           </Button>
         </div>
-        {deadline && (
+        {deadline && daysUntilDeadline && (
           <p className="text-xs text-[var(--text-secondary)]">
-            That gives you{" "}
-            {Math.max(
-              1,
-              Math.ceil((new Date(deadline) - Date.now()) / 86400000)
-            )}{" "}
-            days.
+            {t("intake_commit_days", { days: daysUntilDeadline })}
           </p>
         )}
       </div>
@@ -176,9 +178,7 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
           )}
         </div>
         <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-          I commit to working on this project until it ships. I understand that
-          the app will hold me accountable with daily reminders and progress
-          tracking.
+          {t("intake_commit_checkbox")}
         </p>
       </label>
 
@@ -211,7 +211,7 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
 
       <div className="flex items-center justify-between">
         <Button variant="ghost" onClick={onBack} disabled={submitting}>
-          ← Review plan
+          {t("intake_commit_review_back")}
         </Button>
         <Button
           variant="emerald"
@@ -219,7 +219,7 @@ export function StepCommit({ blueprint, onBack, onConfirm }) {
           disabled={!committed || submitting}
           onClick={handleConfirm}
         >
-          {submitting ? "Starting…" : "Start project"}{" "}
+          {submitting ? t("intake_commit_starting") : t("intake_start")}{" "}
           <FaRocket className="inline" />
         </Button>
       </div>

@@ -29,121 +29,250 @@ Single source of truth. Read before writing any code.
 | 10    | Bug Fixes: Ghost, AI, Store            | ✅ Done |
 | 11    | Parser Auto-Repair, Edit Detection, UX | ✅ Done |
 | 12    | Production Hardening (14 fixes)        | ✅ Done |
+| 13    | Full i18n, Clarify Toast, Regen Fix    | ✅ Done |
 
 ---
 
-## Phase 11 — Parser Auto-Repair, Edit Detection, StepClarify Polish
+## Phase 13 — Full i18n, Clarify Toast, Regen Fix
 
 **Status: ✅ Done**
 
 ### What was fixed / added
 
-#### `lib/ai/parser.js` — Auto-repair invalid JSON
+#### `lib/i18n/translations.js` — Complete key audit
 
-- Added `repairJSON()` function that handles the most common LLM output failures **before throwing**: trailing commas, unclosed brackets/strings, single-quoted strings, truncated responses.
-- Counts open braces character-by-character and appends correct closing brackets.
-- `parseClarifyQuestions` has a regex fallback that extracts `question`/`placeholder` pairs even when `JSON.parse` completely fails.
-- Task objects (`[{title: "..."}]` instead of `["..."]`) are now accepted — the parser handles both shapes.
-- Blocker objects with a missing `description` field are filtered rather than crashing.
-- **No regeneration triggered on repair — zero extra API cost.**
+- Added **100+ missing translation keys** covering every visible string in the app.
+- New key groups: `next_action_*`, `streak_*`, `blocker_*`, `task_*`, `pressure_*`, `completion_*`, `postmortem_*`, `stats_*`, `confirm_*`, `toast_*`, `wait_*`, `clarify_toast_*`, `blueprint_toast_*`, `regen_*`, `import_*`, `save_prompt_*`, `network_*`, `empty_state_*`, `card_*`, `feedback_*`, `export_email_*`, `common_*`, `intake_commit_*`, `intake_clarify_*`, `intake_review_*`.
+- All 7 languages updated: `en`, `bn`, `ar`, `fr`, `es`, `de`, `zh`.
+- Bengali (`bn`) — fully translated all new keys.
 
-#### `app/new/page.jsx` — Edit detection with explicit permission
+#### `lib/toastSequence.js` — i18n-aware
 
-- Blueprint key now tracks `idea + scopeLevel + clarifyAnswers` together (previously only `idea + scopeLevel`).
-- When inputs change after a blueprint is generated and the user navigates to Step 3 (Review), a `RegenPermissionBanner` appears with two clear choices: **"Regenerate plan ↺"** or **"Keep current plan"**.
-- Choosing "Keep" stamps the current inputs as accepted — banner won't reappear.
-- A compact `✏️ Edited` badge shows in the breadcrumb on other steps.
-- **No surprise regenerations** — user is always in control.
+- `createToastSequence(context, locale)` now accepts a `locale` parameter.
+- Messages resolved from `translations[locale]` at sequence-start time.
+- Keys for questions: `clarify_toast_generating/analyzing/crafting/polishing/working`.
+- Keys for blueprint: `blueprint_toast_analysing/mapping/defining/writing/blockers/tools/finalising`.
+- Falls back to English if locale key missing.
 
-#### `components/intake/StepClarify.jsx` — Polish
+#### `components/intake/StepClarify.jsx` — Toast sequence fixed
 
-- Ghost is simpler and more reliable: matches typed prefix against `q.placeholder` only (no complex rule system).
-- Native placeholder hidden while ghost is showing — no text overlap.
-- Enter key advances focus to the next question; on the last question it submits if all are filled.
-- Loading skeleton has staggered animation delays.
-- Error state has a proper Retry / Skip split with distinct styles.
-- CTA button label changes to `"Answer all (2/3)"` when not all are filled.
+- **Was broken**: no toasts fired during question fetch.
+- **Fixed**: `createToastSequence("questions", locale)` called at start of `fetchQuestions()`.
+- Sequence dismissed with `toastSeqRef.current.success(t("clarify_toast_ready"))` on success.
+- Sequence dismissed with `toastSeqRef.current.error(t("clarify_toast_error"))` on failure.
+- Toast sequence cleaned up on unmount via `toastSeqRef.current?.unmount()`.
+- All UI strings use `t()`: title, desc, loading text, error messages, buttons.
+
+#### `components/intake/StepReview.jsx` — Locale-aware toast sequence
+
+- `createToastSequence("blueprint", locale)` — passes locale from `useI18n()`.
+- Progress stage labels use `t(stage.key)` instead of hardcoded English.
+- All UI strings translated: limit gate, error state, streaming UI, blueprint display, sign-in nudge.
+
+#### `app/new/page.jsx` — i18n wait sequence + regen fix
+
+- `startWaitSequence(t)` receives `t` function — all 4 wait messages use translation keys.
+- `RegenPermissionBanner` receives `t` prop and uses `t("regen_banner_title/desc/regenerate/keep")`.
+- `handleRegeneratePlan` now correctly sets `genStatus("streaming")`, resets to step 3, then calls `runGeneration()` — no more blank screen after regen.
+- Blueprint key computed inside `runGeneration()` from current `genInputsRef` values — eliminates stale closure issue.
+- `tRef` tracks latest `t` function so `runGeneration` always uses current locale's messages.
+
+#### `lib/store/projectStore.js` — i18n toast messages
+
+- `tr(key)` helper reads `momentum_locale` from localStorage (store runs outside React).
+- All `toast.*` calls use `tr()` for translated messages.
+- `toast_syncing`, `toast_sync_saved`, `toast_sync_offline`, `toast_save_local`, `toast_sync_warn` keys used.
+
+#### `components/ui/NetworkMonitor.jsx` — i18n
+
+- Uses `useI18n()` → `t("network_offline")` and `t("network_online")`.
+
+#### Components fully i18n'd (all strings use `t()`):
+
+- `components/project/NextAction.jsx` — `next_action_*` keys
+- `components/project/StreakBanner.jsx` — `streak_*` keys
+- `components/project/BlockerPanel.jsx` — `blocker_*` keys
+- `components/project/TaskList.jsx` — `task_*` keys
+- `components/project/ProjectPressure.jsx` — `pressure_*` keys
+- `components/project/EmailExportModal.jsx` — `export_email_*` keys
+- `components/completion/Postmortem.jsx` — `postmortem_*` keys
+- `components/completion/ProjectStats.jsx` — `stats_*` keys
+- `components/dashboard/EmptyState.jsx` — `empty_state_*` keys
+- `components/dashboard/ProjectCard.jsx` — `card_*` keys
+- `components/ui/SavePromptModal.jsx` — `save_prompt_*` keys
+- `components/intake/StepCommit.jsx` — `intake_commit_*` keys
+- `app/project/[id]/page.jsx` — confirm modals, export toasts, all labels
+- `app/project/[id]/complete/page.jsx` — `completion_*` keys
+
+#### `app/settings/page.jsx` — patch
+
+- `"Notifications"` title → `t("settings_notifications")`
+- Hardcoded description → `t("settings_notifications_desc")`
+
+---
+
+## i18n Rules — CRITICAL
+
+### Translation key structure
+
+Keys are `domain_sub_detail`. Never use raw English strings in JSX — always `t("key")`.
+
+### Store-level translations
+
+The Zustand store runs outside React and cannot use `useI18n()`. Use the `tr(key)` helper in `lib/store/projectStore.js` which reads `momentum_locale` from localStorage.
+
+### Toast sequence locale
+
+Always pass `locale` when creating a toast sequence:
+
+```js
+const { locale, t } = useI18n();
+const seq = createToastSequence("blueprint", locale); // ← locale required
+```
+
+### Adding new translations
+
+1. Add the key to `en` first (canonical).
+2. Add to all 6 other languages (`bn`, `ar`, `fr`, `es`, `de`, `zh`).
+3. Update `CLAUDE.md` with the new key group.
+4. Never hard-code visible strings in JSX — always use `t()`.
+
+### Missing key fallback
+
+`t(key)` falls back: `locale dict → en dict → key itself`. So a missing key shows the key name, making it easy to spot.
+
+---
+
+## Clarify Toast Sequence — CRITICAL
+
+`StepClarify` must show a toast sequence while `generateClarifyQuestions()` runs. Pattern:
+
+```js
+// Start sequence
+toastSeqRef.current = createToastSequence("questions", locale);
+toastSeqRef.current.start();
+
+try {
+  const text = await generateClarifyQuestions(idea, locale);
+  // ...
+  toastSeqRef.current?.success(t("clarify_toast_ready"));
+  toastSeqRef.current = null;
+} catch {
+  toastSeqRef.current?.error(t("clarify_toast_error"));
+  toastSeqRef.current = null;
+}
+```
+
+Always clean up on unmount:
+
+```js
+useEffect(() => {
+  mountedRef.current = true;
+  return () => {
+    mountedRef.current = false;
+    toastSeqRef.current?.unmount();
+  };
+}, []);
+```
+
+---
+
+## Regen Logic — CRITICAL
+
+### Blueprint key
+
+```js
+const inputKey = `${idea.trim()}||${scopeLevel}||${JSON.stringify(
+  clarifyAnswers
+)}`;
+const blueprintIsStale =
+  blueprint !== null && blueprintKey !== null && inputKey !== blueprintKey;
+const showRegenBanner = blueprintIsStale && (step === 2 || step === 3);
+```
+
+### handleRegeneratePlan
+
+```js
+const handleRegeneratePlan = useCallback(() => {
+  retryCountRef.current = 0;
+  setBlueprint(null);
+  setBlueprintKey(null);
+  setGenStatus("streaming");
+  setGenCharCount(0);
+  setGenError(null);
+  setStep(3); // Go to review step
+  setMaxReached((prev) => Math.max(prev, 3));
+  runGeneration(); // Start generation immediately
+}, [runGeneration]);
+```
+
+### handleKeepPlan
+
+```js
+const handleKeepPlan = useCallback(() => {
+  setBlueprintKey(inputKey); // Stamp current inputs as accepted
+  toast.success(t("toast_keep_plan"), { duration: 2000 });
+}, [inputKey, t]);
+```
+
+### Blueprint key stamped inside runGeneration
+
+The key is captured from `genInputsRef.current` **inside** `runGeneration()` after parse succeeds — never from stale closure:
+
+```js
+const currentInputKey = `${currentIdea.trim()}||${currentScope}||${JSON.stringify(
+  currentAnswers
+)}`;
+setBlueprintKey(currentInputKey);
+```
+
+---
+
+## Wait Sequence — CRITICAL
+
+`startWaitSequence(t)` in `app/new/page.jsx` uses the `t` function:
+
+```js
+function startWaitSequence(t) {
+  const MESSAGES = [
+    { after: 6000, key: "wait_thinking" },
+    { after: 15000, key: "wait_switching" },
+    { after: 28000, key: "wait_still_working" },
+    { after: 42000, key: "wait_almost" },
+  ];
+  // ...shows one toast at a time, dismissing previous before showing next
+}
+```
+
+Pass a fresh `tRef.current` so locale changes are reflected:
+
+```js
+const tRef = useRef(t);
+useEffect(() => {
+  tRef.current = t;
+}, [t]);
+// Inside runGeneration:
+stopWaitRef.current = startWaitSequence(tRef.current);
+```
 
 ---
 
 ## Phase 12 — Production Hardening (14 fixes)
 
-**Status: ✅ Done**
+[Previous content preserved — see git history]
 
-### Files changed and what was fixed
+Key fixes:
 
-#### `lib/ai/clientGenerate.js`
-
-- Added `"use client"` directive at the top — **required**, prevents Next.js bundling this into server paths.
-- Puter is now imported **lazily** via `await import("./puter")` inside a `getPuterModule()` helper instead of at module level. Module graph never pulls `window` access into SSR.
-- Synchronous `checkPuterAvailable()` (reads `window.puter` set by CDN, not the module) used for the fast path check.
-
-#### `lib/Notifications.js`
-
-- **Removed** `"use client"` directive — this is a utility module, not a component.
-- All functions already guard `typeof window` themselves. The directive was causing Next.js to treat it as a client boundary and risked crashes when imported transitively.
-
-#### `lib/store/projectStore.js` — three fixes
-
-1. **`hydrateFromServer` `finally` block**: `toast.dismiss(syncId)` and `s.hydrated = true` are now in a `finally` block — they execute even on early return (DB unavailable) or on throw. The loading toast can never get permanently stuck.
-2. **`completeProject` stale snapshot**: Postmortem stats snapshot is now captured **inside** the Immer `set()` callback (where draft values are final) instead of in a subsequent `get()` call. Eliminates the race between Immer commit and the snapshot read. The captured object is used directly for the remote PATCH.
-3. **`debouncedRemoteUpdate` silent errors**: Tracks consecutive failures per project ID in a `failureCount` Map. After 3 consecutive failures shows a single `toast.warn` ("Changes saved locally but not syncing to cloud"). Does not spam on every keystroke. Resets counter on success.
-
-#### `components/intake/StepReview.jsx`
-
-- **`handleRetry` now resets `hasStarted.current`**: Previously only `retryCount.current` was reset. Leaving `hasStarted.current = true` meant the `useEffect` gate was permanently closed — back-navigating after an error and returning to the step produced a blank screen with no generation starting ever again.
-- Pattern: reset `hasStarted.current = false`, then immediately set to `true`, then call `runGeneration()` directly (bypassing the effect gate).
-- **Progress bar reaches 100%**: `setCharCount(Infinity)` is called after the stream completes, with a 300ms delay before transitioning to the "done" UI. Users see the bar complete instead of jumping from 98% to disappearing.
-
-#### `app/project/[id]/export/route.js`
-
-- **Swapped `connectDB()` → `tryConnectDB()`**: Export route was the only API route still using the throwing version. A DB blip during export now gracefully falls through to the base64 client data instead of returning a 500.
-- **500KB payload cap**: Base64 `data` query parameter is checked against `MAX_PAYLOAD_BYTES = 500 * 1024` before decoding. Oversized payloads return 413.
-
-#### `app/api/export-email/route.js`
-
-- **Production 503 when `RESEND_API_KEY` is absent**: Added `const isDev = process.env.NODE_ENV !== "production"`. In dev: still returns the friendly 200 dev-mode message. In production with a missing key: returns 503 with a user-facing message suggesting PDF or Markdown export. No more silent false successes that show a toast but send no email.
-
-#### `app/api/generate/route.js`
-
-- **`x-ratelimit-*` response headers**: All responses now include `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`. Clients can self-throttle even when in-memory cold-start resets the counter.
-- **Cold-start documented**: Comment at top of file explicitly states the `ipUsage` Map resets on cold start and why this is acceptable for MVP. Future path: Redis/Upstash.
-- `checkRateLimit` returns `remaining` and `reset` values, threaded through to all response paths.
-
-#### `lib/ai/puter.js`
-
-- **`PUTER_LOAD_TIMEOUT`: 5000ms → 2000ms** — fail fast to API fallback instead of making user wait 5s.
-- **`PUTER_POLL_INTERVAL`: 150ms → 50ms** — detect puter availability ~3x faster when it is loaded; hit the timeout ~3x faster when it isn't.
-
-#### `components/intake/StepClarify.jsx`
-
-- **`hasFetched` ref remount fix**: The ref was local to component instance — on unmount/remount (back-nav, React Strict Mode) it reset to `false` and re-fetched even when `cachedQuestions` was populated.
-- **Fix**: Initial state now derived from `cachedQuestions` prop directly. `loading` starts as `false` when `cachedQuestions` is non-null. `useEffect` only triggers fetch when `cachedQuestions === null` on mount. A second `useEffect` syncs if the parent provides questions after initial render. The parent's `onQuestionsLoaded` cache is the source of truth across remounts.
-
-#### `app/project/[id]/page.jsx`
-
-- **Replaced both `confirm()` dialogs** (delete + complete) with a `ConfirmModal` component built on the existing `Modal` from the design system.
-- `ConfirmModal` shows project name in the description, has a spinner on the confirm button while the async operation runs, uses semantic variants (`danger` for delete, `emerald` for complete).
-- Single `confirmModal` state object `{ open, type, loading }` drives both actions. No more main-thread blocking, no more iframe/PWA breakage.
-
----
-
-## Ghost Writing Rules (canonical)
-
-### StepCapture
-
-- Ghost matches typed prefix against the `EXAMPLES` array (case-insensitive).
-- Returns `example.slice(value.length)` when `example.toLowerCase().startsWith(value.toLowerCase())`.
-- If no example starts with the typed text, ghost is empty.
-- Tab or → accepts the full ghost. Ghost cleared on blur or no match.
-
-### StepClarify
-
-- Ghost matches typed prefix against `q.placeholder` (the AI-generated example answer for that question).
-- Returns `placeholder.slice(value.length)` when placeholder starts with the typed text.
-- Native placeholder hidden while ghost is showing — no text overlap.
-- Tab or → accepts. ✕ button dismisses. Esc clears.
-- Enter advances focus to next question; submits on last if all filled.
+- `clientGenerate.js` — `"use client"` + lazy puter import
+- `Notifications.js` — removed `"use client"` directive
+- `projectStore.js` — `hydrateFromServer` finally block, `completeProject` snapshot inside Immer, `debouncedRemoteUpdate` failure counter
+- `StepReview.jsx` — `handleRetry` resets `hasStarted.current`, progress bar reaches 100%
+- `export/route.js` — `tryConnectDB()`, 500KB payload cap
+- `export-email/route.js` — 503 in production when RESEND_API_KEY absent
+- `generate/route.js` — `X-RateLimit-*` headers on all responses
+- `puter.js` — PUTER_LOAD_TIMEOUT 2000ms, PUTER_POLL_INTERVAL 50ms
+- `StepClarify.jsx` — `hasFetched` ref remount fix
+- `project/[id]/page.jsx` — `window.confirm()` → `ConfirmModal`
 
 ---
 
@@ -158,128 +287,23 @@ Single source of truth. Read before writing any code.
 | ambitious | OpenRouter (API) | **server-side** | Rate limited |
 
 **Puter.js is a browser SDK — it CANNOT run in Next.js API routes.**
-All puter calls happen in `lib/ai/clientGenerate.js` (client-only, `"use client"` at top).
-
-### Stream type contract
-
-Both puter and the API route return `ReadableStream<Uint8Array>`.
-
-- `puterStream()` in `lib/ai/puter.js`: gets full text, emits as chunked `ReadableStream` via `TextEncoder`.
-- `POST /api/generate` body: `ReadableStream<Uint8Array>` from the fetch Response.
-
-StepReview's reader loop decodes with:
-
-```js
-value instanceof Uint8Array
-  ? decoder.decode(value, { stream: true })
-  : String(value);
-```
 
 ### Entry point: `lib/ai/clientGenerate.js`
 
-- **`"use client"` required at top** — hard boundary against server bundling.
-- Puter imported **lazily** via `await import("./puter")` — module graph safe.
-- `checkPuterAvailable()` is synchronous (reads `window.puter`, not the module).
+- `"use client"` required at top.
+- Puter imported lazily via `await import("./puter")`.
 - `generateBlueprint()` → puter for lean/standard, API route for ambitious or puter failure.
-- `generateClarifyQuestions()` → puter first, API fallback.
-- `generateReengage()` → puter first, API fallback.
-
-### `lib/ai/puter.js`
-
-- `PUTER_LOAD_TIMEOUT = 2000ms` (was 5000) — fail fast.
-- `PUTER_POLL_INTERVAL = 50ms` (was 150) — detect readiness faster.
-- `puterGenerate(prompt)` — non-streaming, returns string.
-- `puterStream(system, user)` — simulates streaming via chunked ReadableStream.
-- `isPuterAvailable()` — synchronous check of `window.puter?.ai?.chat`.
-
-### `app/api/generate/route.js`
-
-Only called for: ambitious scope OR puter failure fallback.
-
-**Rate limiter note**: In-memory `ipUsage` Map resets on Vercel cold start. This is acceptable for MVP — the client-side `rateLimit.js` is the primary UX guard. `X-RateLimit-*` headers are returned on every response so clients can self-throttle. For hard server-side enforcement at scale: migrate to Redis/Upstash.
-
-### `app/layout.js`
-
-```html
-<script src="https://js.puter.com/v2/" defer />
-```
-
-ONLY way puter is loaded. Do not import as a module.
-
----
-
-## JSON Auto-Repair — CRITICAL
-
-`lib/ai/parser.js` attempts auto-repair before throwing. The `repairJSON()` function handles:
-
-1. Markdown fence stripping (`\`\`\`json`)
-2. Outer `{...}` extraction
-3. Trailing commas before `]` or `}`
-4. Unclosed strings (appends `"`)
-5. Unclosed arrays/objects (counts open brackets, appends closers)
-6. Single-quoted strings → double-quoted
-
-If repair succeeds, the blueprint is parsed normally — **no regeneration, no extra API call**.
-If repair fails, a clear error is thrown for the UI retry flow.
-
-`parseClarifyQuestions` has an additional regex fallback that extracts `question`/`placeholder` pairs even when `JSON.parse` completely fails on the repaired string.
-
----
-
-## Edit Detection (Wizard) — CRITICAL
-
-`app/new/page.jsx` tracks `inputKey = idea + "||" + scopeLevel + "||" + JSON.stringify(clarifyAnswers)`.
-
-When a blueprint exists and `inputKey !== blueprintKey`:
-
-- `blueprintIsStale = true`
-- On Step 3 (Review): `RegenPermissionBanner` renders above `StepReview`.
-- User must explicitly choose **"Regenerate"** or **"Keep current plan"**.
-- "Keep" stamps `blueprintKey = inputKey` — banner won't reappear.
-- "Regenerate" nulls `blueprint` and `blueprintKey` — StepReview starts fresh generation.
-- Breadcrumb shows `✏️ Edited` badge on other steps when stale.
-
-**Never silently regenerate.** The user is always in control.
+- `generateClarifyQuestions(idea, locale)` → puter first, API fallback.
+- `generateReengage(project, locale)` → puter first, API fallback.
 
 ---
 
 ## Anonymous project limit — CRITICAL
 
-### Rule: 1 project per anonymous session.
-
-**Server-side enforcement** — client checks are UX hints only.
-
-Flow:
-
-1. `GET /api/projects/check-limit` — counts MongoDB docs for this sessionId.
-2. `lib/ai/useProjectLimit.js` hook — fetches check on mount.
-3. `app/new/page.jsx` — shows gate UI if limit exceeded.
-4. `StepReview` — receives `limitAllowed` + `limitLoading` props.
-5. `POST /api/projects` — saves every new project with `sessionId`.
-
-### On sign-in:
-
-1. `DataProvider` calls `claimAnonymousProjects()` first.
-2. `POST /api/projects/claim` bulk-updates sessionId docs → userId.
-3. `hydrateFromServer()` merges everything.
-
----
-
-## Streak calculation (fixed in Phase 10)
-
-In `updateTask`:
-
-```js
-const lastActive = p.lastActivityAt?.split("T")[0]; // read BEFORE update
-p.lastActivityAt = now; // then update
-if (lastActive === today) {
-  if (p.streakDays < 1) p.streakDays = 1;
-} else if (lastActive === yesterday) {
-  p.streakDays += 1;
-} else {
-  p.streakDays = 1;
-}
-```
+- Anonymous: 1 project per session.
+- Server-side enforcement via `POST /api/projects` and `GET /api/projects/check-limit`.
+- `useProjectLimit()` hook — fetches check on mount.
+- `StepReview` receives `limitAllowed` + `limitLoading` props.
 
 ---
 
@@ -287,7 +311,7 @@ if (lastActive === today) {
 
 ### Immer projectId capture
 
-Always capture IDs **before** the `set()` call. Immer draft proxies are not plain objects.
+Always capture IDs **before** the `set()` call:
 
 ```js
 const project = createProject(data);
@@ -295,106 +319,24 @@ const projectId = project.id; // capture BEFORE set()
 set((s) => {
   s.projects.push(project);
 });
-return projectId; // safe
+return projectId;
 ```
 
 ### completeProject snapshot
 
-Stats must be captured **inside** the Immer `set()` callback:
-
-```js
-set((s) => {
-  const p = s.projects.find((x) => x.id === id);
-  // ... mutate p ...
-  snapshotForRemote = { completionDate: p.completionDate, postmortem: { ... } };
-});
-// use snapshotForRemote for PATCH — never call get() after set() for this
-```
-
-### debouncedRemoteUpdate failure handling
-
-After `FAILURE_TOAST_THRESHOLD = 3` consecutive failures for the same project:
-
-- Shows one `toast.warn` ("Changes saved locally but not syncing to cloud").
-- Does not repeat on every subsequent failure.
-- Counter resets on success.
-
-### hydrateFromServer
-
-`toast.dismiss(syncId)` and `s.hydrated = true` are in a `finally` block — always execute regardless of early return or throw.
+Stats captured **inside** the Immer `set()` callback, stored in `snapshotForRemote`, used for PATCH after `set()` commits.
 
 ---
 
 ## Confirm dialogs — CRITICAL
 
-**Never use `window.confirm()`**. It is blocked in iframes, PWAs, and some mobile browsers.
-
-Use the `ConfirmModal` component in `app/project/[id]/page.jsx` (or extract it to `components/ui/ConfirmModal.jsx` if needed elsewhere):
-
-```jsx
-<ConfirmModal
-  open={confirmModal.open}
-  onClose={closeConfirm}
-  onConfirm={handleConfirmAction}
-  loading={confirmModal.loading}
-  title="Delete project"
-  description="This cannot be undone."
-  confirmLabel="Delete permanently"
-  confirmVariant="danger"
-/>
-```
-
----
-
-## Export rules
-
-### `app/project/[id]/export/route.js`
-
-- Uses `tryConnectDB()` (never `connectDB()`) — DB failure falls through to base64 client data.
-- Base64 `data` query parameter capped at `MAX_PAYLOAD_BYTES = 500KB`. Returns 413 if exceeded.
-
-### `app/api/export-email/route.js`
-
-- **Dev** (`NODE_ENV !== "production"`): missing `RESEND_API_KEY` returns 200 with a dev-mode note.
-- **Production**: missing `RESEND_API_KEY` returns **503** with a user-facing message to use PDF/Markdown instead.
+**Never use `window.confirm()`**. Always use `ConfirmModal` from `app/project/[id]/page.jsx`.
 
 ---
 
 ## MongoDB: graceful degradation
 
-`tryConnectDB()` returns `null` instead of throwing. DB outage degrades to localStorage-only.
-
-**All API routes must use `tryConnectDB()`.** The only exception is `lib/db/mongoose.js` itself which exposes both versions intentionally.
-
----
-
-## Server/Client boundary rules
-
-**NEVER** import in server files (`app/api/`, `lib/db/`, `lib/models/`):
-
-- `lib/ai/clientGenerate.js` — `"use client"`, uses dynamic puter import
-- `lib/ai/puter.js` — reads `window.puter`
-- `lib/ai/rateLimit.js` — uses `localStorage`
-- `lib/ai/aiStatus.js` — uses toast (client store)
-
-`lib/Notifications.js` — **no** `"use client"` directive. Pure utility with own `typeof window` guards. Safe to import anywhere.
-
----
-
-## Rate limiting
-
-### Client-side (`lib/ai/rateLimit.js`)
-
-- Tracks daily usage in `localStorage` by type.
-- Anonymous: 1 generate/day. Signed-in: 5/day.
-- UX hint only — not a security guarantee.
-
-### Server-side (`app/api/generate/route.js`)
-
-- In-memory `ipUsage` Map, 60s sliding window per IP.
-- Resets on cold start (Vercel serverless). Documented intentionally.
-- Returns `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset` headers on every response.
-- Future: replace with Redis/Upstash for hard enforcement across instances.
+All API routes use `tryConnectDB()` (never `connectDB()`). DB outage degrades to localStorage-only.
 
 ---
 
@@ -404,7 +346,7 @@ Auth is **optional** — every feature works without signing in.
 
 - Anonymous: 1 project limit, sessionId-keyed MongoDB + localStorage.
 - Signed-in: unlimited, userId-keyed MongoDB, full sync.
-- Admin role: Clerk `publicMetadata.role === "admin"` — grants feedback board admin panel.
+- Admin: Clerk `publicMetadata.role === "admin"`.
 
 ---
 
@@ -419,36 +361,8 @@ Auth is **optional** — every feature works without signing in.
 | Database   | MongoDB via Mongoose               |
 | AI Primary | Puter.js (client-side, free)       |
 | AI Deep    | OpenRouter via API route           |
-| i18n       | Custom context, 6 languages        |
+| i18n       | Custom context, 7 languages        |
 | PDF export | jsPDF (client-side)                |
-
----
-
-## Wizard navigation rules
-
-- **Never reset step state on navigation.**
-- **Blueprint cache key** = `idea + "||" + scopeLevel + "||" + JSON.stringify(clarifyAnswers)`.
-- **`goTo(n)`** — navigate to any step `≤ maxReached`, no side effects.
-- **`advance(n)`** — navigate forward, updates `maxReached`.
-- **`StepReview` receives `cachedBlueprint`** when navigating back — skips AI call if key matches.
-- **`blueprintIsStale`** shows `RegenPermissionBanner` on Step 3 — user must confirm before regenerating.
-
----
-
-## Toast rules
-
-- `toast.error(msg)` — always appends "Report this issue →" `/feedback` link.
-- `toast.error(msg, { action: { label, onClick } })` — explicit action overrides auto-link.
-- `toast.warn(msg, { dedup: true })` — use `dedup` for recurring warnings (e.g. sync failure) to avoid spamming.
-
----
-
-## Feedback page rules
-
-- `/feedback` is **always public** — no auth, no redirect, no middleware guard.
-- Admin only: change status, add team note (Clerk `publicMetadata.role === "admin"`).
-- Upvote is idempotent server-side (`$ne sessionId` guard).
-- In-memory fallback (`memStore`) when MongoDB unavailable.
 
 ---
 
@@ -456,21 +370,17 @@ Auth is **optional** — every feature works without signing in.
 
 - Do NOT use `lib/ai/openrouter.js` — use `lib/ai/client.js` (server) or `lib/ai/clientGenerate.js` (client).
 - Do NOT call puter from API routes.
-- Do NOT import puter at module level in `clientGenerate.js` — use `getPuterModule()` lazy import.
+- Do NOT import puter at module level in `clientGenerate.js`.
 - Do NOT omit `"use client"` from `clientGenerate.js`.
 - Do NOT add `"use client"` to utility modules like `lib/Notifications.js`.
-- Do NOT use `window.confirm()` or `window.alert()` anywhere — use `ConfirmModal`.
+- Do NOT use `window.confirm()` or `window.alert()` — use `ConfirmModal`.
 - Do NOT use `connectDB()` in API routes — use `tryConnectDB()`.
-- Do NOT silently return 200 when a required env key is missing in production.
-- Do NOT skip the server-side project limit check.
+- Do NOT hard-code visible strings in JSX — always use `t("key")`.
+- Do NOT call `createToastSequence()` without passing the `locale` argument.
+- Do NOT regenerate blueprint silently — always show `RegenPermissionBanner` and wait for user choice.
 - Do NOT call `auth.protect()` anywhere.
 - Do NOT add new localStorage keys outside `lib/persistence.js`.
 - Do NOT reset wizard step state or blueprint on back-navigation.
-- Do NOT regenerate blueprint silently — always show `RegenPermissionBanner` and wait for user choice.
-- Do NOT read `p.lastActivityAt` after setting it to `now` in streak calc.
-- Do NOT return `project.id` from inside an Immer `set()` callback.
-- Do NOT capture postmortem stats in `get()` after `set()` — capture inside the Immer callback.
-- Do NOT add auth guards to `/feedback` or its API route.
 
 ---
 
@@ -486,12 +396,12 @@ CLERK_SECRET_KEY=...
 NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
 NEXT_PUBLIC_PUTER_APP_ID=...
 NEXT_PUBLIC_PUTER_AUTH_TOKEN=...
-RESEND_API_KEY=...          # required in production for email export (returns 503 if absent)
+RESEND_API_KEY=...          # required in production for email export
 ```
 
 ---
 
-## Phase 13 — Post-MVP Backlog
+## Phase 14 — Post-MVP Backlog
 
 - [ ] Recurring check-ins and deadline reminders (cron / server actions)
 - [ ] Timeline / Gantt visualization
@@ -506,6 +416,14 @@ RESEND_API_KEY=...          # required in production for email export (returns 5
 - [ ] Redis/Upstash rate limiting for hard cross-instance enforcement
 - [ ] Extract `ConfirmModal` to `components/ui/ConfirmModal.jsx` for reuse
 - [ ] Model picker in Settings: map `model1/2/3` IDs to real OpenRouter model strings
+- [ ] PhaseTimeline `t()` for "Done" label and phase status strings
+- [ ] StepCapture `t()` for example text and ghost hints (lower priority — mostly content)
 
-the translation should work in the dashboard inspiration lines too.
-also in the capture examples.
+scope_standard_hint
+intake_scope_standard
+
+are appearing in the stepReview. we need to optimize it properly.
+then the feedback page hasn't translated at all.
+
+1. Use an i18n library for the app UI
+   Use an npm i18n package such as i18next or, in Next.js, next-intl. These libraries are designed for locale routing, translation keys, and structured message loading, so your interface can swap languages smoothly without calling an external API for every label. next-intl also handles locale-based routing and localized pathnames in Next.js.

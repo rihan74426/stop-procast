@@ -38,7 +38,6 @@ import {
 import { MdDelete } from "react-icons/md";
 
 // ─── ConfirmModal ─────────────────────────────────────────────────────
-// Replaces native confirm() — works in all contexts (iframes, PWAs, etc.)
 
 function ConfirmModal({
   open,
@@ -50,6 +49,7 @@ function ConfirmModal({
   confirmVariant = "danger",
   loading,
 }) {
+  const { t } = useI18n();
   return (
     <Modal open={open} onClose={onClose} title={title} size="sm">
       <div className="flex flex-col gap-5">
@@ -58,7 +58,7 @@ function ConfirmModal({
         </p>
         <div className="flex gap-2 justify-end">
           <Button variant="ghost" onClick={onClose} disabled={loading}>
-            Cancel
+            {t("common_cancel")}
           </Button>
           <Button
             variant={confirmVariant}
@@ -84,11 +84,9 @@ function ProjectContent({ id }) {
   const completeProject = useProjectStore((s) => s.completeProject);
 
   const [showEmailExport, setShowEmailExport] = useState(false);
-
-  // Confirm modal state
   const [confirmModal, setConfirmModal] = useState({
     open: false,
-    type: null, // 'delete' | 'complete'
+    type: null,
     loading: false,
   });
 
@@ -114,11 +112,11 @@ function ProjectContent({ id }) {
       setConfirmModal({ open: false, type: null, loading: false });
       toast.error(
         confirmModal.type === "delete"
-          ? "Failed to delete project."
-          : "Failed to complete project."
+          ? t("toast_delete_error")
+          : t("toast_complete_error")
       );
     }
-  }, [confirmModal.type, deleteProject, completeProject, id, router]);
+  }, [confirmModal.type, deleteProject, completeProject, id, router, t]);
 
   if (!project) {
     return (
@@ -142,7 +140,7 @@ function ProjectContent({ id }) {
     try {
       exportProjectMarkdown(project);
     } catch {
-      toast.error("Markdown export failed. Please try again.");
+      toast.error(t("toast_export_md_error"));
     }
   };
 
@@ -150,19 +148,19 @@ function ProjectContent({ id }) {
     try {
       exportProjectJSON(project);
     } catch {
-      toast.error("JSON export failed. Please try again.");
+      toast.error(t("toast_export_json_error"));
     }
   };
 
   const handleExportPDF = async () => {
-    const toastId = toast.loading("Generating PDF…");
+    const toastId = toast.loading(t("toast_export_pdf_generating"));
     try {
       const { exportProjectPDF } = await import("@/lib/utils/exportPDF");
       await exportProjectPDF(project);
       toast.dismiss(toastId);
     } catch (err) {
       toast.dismiss(toastId);
-      toast.error("PDF export failed. Please try again.");
+      toast.error(t("toast_export_pdf_error"));
       console.error("PDF export failed:", err);
     }
   };
@@ -170,15 +168,15 @@ function ProjectContent({ id }) {
   // Confirm modal config per action type
   const confirmConfig = {
     delete: {
-      title: "Delete project",
-      description: `"${project.projectTitle}" will be permanently deleted. This cannot be undone.`,
-      confirmLabel: "Delete permanently",
+      title: t("confirm_delete_title"),
+      description: t("confirm_delete_desc", { title: project.projectTitle }),
+      confirmLabel: t("confirm_delete_label"),
       confirmVariant: "danger",
     },
     complete: {
-      title: "Mark as shipped",
-      description: `Mark "${project.projectTitle}" as complete? You'll be taken to the completion screen to write a retrospective.`,
-      confirmLabel: "Mark as shipped 🚀",
+      title: t("confirm_complete_title"),
+      description: t("confirm_complete_desc", { title: project.projectTitle }),
+      confirmLabel: t("confirm_complete_label"),
       confirmVariant: "emerald",
     },
   };
@@ -246,7 +244,9 @@ function ProjectContent({ id }) {
                         })}
                       </Badge>
                     )}
-                    {isCompleted && <Badge status="completed">✓ Done</Badge>}
+                    {isCompleted && (
+                      <Badge status="completed">✓ {t("project_done")}</Badge>
+                    )}
                   </div>
                 </div>
 

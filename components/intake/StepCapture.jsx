@@ -4,24 +4,9 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/Button";
 import { useI18n } from "@/lib/i18n";
 
-// ─── Personalization prefixes ─────────────────────────────────────────
-const PREFIXES = [
-  "I want to",
-  "I need to",
-  "I'll",
-  "I'm going to",
-  "I'd like to",
-];
-
 // ─── Ghost suggestion engine ──────────────────────────────────────────
-//
-// Each entry has:
-//   triggers: lowercase words/phrases that activate this completion
-//   completions: array of possible continuations (one chosen based on context)
-//   weight: how specific/useful this is (higher = preferred when multiple match)
 
 const SUGGESTION_RULES = [
-  // Learning goals
   {
     triggers: ["learn", "learning", "study", "studying", "master", "mastering"],
     completions: [
@@ -35,7 +20,6 @@ const SUGGESTION_RULES = [
     ],
     weight: 2,
   },
-  // Writing goals
   {
     triggers: ["write", "writing", "draft", "drafting"],
     completions: [
@@ -48,7 +32,6 @@ const SUGGESTION_RULES = [
     ],
     weight: 2,
   },
-  // Building/launching
   {
     triggers: [
       "build",
@@ -71,7 +54,6 @@ const SUGGESTION_RULES = [
     ],
     weight: 2,
   },
-  // Launching / shipping
   {
     triggers: [
       "launch",
@@ -92,7 +74,6 @@ const SUGGESTION_RULES = [
     ],
     weight: 2,
   },
-  // Fitness / health
   {
     triggers: [
       "run",
@@ -113,7 +94,6 @@ const SUGGESTION_RULES = [
     ],
     weight: 2,
   },
-  // Planning / organising
   {
     triggers: [
       "plan",
@@ -132,7 +112,6 @@ const SUGGESTION_RULES = [
     ],
     weight: 2,
   },
-  // Habits
   {
     triggers: [
       "habit",
@@ -152,7 +131,6 @@ const SUGGESTION_RULES = [
     ],
     weight: 2,
   },
-  // Research
   {
     triggers: [
       "research",
@@ -172,7 +150,6 @@ const SUGGESTION_RULES = [
     ],
     weight: 2,
   },
-  // Starting
   {
     triggers: [
       "start",
@@ -191,7 +168,6 @@ const SUGGESTION_RULES = [
     ],
     weight: 2,
   },
-  // Improve / grow
   {
     triggers: ["improve", "improving", "grow", "growing", "increase", "boost"],
     completions: [
@@ -204,7 +180,6 @@ const SUGGESTION_RULES = [
     ],
     weight: 2,
   },
-  // Complete / finish
   {
     triggers: ["complete", "completing", "finish", "finishing"],
     completions: [
@@ -216,7 +191,6 @@ const SUGGESTION_RULES = [
     ],
     weight: 2,
   },
-  // Generic sentence starters — lower weight, fill-in when nothing specific matches
   {
     triggers: ["i want", "i need", "i'd like", "i would like"],
     completions: [
@@ -229,7 +203,6 @@ const SUGGESTION_RULES = [
   },
 ];
 
-// Contextual completions based on domain keywords anywhere in text
 const DOMAIN_HINTS = [
   {
     keywords: [
@@ -273,10 +246,6 @@ const DOMAIN_HINTS = [
   },
 ];
 
-/**
- * Returns a ghost completion string for the current input value.
- * Smarter matching: checks for trigger words even in mid-phrase context.
- */
 function getGhostCompletion(value) {
   if (!value || value.trim().length < 6) return "";
 
@@ -286,7 +255,6 @@ function getGhostCompletion(value) {
   const lastTwoWords = words.slice(-2).join(" ");
   const lastThreeWords = words.slice(-3).join(" ");
 
-  // 1. Check for mid-word trigger (user is mid-typing a trigger word)
   for (const rule of SUGGESTION_RULES) {
     for (const trigger of rule.triggers) {
       if (
@@ -300,13 +268,11 @@ function getGhostCompletion(value) {
     }
   }
 
-  // 2. Check for complete trigger word in various positions
   let bestRule = null;
   let bestWeight = -1;
 
   for (const rule of SUGGESTION_RULES) {
     for (const trigger of rule.triggers) {
-      // Match at end of input
       if (
         lower.endsWith(" " + trigger) ||
         lower === trigger ||
@@ -327,11 +293,9 @@ function getGhostCompletion(value) {
     return " " + bestRule.completions[idx];
   }
 
-  // 3. Domain hint — contextual suffix based on keywords
   if (value.trim().length > 20 && !value.trim().endsWith(".")) {
     for (const hint of DOMAIN_HINTS) {
       if (hint.keywords.some((kw) => lower.includes(kw))) {
-        // Only suggest if not already present
         if (!lower.includes(hint.append.toLowerCase().slice(3))) {
           return hint.append;
         }
@@ -342,16 +306,15 @@ function getGhostCompletion(value) {
   return "";
 }
 
-// ─── Curated examples ─────────────────────────────────────────────────
-const EXAMPLES = [
-  "I want to learn conversational Spanish through daily 20-minute practice",
-  "I need to build a SaaS product and get my first 10 paying customers",
-  "I'll train for a half marathon with a structured 16-week plan",
-  "I'd like to write and publish a 30,000-word non-fiction book",
-  "I'm going to start a YouTube channel about product design",
-  "I need to complete my online course and get certified",
-  "I want to improve my public speaking by delivering 3 talks",
-  "I'll launch my side project and acquire the first 100 users",
+// ─── Example keys (7 examples, translated via i18n) ───────────────────
+const EXAMPLE_KEYS = [
+  "capture_example_0",
+  "capture_example_1",
+  "capture_example_2",
+  "capture_example_3",
+  "capture_example_4",
+  "capture_example_5",
+  "capture_example_6",
 ];
 
 // ─── Component ────────────────────────────────────────────────────────
@@ -368,13 +331,12 @@ export function StepCapture({ value, onChange, onNext }) {
   // Rotate placeholder examples
   useEffect(() => {
     const timer = setInterval(
-      () => setExampleIdx((i) => (i + 1) % EXAMPLES.length),
+      () => setExampleIdx((i) => (i + 1) % EXAMPLE_KEYS.length),
       4000
     );
     return () => clearInterval(timer);
   }, []);
 
-  // Debounced ghost computation — don't fire on every keystroke
   const computeGhost = useCallback((text) => {
     if (ghostDebounceRef.current) clearTimeout(ghostDebounceRef.current);
     ghostDebounceRef.current = setTimeout(() => {
@@ -395,9 +357,7 @@ export function StepCapture({ value, onChange, onNext }) {
     const newVal = value + ghost;
     onChange(newVal);
     setGhost("");
-    // Recompute after accepting — might unlock another suggestion
     setTimeout(() => computeGhost(newVal), 150);
-    // Keep focus and move cursor to end
     setTimeout(() => {
       const el = textareaRef.current;
       if (el) {
@@ -414,7 +374,6 @@ export function StepCapture({ value, onChange, onNext }) {
         acceptGhost();
         return;
       }
-      // ArrowRight only accepts when cursor is at end
       if (ghost && e.key === "ArrowRight") {
         const el = textareaRef.current;
         if (el && el.selectionStart === el.value.length) {
@@ -436,12 +395,12 @@ export function StepCapture({ value, onChange, onNext }) {
     [onChange]
   );
 
-  // Clear ghost when value is cleared
   useEffect(() => {
     if (!value) setGhost("");
   }, [value]);
 
   const showGhost = focused && ghost.length > 0;
+  const currentPlaceholder = `e.g. ${t(EXAMPLE_KEYS[exampleIdx])}`;
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8">
@@ -462,7 +421,6 @@ export function StepCapture({ value, onChange, onNext }) {
             focused ? "border-[var(--violet)]" : "border-[var(--border)]",
           ].join(" ")}
         >
-          {/* Ghost text layer — rendered behind the real textarea */}
           {showGhost && (
             <div
               aria-hidden="true"
@@ -471,13 +429,10 @@ export function StepCapture({ value, onChange, onNext }) {
                 fontFamily: "inherit",
                 fontSize: "inherit",
                 lineHeight: "inherit",
-                // Match textarea padding exactly
-                paddingBottom: "52px", // leaves room for footer bar
+                paddingBottom: "52px",
               }}
             >
-              {/* Invisible spacer matching existing text */}
               <span className="invisible whitespace-pre-wrap">{value}</span>
-              {/* Ghost suggestion in muted colour */}
               <span
                 className="whitespace-pre-wrap"
                 style={{ color: "var(--text-tertiary)", opacity: 0.6 }}
@@ -497,7 +452,7 @@ export function StepCapture({ value, onChange, onNext }) {
             }}
             onBlur={() => setFocused(false)}
             onKeyDown={handleKeyDown}
-            placeholder={`e.g. ${EXAMPLES[exampleIdx]}`}
+            placeholder={currentPlaceholder}
             rows={5}
             className="w-full bg-transparent px-4 sm:px-5 py-3 sm:py-4 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none focus:outline-none text-sm sm:text-base leading-relaxed relative z-10"
             autoFocus
@@ -519,7 +474,6 @@ export function StepCapture({ value, onChange, onNext }) {
             </span>
 
             <div className="flex items-center gap-2">
-              {/* Ghost accept hint */}
               {showGhost && (
                 <button
                   onMouseDown={(e) => {
@@ -540,7 +494,6 @@ export function StepCapture({ value, onChange, onNext }) {
           </div>
         </div>
 
-        {/* Ghost hint tooltip — only shown briefly when ghost first appears */}
         {showGhost && (
           <div className="absolute -bottom-7 right-0 text-[10px] text-[var(--text-tertiary)] pointer-events-none">
             Press{" "}
@@ -576,18 +529,21 @@ export function StepCapture({ value, onChange, onNext }) {
 
         {showExamples && (
           <div className="flex flex-col gap-2 animate-[fadeIn_150ms_ease_both]">
-            {EXAMPLES.map((ex, i) => (
-              <button
-                key={i}
-                onClick={() => handleExampleClick(ex)}
-                className="text-left text-sm text-[var(--text-secondary)] px-3 sm:px-4 py-2.5 rounded-[var(--r-md)] border border-[var(--border)] hover:border-[var(--violet)] hover:text-[var(--text-primary)] hover:bg-[var(--violet-bg)] transition-all duration-150 group"
-              >
-                <span className="text-[var(--text-tertiary)] group-hover:text-[var(--violet-dim)] mr-2 text-xs">
-                  {i + 1}.
-                </span>
-                {ex}
-              </button>
-            ))}
+            {EXAMPLE_KEYS.map((key, i) => {
+              const ex = t(key);
+              return (
+                <button
+                  key={i}
+                  onClick={() => handleExampleClick(ex)}
+                  className="text-left text-sm text-[var(--text-secondary)] px-3 sm:px-4 py-2.5 rounded-[var(--r-md)] border border-[var(--border)] hover:border-[var(--violet)] hover:text-[var(--text-primary)] hover:bg-[var(--violet-bg)] transition-all duration-150 group"
+                >
+                  <span className="text-[var(--text-tertiary)] group-hover:text-[var(--violet-dim)] mr-2 text-xs">
+                    {i + 1}.
+                  </span>
+                  {ex}
+                </button>
+              );
+            })}
           </div>
         )}
       </div>

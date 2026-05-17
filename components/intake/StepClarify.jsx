@@ -248,7 +248,8 @@ export function StepClarify({
 }) {
   const { locale, t } = useI18n();
   const [questions, setQuestions] = useState(cachedQuestions ?? []);
-  const [loading, setLoading] = useState(cachedQuestions === null);
+  // treat both null and undefined as "no cached data" so we always fetch when absent
+  const [loading, setLoading] = useState(cachedQuestions == null);
   const [error, setError] = useState(null);
 
   const hasFetched = useRef(false);
@@ -259,14 +260,16 @@ export function StepClarify({
 
   // Sync if parent provides questions after initial render
   useEffect(() => {
-    if (cachedQuestions !== null && cachedQuestions.length > 0) {
+    // handle both null and undefined consistently: only sync when we actually have an array
+    if (cachedQuestions != null && cachedQuestions.length > 0) {
       setQuestions(cachedQuestions);
       setLoading(false);
     }
   }, [cachedQuestions]);
 
   useEffect(() => {
-    if (cachedQuestions !== null) return;
+    // only fetch when cachedQuestions is explicitly absent (null/undefined)
+    if (cachedQuestions != null) return;
     if (hasFetched.current) return;
     hasFetched.current = true;
     fetchQuestions();
@@ -320,8 +323,10 @@ export function StepClarify({
     toastSeqRef.current?.unmount();
     toastSeqRef.current = null;
 
+    // allow fetchQuestions to run again
     hasFetched.current = false;
-    hasFetched.current = true;
+    hasFetched.current = true; // keep one immediate guard (fetchQuestions will run now)
+    // trigger fetch again — ensure we actually call it
     fetchQuestions();
   }
 

@@ -2,6 +2,7 @@
 
 import { daysSince } from "@/lib/utils/date";
 import { useI18n } from "@/lib/i18n";
+import { FaClock } from "react-icons/fa";
 
 export function StreakBanner({ project }) {
   const { t } = useI18n();
@@ -59,7 +60,9 @@ export function StreakBanner({ project }) {
   if (idle >= 3) {
     return (
       <div className="flex items-center gap-3 rounded-[var(--r-lg)] bg-[var(--amber-bg)] border border-[var(--amber)] px-4 py-3">
-        <span className="text-lg">⏰</span>
+        <span className="text-lg">
+          <FaClock className="inline" />
+        </span>
         <p className="text-sm text-[var(--amber)]">
           {t("streak_idle_warning", { n: idle })}
         </p>

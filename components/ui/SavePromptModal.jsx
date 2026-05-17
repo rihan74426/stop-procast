@@ -3,33 +3,28 @@
 import { useEffect, useState } from "react";
 import { useUser, SignInButton, SignUpButton } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
+import { useI18n } from "@/lib/i18n";
 
-/**
- * Shown once after the user creates their first project or completes their
- * first task — whichever comes first. Gently nudges them to sign in so their
- * data is saved to MongoDB. Dismissed forever once they close it.
- */
 export function SavePromptModal() {
   const { isSignedIn, isLoaded } = useUser();
+  const { t } = useI18n();
   const projects = useProjectStore((s) => s.projects);
   const [show, setShow] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
     if (!isLoaded) return;
-    if (isSignedIn) return; // already signed in — don't show
+    if (isSignedIn) return;
     if (dismissed) return;
 
     const seen = localStorage.getItem("sp_save_nudge_seen");
     if (seen) return;
 
-    // Show after they have at least 1 project with at least 1 task done
     const hasActivity =
       projects.some((p) => p.tasks.some((t) => t.status === "done")) ||
       projects.length >= 1;
 
     if (hasActivity) {
-      // Small delay so it doesn't flash immediately on page load
       const timer = setTimeout(() => setShow(true), 2000);
       return () => clearTimeout(timer);
     }
@@ -53,7 +48,7 @@ export function SavePromptModal() {
               <span className="text-base">💾</span>
             </div>
             <p className="font-display font-semibold text-sm text-[var(--text-primary)]">
-              Save your progress
+              {t("save_prompt_title")}
             </p>
           </div>
           <button
@@ -66,8 +61,7 @@ export function SavePromptModal() {
         </div>
 
         <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-4">
-          Your projects are stored locally right now. Sign in to sync them
-          across all your devices and never lose your work.
+          {t("save_prompt_desc")}
         </p>
 
         <div className="flex gap-2">
@@ -76,7 +70,7 @@ export function SavePromptModal() {
               onClick={handleDismiss}
               className="flex-1 h-9 rounded-[var(--r-md)] bg-[var(--violet)] text-white text-sm font-medium hover:bg-[var(--violet-dim)] transition-colors"
             >
-              Create account
+              {t("save_prompt_signup")}
             </button>
           </SignUpButton>
           <SignInButton mode="modal">
@@ -84,7 +78,7 @@ export function SavePromptModal() {
               onClick={handleDismiss}
               className="flex-1 h-9 rounded-[var(--r-md)] border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-colors"
             >
-              Sign in
+              {t("save_prompt_signin")}
             </button>
           </SignInButton>
         </div>
@@ -93,7 +87,7 @@ export function SavePromptModal() {
           onClick={handleDismiss}
           className="w-full mt-2 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors py-1"
         >
-          Continue without saving
+          {t("save_prompt_continue")}
         </button>
       </div>
 

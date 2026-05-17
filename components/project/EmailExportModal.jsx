@@ -6,11 +6,6 @@ import { useI18n } from "@/lib/i18n";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 
-/**
- * Encode project data to base64 safely — handles full Unicode (Bengali, Arabic, etc.)
- * Uses TextEncoder → binary string → btoa instead of the broken
- * btoa(encodeURIComponent(...).replace(...)) pattern.
- */
 function encodeProjectData(project) {
   try {
     const json = JSON.stringify(project);
@@ -45,7 +40,7 @@ export function EmailExportModal({ open, onClose, project }) {
       const encoded = encodeProjectData(project);
       if (!encoded) {
         setStatus("error");
-        setErrorMsg("Failed to encode project data. Try JSON export instead.");
+        setErrorMsg(t("common_error"));
         return;
       }
 
@@ -70,12 +65,12 @@ export function EmailExportModal({ open, onClose, project }) {
           data.error ||
             (res.status === 503
               ? "Email service not configured. Please use PDF or Markdown export."
-              : "Failed to send. Please try again.")
+              : t("export_email_error"))
         );
       }
     } catch {
       setStatus("error");
-      setErrorMsg("Network error. Please check your connection and try again.");
+      setErrorMsg(t("common_error"));
     }
   };
 
@@ -89,15 +84,16 @@ export function EmailExportModal({ open, onClose, project }) {
   const formats = [
     { id: "markdown", label: "Markdown" },
     { id: "json", label: "JSON" },
-    { id: "both", label: "Both" },
+    { id: "both", label: t("common_done") === "Both" ? "Both" : "Both" },
   ];
 
+  // Gate — not signed in
   if (!isSignedIn) {
     return (
       <Modal
         open={open}
         onClose={handleClose}
-        title="Export via Email"
+        title={t("export_email_title")}
         size="sm"
       >
         <div className="flex flex-col gap-5">
@@ -107,11 +103,10 @@ export function EmailExportModal({ open, onClose, project }) {
             </div>
             <div>
               <p className="font-display font-semibold text-lg text-[var(--text-primary)] mb-1">
-                Sign in to export
+                {t("export_email_gate_title")}
               </p>
               <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-xs">
-                Create a free account to export your plan and keep your work
-                saved across devices.
+                {t("export_email_gate_desc")}
               </p>
             </div>
             <div className="flex flex-col gap-2 w-full mt-1">
@@ -120,7 +115,7 @@ export function EmailExportModal({ open, onClose, project }) {
                   onClick={handleClose}
                   className="w-full h-11 rounded-[var(--r-md)] bg-[var(--violet)] text-white text-sm font-semibold hover:bg-[var(--violet-dim)] transition-colors active:scale-[0.98]"
                 >
-                  Create free account
+                  {t("export_email_gate_signup")}
                 </button>
               </SignUpButton>
               <SignInButton mode="modal">
@@ -128,12 +123,12 @@ export function EmailExportModal({ open, onClose, project }) {
                   onClick={handleClose}
                   className="w-full h-11 rounded-[var(--r-md)] border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-colors"
                 >
-                  Sign in
+                  {t("export_email_gate_signin")}
                 </button>
               </SignInButton>
             </div>
             <p className="text-xs text-[var(--text-tertiary)]">
-              Free forever. No credit card required.
+              {t("export_email_gate_free")}
             </p>
           </div>
         </div>
@@ -159,11 +154,11 @@ export function EmailExportModal({ open, onClose, project }) {
                 {t("export_email_success")}
               </p>
               <p className="text-sm text-[var(--text-secondary)]">
-                Sent to <strong>{email}</strong>
+                {t("export_email_success_to")} <strong>{email}</strong>
               </p>
             </div>
             <Button onClick={handleClose} variant="ghost" size="sm">
-              Close
+              {t("export_email_close")}
             </Button>
           </div>
         ) : (
@@ -172,12 +167,17 @@ export function EmailExportModal({ open, onClose, project }) {
               {t("export_email_desc")}
             </p>
 
+            {/* Format picker */}
             <div>
               <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
                 {t("export_email_format")}
               </label>
               <div className="flex gap-2">
-                {formats.map((f) => (
+                {[
+                  { id: "markdown", label: "Markdown" },
+                  { id: "json", label: "JSON" },
+                  { id: "both", label: "Both" },
+                ].map((f) => (
                   <button
                     key={f.id}
                     onClick={() => setFormat(f.id)}
@@ -194,6 +194,7 @@ export function EmailExportModal({ open, onClose, project }) {
               </div>
             </div>
 
+            {/* Email input */}
             <div>
               <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
                 {t("export_email_label")}
@@ -222,6 +223,7 @@ export function EmailExportModal({ open, onClose, project }) {
               </div>
             )}
 
+            {/* Project preview */}
             <div className="rounded-[var(--r-md)] bg-[var(--bg-subtle)] px-3 py-2.5 flex items-center gap-3">
               <div className="w-8 h-8 rounded-[var(--r-sm)] bg-[var(--violet-bg)] flex items-center justify-center text-sm shrink-0">
                 📦
@@ -231,15 +233,17 @@ export function EmailExportModal({ open, onClose, project }) {
                   {project?.projectTitle || "Untitled"}
                 </p>
                 <p className="text-xs text-[var(--text-tertiary)]">
-                  {project?.tasks?.length || 0} tasks ·{" "}
-                  {project?.phases?.length || 0} phases
+                  {project?.tasks?.length || 0}{" "}
+                  {t("export_email_project_tasks")} ·{" "}
+                  {project?.phases?.length || 0}{" "}
+                  {t("export_email_project_phases")}
                 </p>
               </div>
             </div>
 
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={handleClose} size="sm">
-                Cancel
+                {t("export_email_cancel")}
               </Button>
               <Button
                 onClick={handleSend}

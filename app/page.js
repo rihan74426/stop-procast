@@ -22,63 +22,53 @@ import {
   FaFire,
   FaBullseye,
   FaChartLine,
-  FaRegSmile,
   FaSmile,
 } from "react-icons/fa";
 
 // ─── Greeting system ──────────────────────────────────────────────────
 
-function getTimeGreeting() {
+function getTimeGreeting(t) {
   const h = new Date().getHours();
-  if (h < 5) return "Burning the midnight oil";
-  if (h < 12) return "Good morning";
-  if (h < 17) return "Good afternoon";
-  if (h < 21) return "Good evening";
-  return "Still at it";
+  if (h < 5) return t("greeting_midnight");
+  if (h < 12) return t("greeting_morning");
+  if (h < 17) return t("greeting_afternoon");
+  if (h < 21) return t("greeting_evening");
+  return t("greeting_night");
 }
 
-const STRANGER_GREETINGS = [
-  { text: "Welcome. Your next chapter starts here.", icon: FaStar },
-  {
-    text: "Every great thing began with a single step. Ready?",
-    icon: FaRocket,
-  },
-  {
-    text: "Ideas don't work until you do. Let's change that.",
-    icon: FaLightbulb,
-  },
-  {
-    text: "The best time to start was yesterday. Second best: now.",
-    icon: FaClock,
-  },
-  { text: "Momentum isn't found — it's built. Start building.", icon: FaFire },
-  {
-    text: "Whatever you're planning, this is where it gets real.",
-    icon: FaBullseye,
-  },
-  { text: "Progress over perfection. Always.", icon: FaChartLine },
+const STRANGER_GREETING_KEYS = [
+  { key: "stranger_greeting_0", icon: FaStar },
+  { key: "stranger_greeting_1", icon: FaRocket },
+  { key: "stranger_greeting_2", icon: FaLightbulb },
+  { key: "stranger_greeting_3", icon: FaClock },
+  { key: "stranger_greeting_4", icon: FaFire },
+  { key: "stranger_greeting_5", icon: FaBullseye },
+  { key: "stranger_greeting_6", icon: FaChartLine },
 ];
 
-const RETURNING_MOTIVATIONS = [
-  "Your ideas deserve to see the light of day.",
-  "One focused hour beats a week of hesitation.",
-  "The work you do today is the story you tell tomorrow.",
-  "Small steps, consistent days — that's how mountains move.",
-  "What got done yesterday? Let's beat it today.",
-  "Your future self is rooting for you.",
-  "Every task you complete is a promise you kept.",
+const RETURNING_MOTIVATION_KEYS = [
+  "returning_motivation_0",
+  "returning_motivation_1",
+  "returning_motivation_2",
+  "returning_motivation_3",
+  "returning_motivation_4",
+  "returning_motivation_5",
+  "returning_motivation_6",
 ];
+
+// ─── Dashboard greeting ───────────────────────────────────────────────
 
 function DashboardGreeting({ user, projectCount }) {
-  const timeGreeting = getTimeGreeting();
+  const { t } = useI18n();
+  const timeGreeting = getTimeGreeting(t);
   const isSignedIn = !!user;
 
-  // Deterministic random based on day (changes daily)
   const dayIndex = Math.floor(Date.now() / 86400000);
 
   if (!isSignedIn) {
-    const greeting = STRANGER_GREETINGS[dayIndex % STRANGER_GREETINGS.length];
-    const Icon = greeting.icon;
+    const greetingDef =
+      STRANGER_GREETING_KEYS[dayIndex % STRANGER_GREETING_KEYS.length];
+    const Icon = greetingDef.icon;
     return (
       <div className="mb-2">
         <div className="flex items-center gap-2 mb-1">
@@ -86,20 +76,20 @@ function DashboardGreeting({ user, projectCount }) {
             <Icon />
           </span>
           <h1 className="font-display font-semibold text-xl sm:text-2xl text-[var(--text-primary)]">
-            {greeting.text}
+            {t(greetingDef.key)}
           </h1>
         </div>
         <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
-          Turn any idea, goal, or plan into structured action — then actually
-          follow through.
+          {t("stranger_greeting_subtitle")}
         </p>
       </div>
     );
   }
 
-  const firstName = user.firstName || user.username || "there";
-  const motivation =
-    RETURNING_MOTIVATIONS[dayIndex % RETURNING_MOTIVATIONS.length];
+  const firstName =
+    user.firstName || user.username || t("greeting_fallback_name");
+  const motivationKey =
+    RETURNING_MOTIVATION_KEYS[dayIndex % RETURNING_MOTIVATION_KEYS.length];
 
   return (
     <div className="mb-2">
@@ -107,9 +97,7 @@ function DashboardGreeting({ user, projectCount }) {
         {timeGreeting}, {firstName} <FaSmile className="inline" />
       </h1>
       <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
-        {projectCount > 0
-          ? motivation
-          : "You have no active projects. Ready to start something?"}
+        {projectCount > 0 ? t(motivationKey) : t("greeting_no_projects")}
       </p>
     </div>
   );

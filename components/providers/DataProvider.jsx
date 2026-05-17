@@ -5,6 +5,7 @@ import { useUser } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { claimAnonymousProjects } from "@/lib/persistence";
 import { clearMomentumStorage } from "@/lib/clearStorage";
+import { resetHydratedSession } from "@/lib/store/projectStore";
 
 /**
  * DataProvider — wraps pages that read project data.
@@ -38,6 +39,8 @@ export function DataProvider({ children }) {
       syncedUserIdRef.current = null;
       // Reset the Zustand store to empty state
       useProjectStore.setState({ projects: [], hydrated: false });
+      // Reset session-level hydration guard so next sign-in can hydrate afresh
+      resetHydratedSession();
     }
 
     prevUserIdRef.current = currentUserId;
