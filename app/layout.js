@@ -5,6 +5,7 @@ import { I18nProvider } from "@/lib/i18n";
 import { ToastContainer } from "@/components/ui/Toast";
 import { NetworkMonitor } from "@/components/ui/NetworkMonitor";
 import { NotificationInit } from "@/components/ui/NotificationInit";
+import { LANGUAGES } from "@/lib/i18n/translations"; // added for hreflang list
 
 export const metadata = {
   title: "Momentum > Finish What You Start",
@@ -27,6 +28,13 @@ export default function RootLayout({ children }) {
   const puterAuthToken = process.env.NEXT_PUBLIC_PUTER_AUTH_TOKEN ?? "";
   const hasPuterCreds = puterAppId.trim() && puterAuthToken.trim();
 
+  const siteUrl =
+    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
+    "http://localhost:3000";
+  const siteTitle = "Momentum > Finish What You Start";
+  const siteDescription =
+    "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.";
+
   return (
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
@@ -37,6 +45,73 @@ export default function RootLayout({ children }) {
             rel="preconnect"
             href="https://fonts.gstatic.com"
             crossOrigin="anonymous"
+          />
+
+          {/* Basic SEO / Social tags */}
+          <meta name="description" content={siteDescription} />
+          <meta name="author" content="Momentum" />
+          <link rel="canonical" href={siteUrl + "/"} />
+
+          {/* OpenGraph */}
+          <meta property="og:type" content="website" />
+          <meta property="og:title" content={siteTitle} />
+          <meta property="og:description" content={siteDescription} />
+          <meta property="og:url" content={siteUrl} />
+          <meta property="og:site_name" content="Momentum" />
+          <meta property="og:image" content={`${siteUrl}/og-card.png`} />
+          <meta
+            property="og:image:alt"
+            content="Momentum — finish what you start"
+          />
+
+          {/* Twitter */}
+          <meta name="twitter:card" content="summary_large_image" />
+          <meta name="twitter:title" content={siteTitle} />
+          <meta name="twitter:description" content={siteDescription} />
+          <meta name="twitter:image" content={`${siteUrl}/og-card.png`} />
+
+          {/* Hreflang alternates (assumes root per-locale pages; safe fallback to query param) */}
+          {LANGUAGES.map((l) => (
+            <link
+              key={l.code}
+              rel="alternate"
+              hrefLang={l.rtl ? l.code + "-r" : l.code}
+              href={`${siteUrl}${l.code === "en" ? "/" : `/?lang=${l.code}`}`}
+            />
+          ))}
+          <link rel="alternate" hrefLang="x-default" href={siteUrl} />
+
+          {/* JSON-LD structured data: WebSite + Organization */}
+          <script
+            type="application/ld+json"
+            dangerouslySetInnerHTML={{
+              __html: JSON.stringify({
+                "@context": "https://schema.org",
+                "@graph": [
+                  {
+                    "@type": "Organization",
+                    "@id": `${siteUrl}#org`,
+                    name: "Momentum",
+                    url: siteUrl,
+                    logo: `${siteUrl}/favicon.png`,
+                    sameAs: [],
+                  },
+                  {
+                    "@type": "WebSite",
+                    "@id": `${siteUrl}#website`,
+                    url: siteUrl,
+                    name: "Momentum",
+                    description: siteDescription,
+                    publisher: { "@id": `${siteUrl}#org` },
+                    potentialAction: {
+                      "@type": "SearchAction",
+                      target: `${siteUrl}/?q={search_term_string}`,
+                      "query-input": "required name=search_term_string",
+                    },
+                  },
+                ],
+              }),
+            }}
           />
 
           {/*
