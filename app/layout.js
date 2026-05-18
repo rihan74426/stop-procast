@@ -7,10 +7,17 @@ import { NetworkMonitor } from "@/components/ui/NetworkMonitor";
 import { NotificationInit } from "@/components/ui/NotificationInit";
 import { LANGUAGES } from "@/lib/i18n/translations"; // added for hreflang list
 
+// --- REPLACED metadata with full OpenGraph / Twitter / alternates ---
+const SITE_URL =
+  process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
+  "http://localhost:3000";
+
 export const metadata = {
   title: "Momentum > Finish What You Start",
   description:
     "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.",
+  applicationName: "Momentum",
+  authors: [{ name: "Momentum" }],
   icons: {
     icon: "/favicon.png",
     apple: "/favicon.png",
@@ -21,19 +28,50 @@ export const metadata = {
     initialScale: 1,
     maximumScale: 1,
   },
+
+  // Server-rendered OpenGraph (ensures scrapers see the tags)
+  openGraph: {
+    type: "website",
+    title: "Momentum > Finish What You Start",
+    description:
+      "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.",
+    url: SITE_URL,
+    siteName: "Momentum",
+    images: [
+      {
+        url: `${SITE_URL}/og-card.png`,
+        width: 1200,
+        height: 630,
+        alt: "Momentum — finish what you start",
+      },
+    ],
+  },
+
+  // Twitter card
+  twitter: {
+    card: "summary_large_image",
+    title: "Momentum > Finish What You Start",
+    description:
+      "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.",
+    images: [`${SITE_URL}/og-card.png`],
+  },
+
+  // Alternates / hreflang — map languages to root URLs (safe fallback to query param)
+  alternates: {
+    canonical: SITE_URL + "/",
+    languages: LANGUAGES.reduce((acc, l) => {
+      acc[l.code] =
+        l.code === "en" ? SITE_URL + "/" : SITE_URL + `/?lang=${l.code}`;
+      return acc;
+    }, {}),
+  },
 };
+// --- end metadata replacement ---
 
 export default function RootLayout({ children }) {
   const puterAppId = process.env.NEXT_PUBLIC_PUTER_APP_ID ?? "";
   const puterAuthToken = process.env.NEXT_PUBLIC_PUTER_AUTH_TOKEN ?? "";
   const hasPuterCreds = puterAppId.trim() && puterAuthToken.trim();
-
-  const siteUrl =
-    process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-    "http://localhost:3000";
-  const siteTitle = "Momentum > Finish What You Start";
-  const siteDescription =
-    "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.";
 
   return (
     <ClerkProvider>
@@ -48,17 +86,23 @@ export default function RootLayout({ children }) {
           />
 
           {/* Basic SEO / Social tags */}
-          <meta name="description" content={siteDescription} />
+          <meta name="description" content={metadata.description} />
           <meta name="author" content="Momentum" />
-          <link rel="canonical" href={siteUrl + "/"} />
+          <link rel="canonical" href={metadata.alternates.canonical} />
 
           {/* OpenGraph */}
           <meta property="og:type" content="website" />
-          <meta property="og:title" content={siteTitle} />
-          <meta property="og:description" content={siteDescription} />
-          <meta property="og:url" content={siteUrl} />
+          <meta property="og:title" content={metadata.openGraph.title} />
+          <meta
+            property="og:description"
+            content={metadata.openGraph.description}
+          />
+          <meta property="og:url" content={metadata.openGraph.url} />
           <meta property="og:site_name" content="Momentum" />
-          <meta property="og:image" content={`${siteUrl}/og-card.png`} />
+          <meta
+            property="og:image"
+            content={metadata.openGraph.images[0].url}
+          />
           <meta
             property="og:image:alt"
             content="Momentum — finish what you start"
@@ -66,9 +110,12 @@ export default function RootLayout({ children }) {
 
           {/* Twitter */}
           <meta name="twitter:card" content="summary_large_image" />
-          <meta name="twitter:title" content={siteTitle} />
-          <meta name="twitter:description" content={siteDescription} />
-          <meta name="twitter:image" content={`${siteUrl}/og-card.png`} />
+          <meta name="twitter:title" content={metadata.twitter.title} />
+          <meta
+            name="twitter:description"
+            content={metadata.twitter.description}
+          />
+          <meta name="twitter:image" content={metadata.twitter.images[0]} />
 
           {/* Hreflang alternates (assumes root per-locale pages; safe fallback to query param) */}
           {LANGUAGES.map((l) => (
@@ -76,10 +123,10 @@ export default function RootLayout({ children }) {
               key={l.code}
               rel="alternate"
               hrefLang={l.rtl ? l.code + "-r" : l.code}
-              href={`${siteUrl}${l.code === "en" ? "/" : `/?lang=${l.code}`}`}
+              href={`${SITE_URL}${l.code === "en" ? "/" : `/?lang=${l.code}`}`}
             />
           ))}
-          <link rel="alternate" hrefLang="x-default" href={siteUrl} />
+          <link rel="alternate" hrefLang="x-default" href={SITE_URL} />
 
           {/* JSON-LD structured data: WebSite + Organization */}
           <script
@@ -90,22 +137,22 @@ export default function RootLayout({ children }) {
                 "@graph": [
                   {
                     "@type": "Organization",
-                    "@id": `${siteUrl}#org`,
+                    "@id": `${SITE_URL}#org`,
                     name: "Momentum",
-                    url: siteUrl,
-                    logo: `${siteUrl}/favicon.png`,
+                    url: SITE_URL,
+                    logo: `${SITE_URL}/favicon.png`,
                     sameAs: [],
                   },
                   {
                     "@type": "WebSite",
-                    "@id": `${siteUrl}#website`,
-                    url: siteUrl,
+                    "@id": `${SITE_URL}#website`,
+                    url: SITE_URL,
                     name: "Momentum",
-                    description: siteDescription,
-                    publisher: { "@id": `${siteUrl}#org` },
+                    description: metadata.description,
+                    publisher: { "@id": `${SITE_URL}#org` },
                     potentialAction: {
                       "@type": "SearchAction",
-                      target: `${siteUrl}/?q={search_term_string}`,
+                      target: `${SITE_URL}/?q={search_term_string}`,
                       "query-input": "required name=search_term_string",
                     },
                   },
