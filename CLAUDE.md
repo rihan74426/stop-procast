@@ -434,3 +434,4 @@ check the lean and ambitious plans and their flows if they're working properly. 
 
 project publicization for to see everyone. and the search can refer to that project not to regenerate. keep this into the next version plan.
 also the bengali and arabic choosen font will be added in the next version.
+the projects should be publicalized for everyone without names.
