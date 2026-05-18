@@ -58,7 +58,7 @@ export function Sidebar() {
   const navItems = [
     { href: "/", label: t("nav_dashboard"), icon: FiGrid },
     { href: "/new", label: t("nav_new_project"), icon: FiPlus },
-    { href: "/feedback", label: "Feedback", icon: FiMessageSquare },
+    { href: "/feedback", label: t("feedback_title"), icon: FiMessageSquare },
     { href: "/settings", label: t("nav_settings"), icon: FiSettings },
   ];
 
