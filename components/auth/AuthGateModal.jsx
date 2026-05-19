@@ -47,7 +47,7 @@ export function AuthGateModal({ open, onClose, onContinueAnyway }) {
           <div className="flex items-center gap-3 mb-1">
             <div className="w-8 h-8 rounded-[var(--r-md)] bg-white/20 flex items-center justify-center shrink-0 overflow-hidden">
               <img
-                src="/logo.png"
+                src="/favicon.png"
                 alt="Momentum"
                 className="w-full h-full object-contain"
                 onError={(e) => {
