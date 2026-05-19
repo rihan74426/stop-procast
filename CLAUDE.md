@@ -430,10 +430,161 @@ we have to confirm before logging out. warning their getting out of their saved 
 1. Use an i18n library for the app UI
    Use an npm i18n package such as i18next or, in Next.js, next-intl. These libraries are designed for locale routing, translation keys, and structured message loading, so your interface can swap languages smoothly without calling an external API for every label. next-intl also handles locale-based routing and localized pathnames in Next.js.
 
-check the lean and ambitious plans and their flows if they're working properly. I choose ambitious and the ai returned the 6 week plan but the project was set in two phases only.
-
 project publicization for to see everyone. and the search can refer to that project not to regenerate. keep this into the next version plan.
 also the bengali and arabic choosen font will be added in the next version.
 the projects should be publicalized for everyone without names.
 
 we have to set cron and vercel.json and settings appliance throughout the application.
+
+{
+"error": "AI provider rate limit exceeded",
+"message": "AI provider rate limit exceeded",
+"code": "upstream_rate_limited",
+"attempts": [
+{
+"model": "openrouter:meta-llama/llama-3.2-3b-instruct:free",
+"provider": "openrouter",
+"status": 429,
+"code": 429,
+"error": "429 Provider returned error"
+}
+]
+}
+
+next:
+{
+"error": "AI provider unavailable",
+"message": "AI provider unavailable",
+"code": "upstream_provider_unavailable",
+"attempts": [
+{
+"model": "openrouter:liquid/lfm-2.5-1.2b-instruct:free",
+"provider": "openrouter",
+"status": 400,
+"code": 400,
+"error": "400 Provider returned error"
+}
+]
+}
+next:
+{
+"error": "400 {\"id\":\"ojiqevq-2kFHot-9fe3bb332f59ce63\",\"error\":{\"message\":\"Unable to access non-serverless model google/gemma-3-4b-it. Please visit https://api.together.ai/models/google/gemma-3-4b-it to create and start a new dedicated endpoint for the model.\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"model_not_available\"}}",
+"message": "400 {\"id\":\"ojiqevq-2kFHot-9fe3bb332f59ce63\",\"error\":{\"message\":\"Unable to access non-serverless model google/gemma-3-4b-it. Please visit https://api.together.ai/models/google/gemma-3-4b-it to create and start a new dedicated endpoint for the model.\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"model_not_available\"}}",
+"code": "upstream_bad_request",
+"attempts": [
+{
+"model": "togetherai:google/gemma-3-4b-it",
+"provider": "together-ai",
+"status": 400,
+"error": "400 {\"id\":\"ojiqevq-2kFHot-9fe3bb332f59ce63\",\"error\":{\"message\":\"Unable to access non-serverless model google/gemma-3-4b-it. Please visit https://api.together.ai/models/google/gemma-3-4b-it to create and start a new dedicated endpoint for the model.\",\"type\":\"invalid_request_error\",\"param\":null,\"code\":\"model_not_available\"}}"
+}
+]
+}
+
+next:
+{
+"success": true,
+"result": {
+"index": 0,
+"logprobs": null,
+"finish_reason": "stop",
+"native_finish_reason": "stop",
+"message": {
+"role": "assistant",
+"content": null,
+"refusal": null,
+"reasoning": "We can see that we have a problem with 0.0.0.0.0.0.0.0.0.0.0.standing the 0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0. Let's placeholder: \"About 5 hours a week\"",
+"reasoning_details": [
+{
+"type": "reasoning.text",
+"text": "We can see that we have a problem with 0.0.0.0.0.0.0.0.0.0.0.standing the 0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0. Let's placeholder: \"About 5 hours a week\"",
+"format": "unknown",
+"index": 0
+}
+]
+},
+"usage": {
+"prompt": 317,
+"completion": 440,
+"input_cache_read": 0,
+"request": 1,
+"billedUsage": 1,
+"usd_cents": 0
+},
+"via_ai_chat_service": true
+},
+"service": {
+"name": "ai-chat"
+},
+"metadata": {
+"service_used": "openrouter",
+"providerUsed": "openrouter:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+}
+}
+
+next call:
+{
+"success": true,
+"result": {
+"index": 0,
+"logprobs": null,
+"finish_reason": "stop",
+"native_finish_reason": "stop",
+"message": {
+"role": "assistant",
+"content": null,
+"refusal": null,
+"reasoning": "We can see that we have a problem with 0.0.0.0.0.0.0.0.0.0.0.standing the 0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0. Let's placeholder: \"About 5 hours a week\"",
+"reasoning_details": [
+{
+"type": "reasoning.text",
+"text": "We can see that we have a problem with 0.0.0.0.0.0.0.0.0.0.0.standing the 0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0.0. Let's placeholder: \"About 5 hours a week\"",
+"format": "unknown",
+"index": 0
+}
+]
+},
+"usage": {
+"prompt": 317,
+"completion": 440,
+"input_cache_read": 0,
+"request": 1,
+"billedUsage": 1,
+"usd_cents": 0
+},
+"via_ai_chat_service": true
+},
+"service": {
+"name": "ai-chat"
+},
+"metadata": {
+"service_used": "openrouter",
+"providerUsed": "openrouter:nvidia/nemotron-3-nano-omni-30b-a3b-reasoning:free"
+}
+}
+
+next call:
+{
+"error": "Model not found: baidu/qianfan-ocr-fast:free",
+"message": "Model not found: baidu/qianfan-ocr-fast:free",
+"code": "bad_request"
+}
+
+next call:
+{
+"error": "AI provider rate limit exceeded",
+"message": "AI provider rate limit exceeded",
+"code": "upstream_rate_limited",
+"attempts": [
+{
+"model": "openrouter:cognitivecomputations/dolphin-mistral-24b-venice-edition:free",
+"provider": "openrouter",
+"status": 429,
+"code": 429,
+"error": "429 Provider returned error"
+}
+]
+}
+
+next generate:
+{"error":"AI returned empty response. Please try again.","code":"AI_ERROR"}
