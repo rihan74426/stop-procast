@@ -14,9 +14,9 @@ export function Footer() {
           {/* Brand */}
           <div className="flex flex-col items-center sm:items-start gap-2 text-center sm:text-left">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-[var(--r-sm)] bg-[var(--violet)] flex items-center justify-center overflow-hidden shrink-0">
+              <div className="w-6 h-6 rounded-[var(--r-sm)]  flex items-center justify-center overflow-hidden shrink-0">
                 <img
-                  src="/logo.png"
+                  src="/favicon.png"
                   alt="Momentum"
                   className="w-full h-full object-contain"
                   onError={(e) => {

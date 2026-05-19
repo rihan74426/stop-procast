@@ -70,7 +70,7 @@ export function Sidebar() {
           <div className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center">
               <Image
-                src="/logo.png"
+                src="/favicon.png"
                 alt="Momentum"
                 width={28}
                 height={40}
@@ -97,7 +97,7 @@ export function Sidebar() {
       <div className="hidden lg:flex items-center gap-2 px-4 py-4 border-b border-[var(--border)]">
         <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center">
           <Image
-            src="/logo.png"
+            src="/favicon.png"
             alt="Momentum"
             width={28}
             height={40}
