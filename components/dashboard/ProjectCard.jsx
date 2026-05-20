@@ -91,7 +91,10 @@ export function ProjectCard({ project }) {
           </span>
           <div className="flex items-center gap-2 sm:gap-3">
             {project.streakDays > 0 && (
-              <span className="flex items-center text-red-400">
+              <span
+                className="flex items-center gap-0.5"
+                style={{ color: "var(--coral)" }}
+              >
                 <FaFire /> {project.streakDays}d
               </span>
             )}

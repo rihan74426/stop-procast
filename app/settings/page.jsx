@@ -1,17 +1,3 @@
-// PATCH: Add this import at the top of app/settings/page.jsx
-// import { NotificationSettings } from "@/components/ui/NotificationSettings";
-
-// PATCH: Add this section inside the settings page, after the Appearance section:
-/*
-<Section title="Notifications">
-  <p className="text-sm text-[var(--text-secondary)] -mt-1 leading-relaxed">
-    Get a morning reminder to stay on track with your goals.
-  </p>
-  <NotificationSettings />
-</Section>
-*/
-
-// Full updated settings page with notifications section:
 "use client";
 
 import { useState, useEffect } from "react";
@@ -68,7 +54,7 @@ function SettingsContent() {
     const data = JSON.stringify(
       { version: 1, exportedAt: new Date().toISOString(), projects },
       null,
-      2,
+      2
     );
     const blob = new Blob([data], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -139,9 +125,9 @@ function SettingsContent() {
               </Section>
 
               {/* Notifications */}
-              <Section title="Notifications">
+              <Section title={t("settings_notifications")}>
                 <p className="text-sm text-[var(--text-secondary)] -mt-1 leading-relaxed">
-                  Get a morning reminder to stay on track with your daily tasks.
+                  {t("settings_notifications_desc")}
                 </p>
                 <NotificationSettings />
               </Section>
@@ -185,7 +171,7 @@ function SettingsContent() {
                         </p>
                         {isSelected && (
                           <p className="text-[11px] text-[var(--violet-dim)] font-medium mt-2">
-                            ✓ Currently active
+                            ✓ {t("settings_saved")}
                           </p>
                         )}
                       </button>
@@ -242,7 +228,7 @@ function SettingsContent() {
                         >
                           {t(`settings_exp_${level}`)}
                         </button>
-                      ),
+                      )
                     )}
                   </div>
                 </Field>
@@ -265,7 +251,7 @@ function SettingsContent() {
                         >
                           {t(`settings_style_${style}`)}
                         </button>
-                      ),
+                      )
                     )}
                   </div>
                 </Field>
@@ -300,8 +286,12 @@ function SettingsContent() {
                   label={t("settings_export_all")}
                   description={
                     projects.length !== 1
-                      ? t("settings_export_desc_plural", { n: projects.length })
-                      : t("settings_export_desc", { n: projects.length })
+                      ? t("settings_export_desc_plural", {
+                          n: String(projects.length),
+                        })
+                      : t("settings_export_desc", {
+                          n: String(projects.length),
+                        })
                   }
                 >
                   <Button variant="ghost" size="sm" onClick={handleExportAll}>

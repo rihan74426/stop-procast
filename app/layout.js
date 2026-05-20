@@ -5,9 +5,8 @@ import { I18nProvider } from "@/lib/i18n";
 import { ToastContainer } from "@/components/ui/Toast";
 import { NetworkMonitor } from "@/components/ui/NetworkMonitor";
 import { NotificationInit } from "@/components/ui/NotificationInit";
-import { LANGUAGES } from "@/lib/i18n/translations"; // added for hreflang list
+import { LANGUAGES } from "@/lib/i18n/translations";
 
-// --- REPLACED metadata with full OpenGraph / Twitter / alternates ---
 const SITE_URL =
   process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
   "http://localhost:3000";
@@ -28,8 +27,6 @@ export const metadata = {
     initialScale: 1,
     maximumScale: 1,
   },
-
-  // Server-rendered OpenGraph (ensures scrapers see the tags)
   openGraph: {
     type: "website",
     title: "Momentum > Finish What You Start",
@@ -46,8 +43,6 @@ export const metadata = {
       },
     ],
   },
-
-  // Twitter card
   twitter: {
     card: "summary_large_image",
     title: "Momentum > Finish What You Start",
@@ -55,18 +50,16 @@ export const metadata = {
       "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.",
     images: [`${SITE_URL}/og-card.png`],
   },
-
-  // Alternates / hreflang — map languages to root URLs (safe fallback to query param)
   alternates: {
     canonical: SITE_URL + "/",
     languages: LANGUAGES.reduce((acc, l) => {
+      // Use correct BCP-47 codes — never append "-r"
       acc[l.code] =
         l.code === "en" ? SITE_URL + "/" : SITE_URL + `/?lang=${l.code}`;
       return acc;
     }, {}),
   },
 };
-// --- end metadata replacement ---
 
 export default function RootLayout({ children }) {
   const puterAppId = process.env.NEXT_PUBLIC_PUTER_APP_ID ?? "";
@@ -85,7 +78,6 @@ export default function RootLayout({ children }) {
             crossOrigin="anonymous"
           />
 
-          {/* Basic SEO / Social tags */}
           <meta name="description" content={metadata.description} />
           <meta name="author" content="Momentum" />
           <link rel="canonical" href={metadata.alternates.canonical} />
@@ -117,18 +109,18 @@ export default function RootLayout({ children }) {
           />
           <meta name="twitter:image" content={metadata.twitter.images[0]} />
 
-          {/* Hreflang alternates (assumes root per-locale pages; safe fallback to query param) */}
+          {/* Hreflang — use plain BCP-47 codes (no "-r" suffix) */}
           {LANGUAGES.map((l) => (
             <link
               key={l.code}
               rel="alternate"
-              hrefLang={l.rtl ? l.code + "-r" : l.code}
+              hrefLang={l.code}
               href={`${SITE_URL}${l.code === "en" ? "/" : `/?lang=${l.code}`}`}
             />
           ))}
           <link rel="alternate" hrefLang="x-default" href={SITE_URL} />
 
-          {/* JSON-LD structured data: WebSite + Organization */}
+          {/* JSON-LD */}
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
@@ -161,10 +153,6 @@ export default function RootLayout({ children }) {
             }}
           />
 
-          {/*
-           * STEP 1 — Write puter credentials into localStorage before puter.js loads.
-           * This must run synchronously before any other script on the page.
-           */}
           {hasPuterCreds && (
             <script
               dangerouslySetInnerHTML={{
@@ -180,11 +168,6 @@ export default function RootLayout({ children }) {
             />
           )}
 
-          {/*
-           * STEP 2 — Load puter.js AFTER credentials are in localStorage.
-           * defer preserves execution order relative to other deferred scripts.
-           * Only loaded when credentials are present.
-           */}
           {hasPuterCreds && <script src="https://js.puter.com/v2/" defer />}
         </head>
         <body>
