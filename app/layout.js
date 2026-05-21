@@ -1,3 +1,13 @@
+/**
+ * app/layout.js — REPLACE your current file with this.
+ *
+ * Key changes:
+ * 1. Uses next/font/google instead of @import in CSS — eliminates render-blocking
+ * 2. Passes font CSS variables to <body> so globals.css still works
+ * 3. Adds generateMetadata-compatible metadata export
+ * 4. Adds <link rel="preconnect"> for puter CDN
+ */
+
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/lib/theme";
@@ -6,34 +16,79 @@ import { ToastContainer } from "@/components/ui/Toast";
 import { NetworkMonitor } from "@/components/ui/NetworkMonitor";
 import { NotificationInit } from "@/components/ui/NotificationInit";
 import { LANGUAGES } from "@/lib/i18n/translations";
+import { Fira_Sans, DM_Sans } from "next/font/google";
+import { THEME_SCRIPT } from "@/lib/theme";
+
+// ─── Fonts via next/font (eliminates render-blocking CDN request) ─────
+const firaSans = Fira_Sans({
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700", "800"],
+  variable: "--font-display",
+  display: "swap",
+  preload: true,
+});
+
+const dmSans = DM_Sans({
+  subsets: ["latin"],
+  weight: ["300", "400", "500"],
+  variable: "--font-body",
+  display: "swap",
+  preload: true,
+});
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-  "http://localhost:3000";
+  "https://momentumio.vercel.app";
 
 export const metadata = {
-  title: "Momentum > Finish What You Start",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Momentum — Finish What You Start",
+    template: "%s | Momentum",
+  },
   description:
-    "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.",
+    "Turn any idea, goal, or plan into structured action. AI-powered project planning with built-in accountability and streak tracking.",
   applicationName: "Momentum",
   authors: [{ name: "Momentum" }],
+  keywords: [
+    "project planning",
+    "AI planning",
+    "productivity",
+    "goal tracking",
+    "task management",
+    "anti-procrastination",
+  ],
+  creator: "Momentum",
+  publisher: "Momentum",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   icons: {
-    icon: "/favicon.png",
-    apple: "/favicon.png",
+    icon: [
+      { url: "/favicon.png", type: "image/png" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
     shortcut: "/favicon.png",
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-  },
+  manifest: "/manifest.json",
   openGraph: {
     type: "website",
-    title: "Momentum > Finish What You Start",
-    description:
-      "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.",
+    locale: "en_US",
     url: SITE_URL,
     siteName: "Momentum",
+    title: "Momentum — Finish What You Start",
+    description:
+      "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.",
     images: [
       {
         url: `${SITE_URL}/og-card.png`,
@@ -45,17 +100,23 @@ export const metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Momentum > Finish What You Start",
+    title: "Momentum — Finish What You Start",
     description:
       "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.",
     images: [`${SITE_URL}/og-card.png`],
+    creator: "@momentumapp",
+  },
+  verification: {
+    // Add these once you set up Search Console and Bing Webmaster:
+    // google: "your-google-verification-code",
+    // yandex: "your-yandex-code",
+    // bing: "your-bing-code",
   },
   alternates: {
-    canonical: SITE_URL + "/",
+    canonical: `${SITE_URL}/`,
     languages: LANGUAGES.reduce((acc, l) => {
-      // Use correct BCP-47 codes — never append "-r"
       acc[l.code] =
-        l.code === "en" ? SITE_URL + "/" : SITE_URL + `/?lang=${l.code}`;
+        l.code === "en" ? `${SITE_URL}/` : `${SITE_URL}/?lang=${l.code}`;
       return acc;
     }, {}),
   },
@@ -68,59 +129,19 @@ export default function RootLayout({ children }) {
 
   return (
     <ClerkProvider>
-      <html lang="en" suppressHydrationWarning>
+      <html
+        lang="en"
+        suppressHydrationWarning
+        className={`${firaSans.variable} ${dmSans.variable}`}
+      >
         <head>
-          <link rel="preconnect" href="https://api.fontshare.com" />
-          <link rel="preconnect" href="https://fonts.googleapis.com" />
-          <link
-            rel="preconnect"
-            href="https://fonts.gstatic.com"
-            crossOrigin="anonymous"
-          />
-
-          <meta name="description" content={metadata.description} />
-          <meta name="author" content="Momentum" />
-          <link rel="canonical" href={metadata.alternates.canonical} />
-
-          {/* OpenGraph */}
-          <meta property="og:type" content="website" />
-          <meta property="og:title" content={metadata.openGraph.title} />
-          <meta
-            property="og:description"
-            content={metadata.openGraph.description}
-          />
-          <meta property="og:url" content={metadata.openGraph.url} />
-          <meta property="og:site_name" content="Momentum" />
-          <meta
-            property="og:image"
-            content={metadata.openGraph.images[0].url}
-          />
-          <meta
-            property="og:image:alt"
-            content="Momentum — finish what you start"
-          />
-
-          {/* Twitter */}
-          <meta name="twitter:card" content="summary_large_image" />
-          <meta name="twitter:title" content={metadata.twitter.title} />
-          <meta
-            name="twitter:description"
-            content={metadata.twitter.description}
-          />
-          <meta name="twitter:image" content={metadata.twitter.images[0]} />
-
-          {/* Hreflang — use plain BCP-47 codes (no "-r" suffix) */}
-          {LANGUAGES.map((l) => (
-            <link
-              key={l.code}
-              rel="alternate"
-              hrefLang={l.code}
-              href={`${SITE_URL}${l.code === "en" ? "/" : `/?lang=${l.code}`}`}
-            />
-          ))}
-          <link rel="alternate" hrefLang="x-default" href={SITE_URL} />
-
-          {/* JSON-LD */}
+          * <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
+          {/* Preconnect for third-party origins — reduces DNS/TLS latency */}
+          <link rel="preconnect" href="https://clerk.momentumio.vercel.app" />
+          {hasPuterCreds && (
+            <link rel="preconnect" href="https://js.puter.com" />
+          )}
+          {/* JSON-LD — SoftwareApplication schema for better rich results */}
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
@@ -128,19 +149,35 @@ export default function RootLayout({ children }) {
                 "@context": "https://schema.org",
                 "@graph": [
                   {
+                    "@type": "SoftwareApplication",
+                    "@id": `${SITE_URL}#app`,
+                    name: "Momentum",
+                    url: SITE_URL,
+                    applicationCategory: "ProductivityApplication",
+                    operatingSystem: "Web",
+                    description:
+                      "AI-powered project planning with built-in accountability.",
+                    offers: {
+                      "@type": "Offer",
+                      price: "0",
+                      priceCurrency: "USD",
+                    },
+                    logo: `${SITE_URL}/favicon.png`,
+                  },
+                  {
                     "@type": "Organization",
                     "@id": `${SITE_URL}#org`,
                     name: "Momentum",
                     url: SITE_URL,
                     logo: `${SITE_URL}/favicon.png`,
-                    sameAs: [],
                   },
                   {
                     "@type": "WebSite",
                     "@id": `${SITE_URL}#website`,
                     url: SITE_URL,
                     name: "Momentum",
-                    description: metadata.description,
+                    description:
+                      "Turn any idea into a structured execution plan.",
                     publisher: { "@id": `${SITE_URL}#org` },
                     potentialAction: {
                       "@type": "SearchAction",
@@ -152,22 +189,19 @@ export default function RootLayout({ children }) {
               }),
             }}
           />
-
+          {/* Puter credentials bootstrap — runs before React hydrates */}
           {hasPuterCreds && (
             <script
               dangerouslySetInnerHTML={{
                 __html: `(function(){try{
-  var appId=${JSON.stringify(puterAppId)};
-  var token=${JSON.stringify(puterAuthToken)};
-  if(appId && !localStorage.getItem("puter.app.id"))
-    localStorage.setItem("puter.app.id", appId);
-  if(token && !localStorage.getItem("puter.auth.token"))
-    localStorage.setItem("puter.auth.token", token);
+  var a=${JSON.stringify(puterAppId)};
+  var t=${JSON.stringify(puterAuthToken)};
+  if(a&&!localStorage.getItem("puter.app.id"))localStorage.setItem("puter.app.id",a);
+  if(t&&!localStorage.getItem("puter.auth.token"))localStorage.setItem("puter.auth.token",t);
 }catch(e){}})();`,
               }}
             />
           )}
-
           {hasPuterCreds && <script src="https://js.puter.com/v2/" defer />}
         </head>
         <body>
