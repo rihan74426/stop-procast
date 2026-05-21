@@ -1,4 +1,3 @@
-"use server";
 import { use } from "react";
 import ProjectContent from "./ProjectPageClient";
 
