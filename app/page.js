@@ -23,6 +23,8 @@ import {
   FaBullseye,
   FaChartLine,
   FaSmile,
+  FaRobot,
+  FaChartBar,
 } from "react-icons/fa";
 
 // ─── Greeting system ──────────────────────────────────────────────────
@@ -295,34 +297,39 @@ function GuestLanding({ t }) {
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-20">
         {[
           {
-            icon: "🤖",
+            icon: FaRobot,
             title: "AI-generated plan",
             desc: "Describe your goal. Momentum builds phases, milestones, and tasks tailored to your scope.",
           },
           {
-            icon: "🔥",
+            icon: FaFire,
             title: "Streak & pressure system",
             desc: "Daily streaks and project pressure scores keep procrastination at bay.",
           },
           {
-            icon: "📊",
+            icon: FaChartBar,
             title: "Execution hub",
             desc: "One view for your next action, blockers, timeline, and overall progress.",
           },
-        ].map((f) => (
-          <div
-            key={f.title}
-            className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5"
-          >
-            <span className="text-3xl mb-3 block">{f.icon}</span>
-            <h2 className="font-display font-semibold text-base text-[var(--text-primary)] mb-2">
-              {f.title}
-            </h2>
-            <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-              {f.desc}
-            </p>
-          </div>
-        ))}
+        ].map((f) => {
+          const Icon = f.icon;
+          return (
+            <div
+              key={f.title}
+              className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5"
+            >
+              <span className="text-3xl mb-3 block">
+                <Icon />
+              </span>
+              <h2 className="font-display font-semibold text-base text-[var(--text-primary)] mb-2">
+                {f.title}
+              </h2>
+              <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                {f.desc}
+              </p>
+            </div>
+          );
+        })}
       </div>
 
       {/* FAQ — rich snippet eligible */}
