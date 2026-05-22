@@ -468,39 +468,3 @@ the projects should be publicalized for everyone without names.
 user agreement of our terms and conditions before sending a request to the ai.
 
 we can categorize the project by the ai. and generate category as soon as the ai responses with new category.
-
-## Error Type
-
-Runtime TypeError
-
-## Error Message
-
-Cannot read properties of undefined (reading 'Project')
-
-    at eval (webpack-internal:///(app-pages-browser)/./lib/models/Project.js:326:123)
-
-    at (app-pages-browser)/./lib/models/Project.js (.next\static\chunks\app\project\[id]\page.js:304:1)
-
-    at eval (webpack-internal:///(app-pages-browser)/./app/project/[id]/ProjectPageClient.jsx:35:78)
-
-    at (app-pages-browser)/./app/project/[id]/ProjectPageClient.jsx (.next\static\chunks\app\project\[id]\page.js:18:1)
-
-    at ProjectPage (app\project\[id]\page.jsx:75:10)
-
-## Code Frame
-
-73 | export default async function ProjectPage({ params }) {
-
-74 | const param = await params;
-
-> 75 | return <ProjectContent id={param.id} />;
-
-     |          ^
-
-76 | }
-
-77 |
-
-Next.js version: 15.5.15 (Webpack)
-
-still coming that error

@@ -18,6 +18,8 @@ import { NotificationInit } from "@/components/ui/NotificationInit";
 import { LANGUAGES } from "@/lib/i18n/translations";
 import { Fira_Sans, DM_Sans } from "next/font/google";
 import { THEME_SCRIPT } from "@/lib/theme";
+import { Analytics } from "@vercel/analytics/react";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 // ─── Fonts via next/font (eliminates render-blocking CDN request) ─────
 const firaSans = Fira_Sans({
@@ -211,6 +213,8 @@ export default function RootLayout({ children }) {
               <ToastContainer />
               <NetworkMonitor />
               <NotificationInit />
+              <Analytics />
+              <SpeedInsights />
             </I18nProvider>
           </ThemeProvider>
         </body>
