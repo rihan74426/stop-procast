@@ -5,7 +5,7 @@
       "schedule": "0 6 * * *"
     },
     {
-      "path": "/api/cron/streak-check",
+      "path": "/api/cron/daily-reminders/streak-check/route.js",
       "schedule": "0 20 * * *"
     }
   ],
