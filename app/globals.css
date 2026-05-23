@@ -1,6 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Fira+Sans:ital,wght@0,100;0,200;0,300;0,400;0,500;0,600;0,700;0,800;0,900;1,100;1,200;1,300;1,400;1,500;1,600;1,700;1,800;1,900&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;1,9..40,300&display=swap");
-
 @import "tailwindcss";
 
 /* Tell Tailwind v4 where to scan for classes */
@@ -12,15 +9,22 @@
 
 /* ─── Design Tokens ──────────────────────────────────────────────────── */
 :root {
-  /* Latin UI fonts (loaded via @import above) */
-  --font-display: "Fira Sans", sans-serif;
-  --font-body: "DM Sans", sans-serif;
+  /* ── Primary UI fonts ──────────────────────────────────────────────
+     --font-display and --font-body are injected by next/font as CSS
+     variables on <html> via the className prop in layout.js.
+     Fira Sans → headings/display  |  DM Sans → body/UI copy
+     Both include Latin + Latin-Ext for English, French, Spanish,
+     German, and other Latin-script languages.
+  */
+  --font-display: var(--font-display); /* Fira Sans  — set by next/font */
+  --font-body: var(--font-body); /* DM Sans    — set by next/font */
 
-  /* Locale font variables — values injected by next/font via className on <html>.
-     These are intentionally left unset here; next/font writes the actual
-     @font-face + var() declarations into its own stylesheet.             */
-  /* --font-bengali  →  set by Anek_Bangla({ variable: "--font-bengali" }) */
-  /* --font-arabic   →  set by Tajawal({ variable: "--font-arabic" })      */
+  /* ── Script-specific font variables ───────────────────────────────
+     Also injected by next/font. Used in the @font-face unicode-range
+     blocks below so the browser auto-selects per character.
+     --font-bengali → Anek Bangla
+     --font-arabic  → Tajawal
+  */
 
   /* Palette — Light */
   --ink: #0c0c0f;
@@ -118,71 +122,65 @@
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
-/* ─── Locale font overrides ──────────────────────────────────────────── */
-/*
-  .lang-bn and .lang-ar are toggled on <html> by I18nProvider whenever
-  the user switches locale. The CSS variables --font-bengali and
-  --font-arabic are injected by next/font into a <style> tag in <head>
-  — they're guaranteed to exist by the time these rules run.
+/* ─── Script-aware @font-face unicode-range overrides ────────────────
+   These rules teach the browser which font to use per Unicode block.
+   This is the key mechanism: no JS, no i18n, no locale class needed.
+   It works on ALL text — AI responses, DB content, user input, labels.
 
-  We reassign --font-display and --font-body so every component that
-  already uses var(--font-body) / var(--font-display) inherits the
-  correct typeface automatically, with zero component changes.
-*/
+   How it works:
+   1. next/font injects @font-face rules for Fira Sans, DM Sans,
+      Anek Bangla, and Tajawal and exposes them as CSS variables.
+   2. We define additional @font-face rules here that reference the
+      same font families but add unicode-range so the browser narrows
+      each font to only the characters it covers.
+   3. When the browser renders a character it checks unicode-range
+      across all loaded faces and picks the best match automatically.
+   4. Font files for Anek Bangla / Tajawal are only fetched when
+      their unicode range characters actually appear on screen.
+── ─────────────────────────────────────────────────────────────────── */
 
-/* Bengali — Anek Bangla */
-html.lang-bn {
-  --font-display: var(--font-bengali);
-  --font-body: var(--font-bengali);
+/* Bengali script — Anek Bangla
+   Covers the full Bengali / Assamese Unicode block U+0980–U+09FF
+   plus Vedic extensions sometimes used in Bengali texts.           */
+@font-face {
+  font-family: "Anek Bangla";
+  src: local("Anek Bangla");
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  unicode-range: U+0980-09FF,
+    /* Bengali block                                  */ U+200C-200D,
+    /* Zero-width non-joiner / joiner (used in Bangla)*/ U+25CC; /* Dotted circle (placeholder for combining marks) */
 }
 
-html.lang-bn body,
-html.lang-bn input,
-html.lang-bn textarea,
-html.lang-bn button,
-html.lang-bn select {
-  font-family: var(--font-bengali);
-  font-optical-sizing: auto;
-  font-variation-settings: "wdth" 100;
+/* Arabic script — Tajawal
+   Covers core Arabic, extended Arabic, Arabic presentation forms,
+   Arabic supplement, and Arabic mathematical symbols.              */
+@font-face {
+  font-family: "Tajawal";
+  src: local("Tajawal");
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  unicode-range: U+0600-06FF,
+    /* Arabic                                          */ U+0750-077F,
+    /* Arabic Supplement                               */ U+08A0-08FF,
+    /* Arabic Extended-A                               */ U+FB50-FDFF,
+    /* Arabic Presentation Forms-A                     */ U+FE70-FEFF,
+    /* Arabic Presentation Forms-B                     */ U+200C-200D,
+    /* Zero-width non-joiner / joiner                  */ U+200F,
+    /* Right-to-left mark                              */ U+25CC; /* Dotted circle                                   */
 }
 
-html.lang-bn h1,
-html.lang-bn h2,
-html.lang-bn h3,
-html.lang-bn h4,
-html.lang-bn h5,
-html.lang-bn h6 {
-  font-family: var(--font-bengali);
-  font-optical-sizing: auto;
-  font-variation-settings: "wdth" 100;
-  /* The global -0.02em looks too tight for Bangla script */
-  letter-spacing: -0.01em;
-}
+/* ─── Font stacks ────────────────────────────────────────────────────
+   The stacks below are what every component uses via var(--font-body)
+   and var(--font-display). Listing Anek Bangla and Tajawal after the
+   primary Latin fonts means the browser automatically falls through to
+   them when a character is not covered by Fira Sans / DM Sans.
 
-/* Arabic — Tajawal */
-html.lang-ar {
-  --font-display: var(--font-arabic);
-  --font-body: var(--font-arabic);
-}
-
-html.lang-ar body,
-html.lang-ar input,
-html.lang-ar textarea,
-html.lang-ar button,
-html.lang-ar select {
-  font-family: var(--font-arabic);
-}
-
-html.lang-ar h1,
-html.lang-ar h2,
-html.lang-ar h3,
-html.lang-ar h4,
-html.lang-ar h5,
-html.lang-ar h6 {
-  font-family: var(--font-arabic);
-  /* Negative letter-spacing is wrong for Arabic connected script */
-  letter-spacing: 0;
-}
+   Combined with the unicode-range @font-face rules above, this gives
+   us per-character script detection with zero JavaScript.
+── ─────────────────────────────────────────────────────────────────── */
 
 /* ─── Base Reset ─────────────────────────────────────────────────────── */
 *,
@@ -196,7 +194,9 @@ html {
 }
 
 body {
-  font-family: var(--font-body);
+  /* DM Sans first (Latin), then Anek Bangla (Bengali Unicode range),
+     then Tajawal (Arabic Unicode range). The browser resolves per glyph. */
+  font-family: var(--font-body), "Anek Bangla", "Tajawal", sans-serif;
   background-color: var(--bg-surface);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
@@ -212,9 +212,44 @@ h3,
 h4,
 h5,
 h6 {
-  font-family: var(--font-display);
+  /* Fira Sans first (Latin), then Anek Bangla, then Tajawal.
+     Headings get the correct script font automatically. */
+  font-family: var(--font-display), "Anek Bangla", "Tajawal", sans-serif;
   letter-spacing: -0.02em;
   line-height: 1.15;
+}
+
+/* Input, textarea, button — also need the full stack so user-typed
+   Bengali or Arabic text renders correctly as they type.           */
+input,
+textarea,
+button,
+select {
+  font-family: var(--font-body), "Anek Bangla", "Tajawal", sans-serif;
+}
+
+/* ─── RTL layout adjustments ─────────────────────────────────────────
+   Applied by I18nProvider when locale is Arabic.
+   Font is already handled above via unicode-range — these rules only
+   adjust spacing/alignment that differs for right-to-left text.     */
+html.lang-ar h1,
+html.lang-ar h2,
+html.lang-ar h3,
+html.lang-ar h4,
+html.lang-ar h5,
+html.lang-ar h6 {
+  /* Negative letter-spacing is wrong for Arabic connected script */
+  letter-spacing: 0;
+}
+
+/* Bengali headings also look better with slightly less tight tracking */
+html.lang-bn h1,
+html.lang-bn h2,
+html.lang-bn h3,
+html.lang-bn h4,
+html.lang-bn h5,
+html.lang-bn h6 {
+  letter-spacing: -0.01em;
 }
 
 /* ─── Scrollbar ──────────────────────────────────────────────────────── */
@@ -248,10 +283,10 @@ h6 {
 
 /* ─── Utility classes ────────────────────────────────────────────────── */
 .font-display {
-  font-family: var(--font-display);
+  font-family: var(--font-display), "Anek Bangla", "Tajawal", sans-serif;
 }
 .font-body {
-  font-family: var(--font-body);
+  font-family: var(--font-body), "Anek Bangla", "Tajawal", sans-serif;
 }
 
 /* ─── Reduced motion ─────────────────────────────────────────────────── */

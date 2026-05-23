@@ -419,10 +419,6 @@ RESEND_API_KEY=...          # required in production for email export
 - [ ] PhaseTimeline `t()` for "Done" label and phase status strings
 - [ ] StepCapture `t()` for example text and ghost hints (lower priority — mostly content)
 
-project publicization for to see everyone. and the search can refer to that project not to regenerate. keep this into the next version plan.
-also the bengali and arabic choosen font will be added in the next version.
-the projects should be publicalized for everyone without names.
+the user types and the text-editor founds a title or idea match, then it suggests that a similar project already exists, do you want to check it first?
 
-user agreement of our terms and conditions before sending a request to the ai.
-
-we can categorize the project by the ai. and generate category as soon as the ai responses with new category.
+also ask them if they want their project to be shown to everyone to spread help and knowledge?

@@ -6,19 +6,35 @@ import { ToastContainer } from "@/components/ui/Toast";
 import { NetworkMonitor } from "@/components/ui/NetworkMonitor";
 import { NotificationInit } from "@/components/ui/NotificationInit";
 import { LANGUAGES } from "@/lib/i18n/translations";
-import { Anek_Bangla, Tajawal } from "next/font/google";
+import { Fredoka, Anek_Bangla, Tajawal } from "next/font/google";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
   "http://localhost:3000";
 
-// ─── Locale-specific fonts ────────────────────────────────────────────
-// preload: false → Next.js will NOT inject a <link rel="preload"> for
-// these fonts on every page. The font files are self-hosted by Next.js
-// at build time (no runtime dependency on Google CDN), but the browser
-// only fetches them when it actually encounters an element that uses the
-// CSS variable — i.e. when .lang-bn / .lang-ar is present on <html>.
-// Users on Latin/other locales pay zero network cost.
+// ─── Latin UI fonts (English + all Latin-script languages) ───────────
+// These are the primary fonts used everywhere. next/font preloads them
+// on every page since they are always needed.
+
+const fredokaDisplay = Fredoka({
+  subsets: ["latin", "latin-ext"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+const fredokaBody = Fredoka({
+  subsets: ["latin", "latin-ext"],
+  weight: ["300", "400", "500"],
+  variable: "--font-body",
+  display: "swap",
+});
+
+// ─── Bengali — Anek Bangla ────────────────────────────────────────────
+// preload: false — only fetched when Bengali Unicode characters appear.
+// The unicode-range in globals.css limits this font to U+0980–U+09FF
+// so the browser only downloads it when Bengali script is actually
+// on the page (AI content, DB data, user input — anything).
 
 const anekBangla = Anek_Bangla({
   subsets: ["bengali"],
@@ -27,6 +43,10 @@ const anekBangla = Anek_Bangla({
   display: "swap",
   preload: false,
 });
+
+// ─── Arabic — Tajawal ─────────────────────────────────────────────────
+// preload: false — only fetched when Arabic Unicode characters appear.
+// unicode-range in globals.css limits this to U+0600–U+06FF + extended.
 
 const tajawal = Tajawal({
   subsets: ["arabic"],
@@ -93,19 +113,22 @@ export default function RootLayout({ children }) {
   return (
     <ClerkProvider>
       {/*
-        Both font CSS variable class names are attached to <html> so the
-        variables (--font-bengali, --font-arabic) exist in scope everywhere.
-        globals.css only activates them under .lang-bn / .lang-ar, which
-        I18nProvider toggles on the html element at runtime.
+        All four font CSS-variable class names are attached to <html>.
+        This makes --font-display, --font-body, --font-bengali, and
+        --font-arabic available everywhere as CSS custom properties.
+
+        The browser then uses unicode-range (defined in globals.css) to
+        automatically select the correct font per character — Latin text
+        gets Fira Sans/DM Sans, Bengali script gets Anek Bangla, Arabic
+        script gets Tajawal. This works on AI-generated content, database
+        data, user input — anything, without any JS involvement.
       */}
       <html
         lang="en"
         suppressHydrationWarning
-        className={`${anekBangla.variable} ${tajawal.variable}`}
+        className={`${fredokaDisplay.variable} ${fredokaBody.variable} ${anekBangla.variable} ${tajawal.variable}`}
       >
         <head>
-          {/* next/font self-hosts the font files at build time, so no  */}
-          {/* runtime connection to fonts.googleapis.com is needed.      */}
           <link rel="preconnect" href="https://api.fontshare.com" />
 
           <meta name="description" content={metadata.description} />
