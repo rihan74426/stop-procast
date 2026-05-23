@@ -1,6 +1,9 @@
 import { use } from "react";
 import ProjectContent from "./ProjectPageClient";
 
+// Add viewport export for Next.js (move viewport out of generateMetadata)
+export const viewport = "width=device-width, initial-scale=1";
+
 // ─── ConfirmModal ─────────────────────────────────────────────────────
 
 // ─── Project content ──────────────────────────────────────────────────
