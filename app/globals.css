@@ -12,9 +12,15 @@
 
 /* ─── Design Tokens ──────────────────────────────────────────────────── */
 :root {
-  /* Fonts */
+  /* Latin UI fonts (loaded via @import above) */
   --font-display: "Fira Sans", sans-serif;
   --font-body: "DM Sans", sans-serif;
+
+  /* Locale font variables — values injected by next/font via className on <html>.
+     These are intentionally left unset here; next/font writes the actual
+     @font-face + var() declarations into its own stylesheet.             */
+  /* --font-bengali  →  set by Anek_Bangla({ variable: "--font-bengali" }) */
+  /* --font-arabic   →  set by Tajawal({ variable: "--font-arabic" })      */
 
   /* Palette — Light */
   --ink: #0c0c0f;
@@ -110,6 +116,72 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Locale font overrides ──────────────────────────────────────────── */
+/*
+  .lang-bn and .lang-ar are toggled on <html> by I18nProvider whenever
+  the user switches locale. The CSS variables --font-bengali and
+  --font-arabic are injected by next/font into a <style> tag in <head>
+  — they're guaranteed to exist by the time these rules run.
+
+  We reassign --font-display and --font-body so every component that
+  already uses var(--font-body) / var(--font-display) inherits the
+  correct typeface automatically, with zero component changes.
+*/
+
+/* Bengali — Anek Bangla */
+html.lang-bn {
+  --font-display: var(--font-bengali);
+  --font-body: var(--font-bengali);
+}
+
+html.lang-bn body,
+html.lang-bn input,
+html.lang-bn textarea,
+html.lang-bn button,
+html.lang-bn select {
+  font-family: var(--font-bengali);
+  font-optical-sizing: auto;
+  font-variation-settings: "wdth" 100;
+}
+
+html.lang-bn h1,
+html.lang-bn h2,
+html.lang-bn h3,
+html.lang-bn h4,
+html.lang-bn h5,
+html.lang-bn h6 {
+  font-family: var(--font-bengali);
+  font-optical-sizing: auto;
+  font-variation-settings: "wdth" 100;
+  /* The global -0.02em looks too tight for Bangla script */
+  letter-spacing: -0.01em;
+}
+
+/* Arabic — Tajawal */
+html.lang-ar {
+  --font-display: var(--font-arabic);
+  --font-body: var(--font-arabic);
+}
+
+html.lang-ar body,
+html.lang-ar input,
+html.lang-ar textarea,
+html.lang-ar button,
+html.lang-ar select {
+  font-family: var(--font-arabic);
+}
+
+html.lang-ar h1,
+html.lang-ar h2,
+html.lang-ar h3,
+html.lang-ar h4,
+html.lang-ar h5,
+html.lang-ar h6 {
+  font-family: var(--font-arabic);
+  /* Negative letter-spacing is wrong for Arabic connected script */
+  letter-spacing: 0;
 }
 
 /* ─── Base Reset ─────────────────────────────────────────────────────── */

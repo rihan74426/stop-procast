@@ -271,13 +271,13 @@ function GuestLanding({ t }) {
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
       {/* Hero — indexable H1 */}
       <h1 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-[var(--text-primary)] leading-tight tracking-tight mb-6">
-        Turn any idea into a{" "}
-        <span style={{ color: "var(--violet)" }}>finished project</span>
+        {t("guest_hero_title_1")}{" "}
+        <span style={{ color: "var(--violet)" }}>
+          {t("guest_hero_title_2")}
+        </span>
       </h1>
       <p className="text-lg sm:text-xl text-[var(--text-secondary)] max-w-2xl leading-relaxed mb-10">
-        Momentum breaks down your goals into phases, milestones, and daily
-        actions. AI builds the plan. You execute it — with streak tracking and
-        pressure alerts to keep you accountable.
+        {t("guest_hero_subtitle")}
       </p>
 
       {/* CTA */}
@@ -286,10 +286,10 @@ function GuestLanding({ t }) {
           href="/new"
           className="inline-flex items-center justify-center h-12 px-8 rounded-[var(--r-md)] bg-[var(--violet)] text-white font-semibold text-base hover:bg-[var(--violet-dim)] transition-colors"
         >
-          Start your first project →
+          {t("guest_cta_primary")}
         </a>
         <span className="text-sm text-[var(--text-tertiary)] self-center">
-          Free · No sign-up required to start
+          {t("guest_cta_free")}
         </span>
       </div>
 
@@ -298,18 +298,18 @@ function GuestLanding({ t }) {
         {[
           {
             icon: FaRobot,
-            title: "AI-generated plan",
-            desc: "Describe your goal. Momentum builds phases, milestones, and tasks tailored to your scope.",
+            title: t("guest_feature_ai_title"),
+            desc: t("guest_feature_ai_desc"),
           },
           {
             icon: FaFire,
-            title: "Streak & pressure system",
-            desc: "Daily streaks and project pressure scores keep procrastination at bay.",
+            title: t("guest_feature_streak_title"),
+            desc: t("guest_feature_streak_desc"),
           },
           {
             icon: FaChartBar,
-            title: "Execution hub",
-            desc: "One view for your next action, blockers, timeline, and overall progress.",
+            title: t("guest_feature_hub_title"),
+            desc: t("guest_feature_hub_desc"),
           },
         ].map((f) => {
           const Icon = f.icon;
@@ -319,7 +319,7 @@ function GuestLanding({ t }) {
               className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5"
             >
               <span className="text-3xl mb-3 block">
-                <Icon />
+                <Icon className="inline" />
               </span>
               <h2 className="font-display font-semibold text-base text-[var(--text-primary)] mb-2">
                 {f.title}
@@ -335,24 +335,24 @@ function GuestLanding({ t }) {
       {/* FAQ — rich snippet eligible */}
       <div className="mb-16">
         <h2 className="font-display font-semibold text-2xl text-[var(--text-primary)] mb-6">
-          Frequently asked questions
+          {t("guest_faq_title")}{" "}
         </h2>
         {[
           {
-            q: "Is Momentum free to use?",
-            a: "Yes. You can create and execute one project without signing up. Sign up free to manage up to 4 projects with full sync.",
+            q: t("guest_faq_1_q"),
+            a: t("guest_faq_1_a"),
           },
           {
-            q: "How does the AI planning work?",
-            a: "You describe your goal in plain language. Momentum's AI breaks it into phases, milestones, and concrete tasks sized for under 2 hours each.",
+            q: t("guest_faq_2_q"),
+            a: t("guest_faq_2_a"),
           },
           {
-            q: "What is the pressure score?",
-            a: "Momentum calculates a project pressure score based on idle days, missed milestones, active blockers, and low progress. It nudges you before a project stalls.",
+            q: t("guest_faq_3_q"),
+            a: t("guest_faq_3_a"),
           },
           {
-            q: "Can I export my project?",
-            a: "Yes — export to Markdown, JSON, or PDF at any time. You can also import a JSON backup to restart a plan fresh.",
+            q: t("guest_faq_4_q"),
+            a: t("guest_faq_4_a"),
           },
         ].map(({ q, a }) => (
           <details

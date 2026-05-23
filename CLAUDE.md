@@ -419,48 +419,6 @@ RESEND_API_KEY=...          # required in production for email export
 - [ ] PhaseTimeline `t()` for "Done" label and phase status strings
 - [ ] StepCapture `t()` for example text and ghost hints (lower priority — mostly content)
 
-crucial:
-the pdf exporting is not in a good shape. it is breaking the whole thing up.
-
-we need to set the bengali font:
-Embed code in the <head> of your html
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Anek+Bangla:wght@100..800&display=swap" rel="stylesheet">
-
-Anek Bangla: CSS class for a variable style
-.anek-bangla-<uniquifier> {
-font-family: "Anek Bangla", sans-serif;
-font-optical-sizing: auto;
-font-weight: <weight>;
-font-style: normal;
-font-variation-settings:
-"wdth" 100;
-}
-
-and for arabic:
-
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700&display=swap" rel="stylesheet">
-
-Tajawal: CSS classes
-.tajawal-regular {
-font-family: "Tajawal", sans-serif;
-font-weight: 400;
-font-style: normal;
-}
-
-.tajawal-bold {
-font-family: "Tajawal", sans-serif;
-font-weight: 700;
-font-style: normal;
-}
-
-1. Use an i18n library for the app UI
-   Use an npm i18n package such as i18next or, in Next.js, next-intl. These libraries are designed for locale routing, translation keys, and structured message loading, so your interface can swap languages smoothly without calling an external API for every label. next-intl also handles locale-based routing and localized pathnames in Next.js.
-
 project publicization for to see everyone. and the search can refer to that project not to regenerate. keep this into the next version plan.
 also the bengali and arabic choosen font will be added in the next version.
 the projects should be publicalized for everyone without names.
