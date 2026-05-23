@@ -1,3 +1,8 @@
+/* ─── Google Fonts — loaded via <link> in layout.js ─────────────────── */
+/* Fredoka: Latin universal font                                          */
+/* Anek Bangla: Bengali script (U+0980–09FF)                             */
+/* Tajawal: Arabic script (U+0600–06FF + extended)                       */
+
 @import "tailwindcss";
 
 /* Tell Tailwind v4 where to scan for classes */
@@ -7,24 +12,55 @@
 /* Tailwind v4: register dark mode variant */
 @variant dark (&:where(.dark, .dark *));
 
+/* ─── Unicode-range font faces ───────────────────────────────────────── */
+/*
+  These rules tell the browser:
+  "Only download and use Anek Bangla when you encounter Bengali characters.
+   Only download and use Tajawal when you encounter Arabic characters."
+  Mixed text like "Hello আমার" renders Fredoka for Latin, Anek Bangla for Bengali
+  — in the same element, automatically.
+*/
+
+@font-face {
+  font-family: "Anek Bangla";
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/anekbangla/v5/BXRvvFPGjeLPh0kCfI4OkFX-UTQHSCaxvBgR6SFyW1YuV7qybQ.woff2")
+    format("woff2");
+  /* Bengali Unicode block */
+  unicode-range: U+0980-09FF;
+}
+
+@font-face {
+  font-family: "Tajawal";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/tajawal/v10/Iura6YBj_oCad4k1nzSBC45I.woff2")
+    format("woff2");
+  /* Arabic block + Arabic Supplement + Arabic Extended-A + Arabic Presentation Forms */
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+
+@font-face {
+  font-family: "Tajawal";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("https://fonts.gstatic.com/s/tajawal/v10/Iura6YBj_oCad4k1nzSTC45I.woff2")
+    format("woff2");
+  unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
+}
+
 /* ─── Design Tokens ──────────────────────────────────────────────────── */
 :root {
-  /* ── Primary UI fonts ──────────────────────────────────────────────
-     --font-display and --font-body are injected by next/font as CSS
-     variables on <html> via the className prop in layout.js.
-     Fira Sans → headings/display  |  DM Sans → body/UI copy
-     Both include Latin + Latin-Ext for English, French, Spanish,
-     German, and other Latin-script languages.
-  */
-  --font-display: var(--font-display); /* Fira Sans  — set by next/font */
-  --font-body: var(--font-body); /* DM Sans    — set by next/font */
-
-  /* ── Script-specific font variables ───────────────────────────────
-     Also injected by next/font. Used in the @font-face unicode-range
-     blocks below so the browser auto-selects per character.
-     --font-bengali → Anek Bangla
-     --font-arabic  → Tajawal
-  */
+  /* Fonts
+     Stack order: Fredoka (Latin) → Anek Bangla (Bengali) → Tajawal (Arabic) → system fallback
+     The browser picks the first font that covers the character being rendered.
+     latin chars → Fredoka, Bengali chars → Anek Bangla, Arabic chars → Tajawal */
+  --font-display: "Fredoka", "Anek Bangla", "Tajawal", sans-serif;
+  --font-body: "Fredoka", "Anek Bangla", "Tajawal", sans-serif;
 
   /* Palette — Light */
   --ink: #0c0c0f;
@@ -122,66 +158,6 @@
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.5);
 }
 
-/* ─── Script-aware @font-face unicode-range overrides ────────────────
-   These rules teach the browser which font to use per Unicode block.
-   This is the key mechanism: no JS, no i18n, no locale class needed.
-   It works on ALL text — AI responses, DB content, user input, labels.
-
-   How it works:
-   1. next/font injects @font-face rules for Fira Sans, DM Sans,
-      Anek Bangla, and Tajawal and exposes them as CSS variables.
-   2. We define additional @font-face rules here that reference the
-      same font families but add unicode-range so the browser narrows
-      each font to only the characters it covers.
-   3. When the browser renders a character it checks unicode-range
-      across all loaded faces and picks the best match automatically.
-   4. Font files for Anek Bangla / Tajawal are only fetched when
-      their unicode range characters actually appear on screen.
-── ─────────────────────────────────────────────────────────────────── */
-
-/* Bengali script — Anek Bangla
-   Covers the full Bengali / Assamese Unicode block U+0980–U+09FF
-   plus Vedic extensions sometimes used in Bengali texts.           */
-@font-face {
-  font-family: "Anek Bangla";
-  src: local("Anek Bangla");
-  font-style: normal;
-  font-weight: 100 800;
-  font-display: swap;
-  unicode-range: U+0980-09FF,
-    /* Bengali block                                  */ U+200C-200D,
-    /* Zero-width non-joiner / joiner (used in Bangla)*/ U+25CC; /* Dotted circle (placeholder for combining marks) */
-}
-
-/* Arabic script — Tajawal
-   Covers core Arabic, extended Arabic, Arabic presentation forms,
-   Arabic supplement, and Arabic mathematical symbols.              */
-@font-face {
-  font-family: "Tajawal";
-  src: local("Tajawal");
-  font-style: normal;
-  font-weight: 400 700;
-  font-display: swap;
-  unicode-range: U+0600-06FF,
-    /* Arabic                                          */ U+0750-077F,
-    /* Arabic Supplement                               */ U+08A0-08FF,
-    /* Arabic Extended-A                               */ U+FB50-FDFF,
-    /* Arabic Presentation Forms-A                     */ U+FE70-FEFF,
-    /* Arabic Presentation Forms-B                     */ U+200C-200D,
-    /* Zero-width non-joiner / joiner                  */ U+200F,
-    /* Right-to-left mark                              */ U+25CC; /* Dotted circle                                   */
-}
-
-/* ─── Font stacks ────────────────────────────────────────────────────
-   The stacks below are what every component uses via var(--font-body)
-   and var(--font-display). Listing Anek Bangla and Tajawal after the
-   primary Latin fonts means the browser automatically falls through to
-   them when a character is not covered by Fira Sans / DM Sans.
-
-   Combined with the unicode-range @font-face rules above, this gives
-   us per-character script detection with zero JavaScript.
-── ─────────────────────────────────────────────────────────────────── */
-
 /* ─── Base Reset ─────────────────────────────────────────────────────── */
 *,
 *::before,
@@ -193,10 +169,20 @@ html {
   height: 100%;
 }
 
-body {
-  /* DM Sans first (Latin), then Anek Bangla (Bengali Unicode range),
-     then Tajawal (Arabic Unicode range). The browser resolves per glyph. */
-  font-family: var(--font-body), "Anek Bangla", "Tajawal", sans-serif;
+/* ─── Universal font stack ───────────────────────────────────────────── */
+/*
+  Every text-bearing element uses the same stack.
+  The browser's font-matching algorithm + unicode-range does the rest:
+  - Latin/numbers/symbols  → Fredoka
+  - Bengali (আ, ব, ক…)    → Anek Bangla  (downloaded on first Bengali char)
+  - Arabic (ا, ب, ت…)     → Tajawal      (downloaded on first Arabic char)
+*/
+body,
+input,
+textarea,
+button,
+select {
+  font-family: var(--font-body);
   background-color: var(--bg-surface);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
@@ -206,50 +192,20 @@ body {
     color var(--dur-slow) var(--ease-smooth);
 }
 
+/* body-specific reset */
+body {
+  min-height: 100%;
+}
+
 h1,
 h2,
 h3,
 h4,
 h5,
 h6 {
-  /* Fira Sans first (Latin), then Anek Bangla, then Tajawal.
-     Headings get the correct script font automatically. */
-  font-family: var(--font-display), "Anek Bangla", "Tajawal", sans-serif;
+  font-family: var(--font-display);
   letter-spacing: -0.02em;
   line-height: 1.15;
-}
-
-/* Input, textarea, button — also need the full stack so user-typed
-   Bengali or Arabic text renders correctly as they type.           */
-input,
-textarea,
-button,
-select {
-  font-family: var(--font-body), "Anek Bangla", "Tajawal", sans-serif;
-}
-
-/* ─── RTL layout adjustments ─────────────────────────────────────────
-   Applied by I18nProvider when locale is Arabic.
-   Font is already handled above via unicode-range — these rules only
-   adjust spacing/alignment that differs for right-to-left text.     */
-html.lang-ar h1,
-html.lang-ar h2,
-html.lang-ar h3,
-html.lang-ar h4,
-html.lang-ar h5,
-html.lang-ar h6 {
-  /* Negative letter-spacing is wrong for Arabic connected script */
-  letter-spacing: 0;
-}
-
-/* Bengali headings also look better with slightly less tight tracking */
-html.lang-bn h1,
-html.lang-bn h2,
-html.lang-bn h3,
-html.lang-bn h4,
-html.lang-bn h5,
-html.lang-bn h6 {
-  letter-spacing: -0.01em;
 }
 
 /* ─── Scrollbar ──────────────────────────────────────────────────────── */
@@ -283,10 +239,15 @@ html.lang-bn h6 {
 
 /* ─── Utility classes ────────────────────────────────────────────────── */
 .font-display {
-  font-family: var(--font-display), "Anek Bangla", "Tajawal", sans-serif;
+  font-family: var(--font-display);
 }
 .font-body {
-  font-family: var(--font-body), "Anek Bangla", "Tajawal", sans-serif;
+  font-family: var(--font-body);
+}
+
+/* ─── RTL support (Arabic locale) ───────────────────────────────────── */
+[dir="rtl"] body {
+  text-align: right;
 }
 
 /* ─── Reduced motion ─────────────────────────────────────────────────── */

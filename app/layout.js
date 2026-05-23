@@ -1,3 +1,15 @@
+/**
+ * app/layout.js
+ *
+ * Font strategy: direct <link> tags instead of next/font.
+ * next/font inlines @font-face rules WITHOUT unicode-range, which breaks
+ * automatic script switching. Loading fonts via Google Fonts CDN preserves
+ * the unicode-range descriptors that make Anek Bangla / Tajawal activate
+ * only for their respective scripts.
+ *
+ * Stack: Fredoka (Latin) → Anek Bangla (Bengali U+0980-09FF) → Tajawal (Arabic U+0600-06FF)
+ */
+
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/lib/theme";
@@ -6,79 +18,61 @@ import { ToastContainer } from "@/components/ui/Toast";
 import { NetworkMonitor } from "@/components/ui/NetworkMonitor";
 import { NotificationInit } from "@/components/ui/NotificationInit";
 import { LANGUAGES } from "@/lib/i18n/translations";
-import { Fredoka, Anek_Bangla, Tajawal } from "next/font/google";
+import { THEME_SCRIPT } from "@/lib/theme";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
-  "http://localhost:3000";
-
-// ─── Latin UI fonts (English + all Latin-script languages) ───────────
-// These are the primary fonts used everywhere. next/font preloads them
-// on every page since they are always needed.
-
-const fredokaDisplay = Fredoka({
-  subsets: ["latin", "latin-ext"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-display",
-  display: "swap",
-});
-
-const fredokaBody = Fredoka({
-  subsets: ["latin", "latin-ext"],
-  weight: ["300", "400", "500"],
-  variable: "--font-body",
-  display: "swap",
-});
-
-// ─── Bengali — Anek Bangla ────────────────────────────────────────────
-// preload: false — only fetched when Bengali Unicode characters appear.
-// The unicode-range in globals.css limits this font to U+0980–U+09FF
-// so the browser only downloads it when Bengali script is actually
-// on the page (AI content, DB data, user input — anything).
-
-const anekBangla = Anek_Bangla({
-  subsets: ["bengali"],
-  weight: ["300", "400", "500", "600", "700", "800"],
-  variable: "--font-bengali",
-  display: "swap",
-  preload: false,
-});
-
-// ─── Arabic — Tajawal ─────────────────────────────────────────────────
-// preload: false — only fetched when Arabic Unicode characters appear.
-// unicode-range in globals.css limits this to U+0600–U+06FF + extended.
-
-const tajawal = Tajawal({
-  subsets: ["arabic"],
-  weight: ["400", "500", "700"],
-  variable: "--font-arabic",
-  display: "swap",
-  preload: false,
-});
+  "https://momentumio.vercel.app";
 
 export const metadata = {
-  title: "Momentum > Finish What You Start",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "Momentum — Finish What You Start",
+    template: "%s | Momentum",
+  },
   description:
-    "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.",
+    "Turn any idea, goal, or plan into structured action. AI-powered project planning with built-in accountability and streak tracking.",
   applicationName: "Momentum",
   authors: [{ name: "Momentum" }],
+  keywords: [
+    "project planning",
+    "AI planning",
+    "productivity",
+    "goal tracking",
+    "task management",
+    "anti-procrastination",
+  ],
+  creator: "Momentum",
+  publisher: "Momentum",
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   icons: {
-    icon: "/favicon.png",
-    apple: "/favicon.png",
+    icon: [
+      { url: "/favicon.png", type: "image/png" },
+      { url: "/favicon.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon.png", sizes: "16x16", type: "image/png" },
+    ],
+    apple: "/apple-touch-icon.png",
     shortcut: "/favicon.png",
   },
-  viewport: {
-    width: "device-width",
-    initialScale: 1,
-    maximumScale: 1,
-  },
+  manifest: "/manifest.json",
   openGraph: {
     type: "website",
-    title: "Momentum > Finish What You Start",
-    description:
-      "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.",
+    locale: "en_US",
     url: SITE_URL,
     siteName: "Momentum",
+    title: "Momentum — Finish What You Start",
+    description:
+      "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.",
     images: [
       {
         url: `${SITE_URL}/og-card.png`,
@@ -90,16 +84,17 @@ export const metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Momentum > Finish What You Start",
+    title: "Momentum — Finish What You Start",
     description:
       "Turn any idea, goal, or plan into structured action. AI-powered planning with built-in accountability.",
     images: [`${SITE_URL}/og-card.png`],
+    creator: "@momentumapp",
   },
   alternates: {
-    canonical: SITE_URL + "/",
+    canonical: `${SITE_URL}/`,
     languages: LANGUAGES.reduce((acc, l) => {
       acc[l.code] =
-        l.code === "en" ? SITE_URL + "/" : SITE_URL + `/?lang=${l.code}`;
+        l.code === "en" ? `${SITE_URL}/` : `${SITE_URL}/?lang=${l.code}`;
       return acc;
     }, {}),
   },
@@ -112,68 +107,48 @@ export default function RootLayout({ children }) {
 
   return (
     <ClerkProvider>
-      {/*
-        All four font CSS-variable class names are attached to <html>.
-        This makes --font-display, --font-body, --font-bengali, and
-        --font-arabic available everywhere as CSS custom properties.
-
-        The browser then uses unicode-range (defined in globals.css) to
-        automatically select the correct font per character — Latin text
-        gets Fira Sans/DM Sans, Bengali script gets Anek Bangla, Arabic
-        script gets Tajawal. This works on AI-generated content, database
-        data, user input — anything, without any JS involvement.
-      */}
-      <html
-        lang="en"
-        suppressHydrationWarning
-        className={`${fredokaDisplay.variable} ${fredokaBody.variable} ${anekBangla.variable} ${tajawal.variable}`}
-      >
+      <html lang="en" suppressHydrationWarning>
         <head>
-          <link rel="preconnect" href="https://api.fontshare.com" />
+          {/* 1. Theme script runs before paint — eliminates dark-mode flash */}
+          <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
 
-          <meta name="description" content={metadata.description} />
-          <meta name="author" content="Momentum" />
-          <link rel="canonical" href={metadata.alternates.canonical} />
-
-          {/* OpenGraph */}
-          <meta property="og:type" content="website" />
-          <meta property="og:title" content={metadata.openGraph.title} />
-          <meta
-            property="og:description"
-            content={metadata.openGraph.description}
-          />
-          <meta property="og:url" content={metadata.openGraph.url} />
-          <meta property="og:site_name" content="Momentum" />
-          <meta
-            property="og:image"
-            content={metadata.openGraph.images[0].url}
-          />
-          <meta
-            property="og:image:alt"
-            content="Momentum — finish what you start"
+          {/* 2. Font preconnects — establishes TCP/TLS early */}
+          <link rel="preconnect" href="https://fonts.googleapis.com" />
+          <link
+            rel="preconnect"
+            href="https://fonts.gstatic.com"
+            crossOrigin="anonymous"
           />
 
-          {/* Twitter */}
-          <meta name="twitter:card" content="summary_large_image" />
-          <meta name="twitter:title" content={metadata.twitter.title} />
-          <meta
-            name="twitter:description"
-            content={metadata.twitter.description}
+          {/*
+           * 3. Font stylesheet — ONE request, THREE font families.
+           *
+           * WHY <link> instead of next/font:
+           * next/font strips unicode-range from @font-face rules when it
+           * inlines them, which forces the browser to download ALL fonts
+           * regardless of which script is on screen. Using the Google Fonts
+           * CDN preserves unicode-range so:
+           *   - Fredoka loads immediately (Latin, always needed)
+           *   - Anek Bangla downloads only when Bengali text is rendered
+           *   - Tajawal downloads only when Arabic text is rendered
+           *
+           * display=swap keeps text visible during font load.
+           *)
+           */}
+          <link
+            rel="stylesheet"
+            href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&family=Anek+Bangla:wght@100;300;400;500;600;700;800&family=Tajawal:wght@300;400;500;700&display=swap"
           />
-          <meta name="twitter:image" content={metadata.twitter.images[0]} />
 
-          {/* Hreflang */}
-          {LANGUAGES.map((l) => (
-            <link
-              key={l.code}
-              rel="alternate"
-              hrefLang={l.code}
-              href={`${SITE_URL}${l.code === "en" ? "/" : `/?lang=${l.code}`}`}
-            />
-          ))}
-          <link rel="alternate" hrefLang="x-default" href={SITE_URL} />
+          {/* 4. Clerk preconnect */}
+          <link rel="preconnect" href="https://clerk.momentumio.vercel.app" />
 
-          {/* JSON-LD */}
+          {/* 5. Puter preconnect (conditional) */}
+          {hasPuterCreds && (
+            <link rel="preconnect" href="https://js.puter.com" />
+          )}
+
+          {/* 6. JSON-LD structured data */}
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
@@ -181,19 +156,35 @@ export default function RootLayout({ children }) {
                 "@context": "https://schema.org",
                 "@graph": [
                   {
+                    "@type": "SoftwareApplication",
+                    "@id": `${SITE_URL}#app`,
+                    name: "Momentum",
+                    url: SITE_URL,
+                    applicationCategory: "ProductivityApplication",
+                    operatingSystem: "Web",
+                    description:
+                      "AI-powered project planning with built-in accountability.",
+                    offers: {
+                      "@type": "Offer",
+                      price: "0",
+                      priceCurrency: "USD",
+                    },
+                    logo: `${SITE_URL}/favicon.png`,
+                  },
+                  {
                     "@type": "Organization",
                     "@id": `${SITE_URL}#org`,
                     name: "Momentum",
                     url: SITE_URL,
                     logo: `${SITE_URL}/favicon.png`,
-                    sameAs: [],
                   },
                   {
                     "@type": "WebSite",
                     "@id": `${SITE_URL}#website`,
                     url: SITE_URL,
                     name: "Momentum",
-                    description: metadata.description,
+                    description:
+                      "Turn any idea into a structured execution plan.",
                     publisher: { "@id": `${SITE_URL}#org` },
                     potentialAction: {
                       "@type": "SearchAction",
@@ -206,21 +197,19 @@ export default function RootLayout({ children }) {
             }}
           />
 
+          {/* 7. Puter credential bootstrap */}
           {hasPuterCreds && (
             <script
               dangerouslySetInnerHTML={{
                 __html: `(function(){try{
-  var appId=${JSON.stringify(puterAppId)};
-  var token=${JSON.stringify(puterAuthToken)};
-  if(appId && !localStorage.getItem("puter.app.id"))
-    localStorage.setItem("puter.app.id", appId);
-  if(token && !localStorage.getItem("puter.auth.token"))
-    localStorage.setItem("puter.auth.token", token);
+  var a=${JSON.stringify(puterAppId)};
+  var t=${JSON.stringify(puterAuthToken)};
+  if(a&&!localStorage.getItem("puter.app.id"))localStorage.setItem("puter.app.id",a);
+  if(t&&!localStorage.getItem("puter.auth.token"))localStorage.setItem("puter.auth.token",t);
 }catch(e){}})();`,
               }}
             />
           )}
-
           {hasPuterCreds && <script src="https://js.puter.com/v2/" defer />}
         </head>
         <body>
