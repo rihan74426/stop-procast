@@ -82,20 +82,19 @@ function LandingContent() {
             </button>
           </SignInButton>
 
-          <SignUpButton mode="modal">
-            <button
-              className="h-9 px-4 text-sm font-semibold rounded-[var(--r-md)] transition-all text-white"
-              style={{ background: "var(--violet)" }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.background = "var(--violet-dim)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.background = "var(--violet)")
-              }
-            >
-              Get started free
-            </button>
-          </SignUpButton>
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center justify-center h-9 px-4 rounded-[var(--r-md)] text-base font-semibold text-white transition-all"
+            style={{ background: "var(--violet)" }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "var(--violet-dim)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "var(--violet)")
+            }
+          >
+            Dashboard
+          </Link>
         </div>
       </nav>
 

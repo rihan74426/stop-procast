@@ -424,7 +424,7 @@ function NewProjectContent() {
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <TopBar />
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto bg-[var(--bg-elevated)]">
             <div className="flex items-center justify-center px-4 py-12">
               <div className="w-full max-w-md text-center flex flex-col gap-6">
                 <div className="text-5xl">🎯</div>

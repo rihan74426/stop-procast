@@ -59,7 +59,7 @@ export function Sidebar() {
   const showFeedbackBadge = !feedbackSeen && pathname !== "/feedback";
 
   // Dashboard href: /dashboard for authed users, / for guests
-  const dashHref = isSignedIn ? "/dashboard" : "/";
+  const dashHref = "/dashboard";
   const dashActive = pathname === "/dashboard" || pathname === "/";
 
   const navItems = [
