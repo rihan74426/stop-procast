@@ -419,6 +419,7 @@ RESEND_API_KEY=...          # required in production for email export
 - [ ] PhaseTimeline `t()` for "Done" label and phase status strings
 - [ ] StepCapture `t()` for example text and ghost hints (lower priority — mostly content)
 
+<<<<<<< HEAD
 the user types and the text-editor founds a title or idea match, then it suggests that a similar project already exists, do you want to check it first?
 
 also ask them if they want their project to be shown to everyone to spread help and knowledge?
@@ -426,3 +427,7 @@ also ask them if they want their project to be shown to everyone to spread help 
 check the project and look at the root page (dashboard). if the guest landing is to be crucial then how a person is going to import projects of him to the new browser? we need a different dashboard page where the users can operate on their projects. and landing page will be the guest landing page as per standard. users will go to their dashboard by a button and navigation.
 
 Not all the buttons should be black in the dark mode and white in the light mode. there are special and diversities among them. now it looks bad. the previous color system was better. now the button color is messsing everywhere.
+=======
+project publicization for to see everyone. and the search can refer to that project not to regenerate. keep this into the next version plan.
+also the bengali and arabic choosen font will be added in the next version.
+>>>>>>> origin/dev
