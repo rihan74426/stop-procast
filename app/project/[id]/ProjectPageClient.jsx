@@ -70,6 +70,7 @@ function ConfirmModal({
     </Modal>
   );
 }
+
 function ProjectPageClient({ id }) {
   const router = useRouter();
   const { t } = useI18n();
@@ -156,11 +157,9 @@ function ProjectPageClient({ id }) {
     } catch (err) {
       toast.dismiss(toastId);
       toast.error(t("toast_export_pdf_error"));
-      console.error("PDF export failed:", err);
     }
   };
 
-  // Confirm modal config per action type
   const confirmConfig = {
     delete: {
       title: t("confirm_delete_title"),
@@ -186,27 +185,29 @@ function ProjectPageClient({ id }) {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopBar />
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
             {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-xs sm:text-sm text-[var(--text-tertiary)] mb-5 sm:mb-6">
+            <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)] mb-4 sm:mb-6 min-w-0">
               <Link
                 href="/"
                 className="hover:text-[var(--text-primary)] transition-colors shrink-0"
               >
                 {t("nav_dashboard")}
               </Link>
-              <span>/</span>
-              <span className="text-[var(--text-primary)] truncate">
+              <span className="shrink-0">/</span>
+              <span className="text-[var(--text-primary)] truncate min-w-0">
                 {project.projectTitle}
               </span>
             </div>
 
-            <div className="grid grid-cols-1 gap-6 sm:gap-8 lg:grid-cols-[1fr_280px] xl:grid-cols-[1fr_300px]">
+            {/* Responsive two-column layout */}
+            <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-[1fr_260px] xl:grid-cols-[1fr_280px]">
               {/* ── Left column ── */}
-              <div className="flex flex-col gap-5 sm:gap-6 min-w-0">
+              <div className="flex flex-col gap-4 sm:gap-5 min-w-0">
+                {/* Project header */}
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-2">
-                    <h1 className="font-display font-semibold text-2xl sm:text-3xl text-[var(--text-primary)] leading-tight">
+                    <h1 className="font-display font-semibold text-xl sm:text-3xl text-[var(--text-primary)] leading-tight flex-1 min-w-0">
                       {project.projectTitle}
                     </h1>
                     <ProgressRing
@@ -214,20 +215,15 @@ function ProjectPageClient({ id }) {
                       size={48}
                       strokeWidth={4}
                       label={`${progress}%`}
-                      className="shrink-0 sm:hidden"
-                    />
-                    <ProgressRing
-                      value={progress}
-                      size={56}
-                      strokeWidth={5}
-                      label={`${progress}%`}
-                      className="shrink-0 hidden sm:flex"
+                      className="shrink-0"
                     />
                   </div>
-                  <p className="text-sm sm:text-base text-[var(--text-secondary)] leading-relaxed">
-                    {project.oneLineGoal}
-                  </p>
-                  <div className="flex flex-wrap gap-2 mt-3">
+                  {project.oneLineGoal && (
+                    <p className="text-sm sm:text-base text-[var(--text-secondary)] leading-relaxed">
+                      {project.oneLineGoal}
+                    </p>
+                  )}
+                  <div className="flex flex-wrap gap-1.5 mt-2.5">
                     <Badge variant="slate">
                       {projectAgeLabel(project.createdAt)}
                     </Badge>
@@ -255,7 +251,7 @@ function ProjectPageClient({ id }) {
                 {!isCompleted && <NextAction project={project} />}
 
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
-                  <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-4">
+                  <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3 sm:mb-4">
                     {t("project_all_tasks")}
                   </p>
                   <TaskList project={project} />
@@ -263,43 +259,50 @@ function ProjectPageClient({ id }) {
               </div>
 
               {/* ── Right column ── */}
-              <div className="flex flex-col gap-4 sm:gap-5 pb-16 lg:pb-0">
+              <div className="flex flex-col gap-3 sm:gap-4 pb-20 lg:pb-0">
                 {/* Stats */}
-                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
-                  <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3 sm:mb-4">
+                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+                  <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3">
                     {t("project_stats")}
                   </p>
-                  <div className="grid grid-cols-4 gap-2 sm:grid-cols-2 sm:gap-3">
+                  <div className="grid grid-cols-4 gap-2 lg:grid-cols-2">
                     {[
                       {
                         label: t("project_done"),
                         value: project.tasks.filter((t) => t.status === "done")
                           .length,
+                        color: "var(--emerald)",
                       },
                       {
                         label: t("project_todo"),
                         value: project.tasks.filter((t) => t.status === "todo")
                           .length,
+                        color: "var(--text-primary)",
                       },
                       {
                         label: t("project_blocked"),
                         value: project.tasks.filter(
                           (t) => t.status === "blocked"
                         ).length,
+                        color: "var(--coral)",
                       },
                       {
                         label: t("project_streak"),
                         value: `${project.streakDays}d`,
+                        color: "var(--amber)",
                       },
-                    ].map(({ label, value }) => (
+                    ].map(({ label, value, color }) => (
                       <div
                         key={label}
-                        className="rounded-[var(--r-md)] bg-[var(--bg-surface)] p-2 sm:p-3 text-center sm:text-left"
+                        className="rounded-[var(--r-md)] bg-[var(--bg-surface)] p-2.5 text-center lg:text-left"
                       >
-                        <p className="text-xs text-[var(--text-tertiary)] mb-0.5 sm:mb-1">
+                        <p className="text-[10px] sm:text-xs text-[var(--text-tertiary)] mb-1 leading-tight">
                           {label}
                         </p>
-                        <p className="text-base sm:text-lg font-display font-semibold text-[var(--text-primary)]">
+                        <p
+                          className="text-base sm:text-lg font-display font-semibold"
+                          style={{ color }}
+                        >
                           {value}
                         </p>
                       </div>
@@ -309,20 +312,20 @@ function ProjectPageClient({ id }) {
 
                 {/* Success criteria */}
                 {project.successCriteria?.length > 0 && (
-                  <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
-                    <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
+                  <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+                    <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3">
                       {t("project_success_criteria")}
                     </p>
-                    <ul className="flex flex-col gap-2">
+                    <ul className="flex flex-col gap-1.5">
                       {project.successCriteria.map((c, i) => (
                         <li
                           key={i}
-                          className="flex items-start gap-2 text-sm text-[var(--text-secondary)]"
+                          className="flex items-start gap-2 text-xs sm:text-sm text-[var(--text-secondary)]"
                         >
                           <span className="text-[var(--emerald)] mt-0.5 shrink-0">
                             ✓
                           </span>
-                          {c}
+                          <span>{c}</span>
                         </li>
                       ))}
                     </ul>
@@ -330,17 +333,17 @@ function ProjectPageClient({ id }) {
                 )}
 
                 {/* Blockers */}
-                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
+                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
                   <BlockerPanel project={project} />
                 </div>
 
                 {/* Tools */}
                 {project.toolsSuggested?.length > 0 && (
-                  <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
-                    <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
+                  <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+                    <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3">
                       {t("project_tools")}
                     </p>
-                    <div className="flex flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-1.5">
                       {project.toolsSuggested.map((tool, i) => (
                         <Badge key={i} variant="slate">
                           {tool}
@@ -351,8 +354,8 @@ function ProjectPageClient({ id }) {
                 )}
 
                 {/* Actions */}
-                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5 flex flex-col gap-2">
-                  <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-1">
+                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 flex flex-col gap-2">
+                  <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-1">
                     {t("project_actions")}
                   </p>
 
@@ -362,7 +365,10 @@ function ProjectPageClient({ id }) {
                       onClick={() => openConfirm("complete")}
                       className="w-full justify-center"
                     >
-                      <FaRocket /> {t("project_mark_shipped")}
+                      <FaRocket className="shrink-0" />
+                      <span className="truncate">
+                        {t("project_mark_shipped")}
+                      </span>
                     </Button>
                   )}
 
@@ -371,35 +377,42 @@ function ProjectPageClient({ id }) {
                     onClick={() => setShowEmailExport(true)}
                     className="w-full justify-center"
                   >
-                    <FaMailBulk /> {t("project_export_email")}
+                    <FaMailBulk className="shrink-0" />
+                    <span className="truncate">
+                      {t("project_export_email")}
+                    </span>
                   </Button>
                   <Button
                     variant="ghost"
                     onClick={handleExportPDF}
                     className="w-full justify-center"
                   >
-                    <FaFilePdf /> {t("project_export_pdf")}
+                    <FaFilePdf className="shrink-0" />
+                    <span className="truncate">{t("project_export_pdf")}</span>
                   </Button>
                   <Button
                     variant="ghost"
                     onClick={handleExportMarkdown}
                     className="w-full justify-center"
                   >
-                    <FaMarkdown /> {t("project_export_md")}
+                    <FaMarkdown className="shrink-0" />
+                    <span className="truncate">{t("project_export_md")}</span>
                   </Button>
                   <Button
                     variant="ghost"
                     onClick={handleExportJSON}
                     className="w-full justify-center"
                   >
-                    <FaJs /> {t("project_export_json")}
+                    <FaJs className="shrink-0" />
+                    <span className="truncate">{t("project_export_json")}</span>
                   </Button>
                   <Button
                     variant="danger"
                     onClick={() => openConfirm("delete")}
                     className="w-full justify-center"
                   >
-                    <MdDelete /> {t("project_delete")}
+                    <MdDelete className="shrink-0" />
+                    <span className="truncate">{t("project_delete")}</span>
                   </Button>
                 </div>
               </div>
@@ -409,7 +422,6 @@ function ProjectPageClient({ id }) {
         </main>
       </div>
 
-      {/* Modals */}
       <EmailExportModal
         open={showEmailExport}
         onClose={() => setShowEmailExport(false)}

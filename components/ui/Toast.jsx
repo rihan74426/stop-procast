@@ -114,11 +114,16 @@ export function ToastContainer() {
   return (
     <div
       aria-live="polite"
-      className="fixed bottom-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none"
-      style={{ maxWidth: "min(380px, calc(100vw - 32px))" }}
+      aria-label="Notifications"
+      className={[
+        "fixed z-[100] flex flex-col gap-2 pointer-events-none",
+        // Mobile: sit above FAB button (bottom: ~80px), from right
+        // Desktop: standard bottom-right
+        "bottom-20 right-3 left-3 sm:left-auto sm:bottom-4 sm:right-4",
+      ].join(" ")}
+      style={{ maxWidth: "min(380px, calc(100vw - 24px))" }}
     >
       {toasts.map((t) => {
-        // Use custom icon if provided, otherwise use default
         const displayIcon = t.customIcon
           ? (() => {
               const IconComponent = t.customIcon;
@@ -145,11 +150,10 @@ export function ToastContainer() {
             <span className="shrink-0 mt-0.5">{displayIcon}</span>
 
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-[var(--text-primary)] leading-snug">
+              <p className="text-sm text-[var(--text-primary)] leading-snug break-words">
                 {t.message}
               </p>
 
-              {/* Feedback link — shown on error toasts automatically */}
               {t.type === "error" && !t.action && (
                 <a
                   href="/feedback"
@@ -159,7 +163,6 @@ export function ToastContainer() {
                 </a>
               )}
 
-              {/* Optional explicit action */}
               {t.action && (
                 <button
                   onClick={() => {
@@ -175,8 +178,8 @@ export function ToastContainer() {
 
             <button
               onClick={() => dismiss(t.id)}
-              className="shrink-0 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors mt-0.5"
-              aria-label="Dismiss"
+              className="shrink-0 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors mt-0.5 p-0.5"
+              aria-label="Dismiss notification"
             >
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
                 <path

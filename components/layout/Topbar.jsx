@@ -47,43 +47,46 @@ export function TopBar() {
 
   return (
     <>
-      <header className="h-14 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex items-center px-3 sm:px-4 gap-2 sm:gap-3 sticky top-0 z-30">
+      <header className="h-14 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex items-center px-3 sm:px-4 gap-1.5 sm:gap-3 sticky top-0 z-30 min-w-0">
         {/* Logo */}
-        <Link href="/" className="flex items-center gap-2 mr-2 shrink-0">
-          <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center">
+        <Link
+          href="/"
+          className="flex items-center gap-1.5 sm:gap-2 mr-1 sm:mr-2 shrink-0"
+        >
+          <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center shrink-0">
             <Image
               src="/favicon.png"
               alt="Momentum"
               width={28}
-              height={40}
+              height={28}
               className="object-cover"
               onError={(e) => {
                 e.currentTarget.style.display = "none";
               }}
             />
           </div>
-          <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)] block">
+          <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)] hidden xs:block sm:block">
             Momentum
           </span>
         </Link>
 
-        <div className="flex-1" />
+        <div className="flex-1 min-w-0" />
 
         {/* Language picker */}
         <div ref={langRef} className="relative">
           <button
             onClick={() => setLangOpen((o) => !o)}
-            className="h-8 px-2.5 flex items-center gap-1.5 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all"
+            className="h-9 px-2 sm:px-2.5 flex items-center gap-1 sm:gap-1.5 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all"
             aria-label={t("lang_select")}
           >
-            <span>{currentLang.flag}</span>
-            <span className="hidden sm:inline">{currentLang.label}</span>
+            <span className="text-base leading-none">{currentLang.flag}</span>
+            <span className="hidden md:inline">{currentLang.label}</span>
             <svg
               width="10"
               height="10"
               viewBox="0 0 10 10"
               fill="none"
-              className={`transition-transform duration-150 ${
+              className={`transition-transform duration-150 hidden sm:block ${
                 langOpen ? "rotate-180" : ""
               }`}
             >
@@ -107,7 +110,7 @@ export function TopBar() {
                     setLangOpen(false);
                   }}
                   className={[
-                    "w-full flex items-center gap-2.5 px-3 py-2 text-sm text-left transition-colors",
+                    "w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left transition-colors",
                     locale === lang.code
                       ? "bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium"
                       : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]",
@@ -125,49 +128,46 @@ export function TopBar() {
         </div>
 
         {/* Theme toggle */}
-        <Button
-          variant="ghost"
-          size="icon"
+        <button
           onClick={toggle}
           aria-label="Toggle theme"
+          className="h-9 w-9 flex items-center justify-center rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all shrink-0"
         >
           {theme === "dark" ? <SunIcon /> : <MoonIcon />}
-        </Button>
+        </button>
 
         {/* Auth */}
         {isLoaded &&
           (isSignedIn ? (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => setShowSignOutConfirm(true)}
-                className="h-8 px-2.5 flex items-center gap-2 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all"
-                title={t("signout_confirm_title")}
-              >
-                {user?.imageUrl ? (
-                  <img
-                    src={user.imageUrl}
-                    alt={user.firstName || "User"}
-                    className="w-5 h-5 rounded-full object-cover"
-                  />
-                ) : (
-                  <div className="w-5 h-5 rounded-full bg-[var(--violet-bg)] flex items-center justify-center text-[10px] font-bold text-[var(--violet-dim)]">
-                    {(
-                      user?.firstName?.[0] ||
-                      user?.emailAddresses?.[0]?.emailAddress?.[0] ||
-                      "U"
-                    ).toUpperCase()}
-                  </div>
-                )}
-                <span className="hidden sm:inline">
-                  {t("signout_confirm_label")}
-                </span>
-              </button>
-            </div>
+            <button
+              onClick={() => setShowSignOutConfirm(true)}
+              className="h-9 px-2 sm:px-2.5 flex items-center gap-1.5 sm:gap-2 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all shrink-0"
+              title={t("signout_confirm_title")}
+            >
+              {user?.imageUrl ? (
+                <img
+                  src={user.imageUrl}
+                  alt={user.firstName || "User"}
+                  className="w-5 h-5 rounded-full object-cover shrink-0"
+                />
+              ) : (
+                <div className="w-5 h-5 rounded-full bg-[var(--violet-bg)] flex items-center justify-center text-[10px] font-bold text-[var(--violet-dim)] shrink-0">
+                  {(
+                    user?.firstName?.[0] ||
+                    user?.emailAddresses?.[0]?.emailAddress?.[0] ||
+                    "U"
+                  ).toUpperCase()}
+                </div>
+              )}
+              <span className="hidden sm:inline truncate max-w-[80px]">
+                {user?.firstName || t("signout_confirm_label")}
+              </span>
+            </button>
           ) : (
             <SignInButton mode="modal">
-              <button className="h-8 px-2 sm:px-3 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all whitespace-nowrap">
+              <button className="h-9 px-2 sm:px-3 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all whitespace-nowrap shrink-0">
                 <span className="hidden sm:inline">{t("nav_sign_in")}</span>
-                <span className="sm:hidden">{t("nav_sign_in_short")}</span>
+                <span className="sm:hidden">Sign in</span>
               </button>
             </SignInButton>
           ))}

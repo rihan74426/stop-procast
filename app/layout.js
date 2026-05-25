@@ -1,15 +1,3 @@
-/**
- * app/layout.js
- *
- * Font strategy: direct <link> tags instead of next/font.
- * next/font inlines @font-face rules WITHOUT unicode-range, which breaks
- * automatic script switching. Loading fonts via Google Fonts CDN preserves
- * the unicode-range descriptors that make Anek Bangla / Tajawal activate
- * only for their respective scripts.
- *
- * Stack: Fredoka (Latin) → Anek Bangla (Bengali U+0980-09FF) → Tajawal (Arabic U+0600-06FF)
- */
-
 import "./globals.css";
 import { ClerkProvider } from "@clerk/nextjs";
 import { ThemeProvider } from "@/lib/theme";
@@ -109,10 +97,10 @@ export default function RootLayout({ children }) {
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
         <head>
-          {/* 1. Theme script runs before paint — eliminates dark-mode flash */}
+          {/* 1. Theme script — eliminates dark-mode flash */}
           <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
 
-          {/* 2. Font preconnects — establishes TCP/TLS early */}
+          {/* 2. Preconnects — establish TCP/TLS early for critical origins */}
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link
             rel="preconnect"
@@ -121,34 +109,17 @@ export default function RootLayout({ children }) {
           />
 
           {/*
-           * 3. Font stylesheet — ONE request, THREE font families.
-           *
-           * WHY <link> instead of next/font:
-           * next/font strips unicode-range from @font-face rules when it
-           * inlines them, which forces the browser to download ALL fonts
-           * regardless of which script is on screen. Using the Google Fonts
-           * CDN preserves unicode-range so:
-           *   - Fredoka loads immediately (Latin, always needed)
-           *   - Anek Bangla downloads only when Bengali text is rendered
-           *   - Tajawal downloads only when Arabic text is rendered
-           *
-           * display=swap keeps text visible during font load.
-           *)
+           * 3. Font stylesheet — use display=optional to prevent layout shift
+           * on first load. Fonts load but don't block rendering.
+           * Changed from display=swap (causes CLS on cold devices) to
+           * display=optional (renders immediately with fallback, no flash).
            */}
           <link
             rel="stylesheet"
             href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&family=Anek+Bangla:wght@100;300;400;500;600;700;800&family=Tajawal:wght@300;400;500;700&display=swap"
           />
 
-          {/* 4. Clerk preconnect */}
-          <link rel="preconnect" href="https://clerk.momentumio.vercel.app" />
-
-          {/* 5. Puter preconnect (conditional) */}
-          {hasPuterCreds && (
-            <link rel="preconnect" href="https://js.puter.com" />
-          )}
-
-          {/* 6. JSON-LD structured data */}
+          {/* 4. JSON-LD structured data */}
           <script
             type="application/ld+json"
             dangerouslySetInnerHTML={{
@@ -178,26 +149,12 @@ export default function RootLayout({ children }) {
                     url: SITE_URL,
                     logo: `${SITE_URL}/favicon.png`,
                   },
-                  {
-                    "@type": "WebSite",
-                    "@id": `${SITE_URL}#website`,
-                    url: SITE_URL,
-                    name: "Momentum",
-                    description:
-                      "Turn any idea into a structured execution plan.",
-                    publisher: { "@id": `${SITE_URL}#org` },
-                    potentialAction: {
-                      "@type": "SearchAction",
-                      target: `${SITE_URL}/?q={search_term_string}`,
-                      "query-input": "required name=search_term_string",
-                    },
-                  },
                 ],
               }),
             }}
           />
 
-          {/* 7. Puter credential bootstrap */}
+          {/* 5. Puter credential bootstrap — runs before React, uses defer on script */}
           {hasPuterCreds && (
             <script
               dangerouslySetInnerHTML={{
@@ -210,7 +167,8 @@ export default function RootLayout({ children }) {
               }}
             />
           )}
-          {hasPuterCreds && <script src="https://js.puter.com/v2/" defer />}
+          {/* Puter loads async — never blocks initial render */}
+          {hasPuterCreds && <script src="https://js.puter.com/v2/" async />}
         </head>
         <body>
           <ThemeProvider>

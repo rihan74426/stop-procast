@@ -1,34 +1,19 @@
 /* ─── Google Fonts — loaded via <link> in layout.js ─────────────────── */
-/* Fredoka: Latin universal font                                          */
-/* Anek Bangla: Bengali script (U+0980–09FF)                             */
-/* Tajawal: Arabic script (U+0600–06FF + extended)                       */
-
 @import "tailwindcss";
 
-/* Tell Tailwind v4 where to scan for classes */
 @source "../components/**/*.{js,ts,jsx,tsx}";
 @source "../lib/**/*.{js,ts,jsx,tsx}";
 
-/* Tailwind v4: register dark mode variant */
 @variant dark (&:where(.dark, .dark *));
 
 /* ─── Unicode-range font faces ───────────────────────────────────────── */
-/*
-  These rules tell the browser:
-  "Only download and use Anek Bangla when you encounter Bengali characters.
-   Only download and use Tajawal when you encounter Arabic characters."
-  Mixed text like "Hello আমার" renders Fredoka for Latin, Anek Bangla for Bengali
-  — in the same element, automatically.
-*/
-
 @font-face {
   font-family: "Anek Bangla";
   font-style: normal;
   font-weight: 100 800;
-  font-display: swap;
+  font-display: optional;
   src: url("https://fonts.gstatic.com/s/anekbangla/v5/BXRvvFPGjeLPh0kCfI4OkFX-UTQHSCaxvBgR6SFyW1YuV7qybQ.woff2")
     format("woff2");
-  /* Bengali Unicode block */
   unicode-range: U+0980-09FF;
 }
 
@@ -36,10 +21,9 @@
   font-family: "Tajawal";
   font-style: normal;
   font-weight: 400;
-  font-display: swap;
+  font-display: optional;
   src: url("https://fonts.gstatic.com/s/tajawal/v10/Iura6YBj_oCad4k1nzSBC45I.woff2")
     format("woff2");
-  /* Arabic block + Arabic Supplement + Arabic Extended-A + Arabic Presentation Forms */
   unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
 }
 
@@ -47,7 +31,7 @@
   font-family: "Tajawal";
   font-style: normal;
   font-weight: 700;
-  font-display: swap;
+  font-display: optional;
   src: url("https://fonts.gstatic.com/s/tajawal/v10/Iura6YBj_oCad4k1nzSTC45I.woff2")
     format("woff2");
   unicode-range: U+0600-06FF, U+0750-077F, U+08A0-08FF, U+FB50-FDFF, U+FE70-FEFF;
@@ -55,14 +39,10 @@
 
 /* ─── Design Tokens ──────────────────────────────────────────────────── */
 :root {
-  /* Fonts
-     Stack order: Fredoka (Latin) → Anek Bangla (Bengali) → Tajawal (Arabic) → system fallback
-     The browser picks the first font that covers the character being rendered.
-     latin chars → Fredoka, Bengali chars → Anek Bangla, Arabic chars → Tajawal */
   --font-display: "Fredoka", "Anek Bangla", "Tajawal", sans-serif;
   --font-body: "Fredoka", "Anek Bangla", "Tajawal", sans-serif;
 
-  /* Palette — Light */
+  /* ── Light palette ── */
   --ink: #0c0c0f;
   --ink-2: #1c1c22;
   --ink-3: #2e2e38;
@@ -90,7 +70,7 @@
   --rose: #993556;
   --rose-bg: #fbeaf0;
 
-  /* Semantic — Light */
+  /* ── Semantic light ── */
   --bg-base: #ffffff;
   --bg-surface: var(--slate-1);
   --bg-elevated: #ffffff;
@@ -106,14 +86,14 @@
   --border-focus: var(--violet);
   --border-subtle: var(--slate-2);
 
-  /* Radius */
+  /* ── Radius ── */
   --r-sm: 6px;
   --r-md: 10px;
   --r-lg: 16px;
   --r-xl: 24px;
   --r-full: 9999px;
 
-  /* Shadow */
+  /* ── Shadows ── */
   --shadow-sm: 0 1px 3px rgba(12, 12, 15, 0.06),
     0 1px 2px rgba(12, 12, 15, 0.04);
   --shadow-md: 0 4px 12px rgba(12, 12, 15, 0.08),
@@ -121,13 +101,16 @@
   --shadow-lg: 0 12px 32px rgba(12, 12, 15, 0.1),
     0 4px 8px rgba(12, 12, 15, 0.06);
 
-  /* Motion */
+  /* ── Motion ── */
   --ease-spring: cubic-bezier(0.175, 0.885, 0.32, 1.275);
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-out: cubic-bezier(0, 0, 0.2, 1);
   --dur-fast: 120ms;
   --dur-base: 200ms;
   --dur-slow: 350ms;
+
+  /* ── Touch target minimum ── */
+  --touch-min: 44px;
 }
 
 /* ─── Dark Mode ──────────────────────────────────────────────────────── */
@@ -163,20 +146,19 @@
 *::before,
 *::after {
   box-sizing: border-box;
+  /* Prevent text size inflation on mobile when rotating */
+  -webkit-text-size-adjust: 100%;
 }
 
 html {
   height: 100%;
+  /* Smoother scrolling on all platforms */
+  scroll-behavior: smooth;
+  /* Prevent horizontal overflow globally */
+  overflow-x: hidden;
 }
 
 /* ─── Universal font stack ───────────────────────────────────────────── */
-/*
-  Every text-bearing element uses the same stack.
-  The browser's font-matching algorithm + unicode-range does the rest:
-  - Latin/numbers/symbols  → Fredoka
-  - Bengali (আ, ব, ক…)    → Anek Bangla  (downloaded on first Bengali char)
-  - Arabic (ا, ب, ت…)     → Tajawal      (downloaded on first Arabic char)
-*/
 body,
 input,
 textarea,
@@ -192,9 +174,10 @@ select {
     color var(--dur-slow) var(--ease-smooth);
 }
 
-/* body-specific reset */
 body {
   min-height: 100%;
+  /* Prevent horizontal overflow */
+  overflow-x: hidden;
 }
 
 h1,
@@ -204,14 +187,39 @@ h4,
 h5,
 h6 {
   font-family: var(--font-display);
-  letter-spacing: -0.02em;
+  /* Better heading tracking — tighter on small sizes, keep letter-spacing less aggressive */
+  letter-spacing: -0.015em;
   line-height: 1.15;
+}
+
+/* ─── Responsive typography scale ────────────────────────────────────── */
+/* Makes text naturally scale between mobile and desktop */
+@media (max-width: 640px) {
+  h1 {
+    font-size: clamp(1.5rem, 5vw, 2rem);
+  }
+  h2 {
+    font-size: clamp(1.25rem, 4vw, 1.625rem);
+  }
+  h3 {
+    font-size: clamp(1.1rem, 3.5vw, 1.375rem);
+  }
+}
+
+/* ─── Interactive elements — touch-friendly minimum sizes ────────────── */
+button,
+[role="button"],
+a {
+  /* Minimum touch target for accessibility */
+  min-height: auto;
+  /* Remove default tap highlight on mobile */
+  -webkit-tap-highlight-color: transparent;
 }
 
 /* ─── Scrollbar ──────────────────────────────────────────────────────── */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -245,7 +253,20 @@ h6 {
   font-family: var(--font-body);
 }
 
-/* ─── RTL support (Arabic locale) ───────────────────────────────────── */
+/* ─── Safe area insets for mobile notches ────────────────────────────── */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* ─── Fix for mobile sidebar overlap on content ──────────────────────── */
+@media (max-width: 1024px) {
+  /* When mobile menu is open, prevent scrolling */
+  body.sidebar-open {
+    overflow: hidden;
+  }
+}
+
+/* ─── RTL support ────────────────────────────────────────────────────── */
 [dir="rtl"] body {
   text-align: right;
 }
@@ -257,5 +278,91 @@ h6 {
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─── Fix common Tailwind + CSS var conflicts ────────────────────────── */
+/* Ensure truncate works properly in flex containers */
+.truncate-flex {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── Card hover states — consistent across the app ─────────────────── */
+.card-interactive {
+  transition: transform var(--dur-base) var(--ease-smooth),
+    box-shadow var(--dur-base) var(--ease-smooth),
+    border-color var(--dur-base) var(--ease-smooth);
+}
+.card-interactive:hover {
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-md);
+}
+.card-interactive:active {
+  transform: translateY(0);
+  box-shadow: var(--shadow-sm);
+}
+
+/* ─── Input/form consistency ─────────────────────────────────────────── */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.5);
+  cursor: pointer;
+}
+.dark input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(0.7);
+}
+
+/* ─── Mobile bottom navigation safe spacing ──────────────────────────── */
+@media (max-width: 1024px) {
+  /* Prevent content from being hidden behind mobile FAB button */
+  main {
+    padding-bottom: max(80px, env(safe-area-inset-bottom, 80px));
+  }
+  /* Exception: pages with their own scroll containers */
+  .no-fab-padding main {
+    padding-bottom: 0;
+  }
+}
+
+/* ─── Prose / content readability ────────────────────────────────────── */
+.prose-content {
+  max-width: 65ch;
+  line-height: 1.7;
+}
+
+/* ─── Fix text overflow in small containers ──────────────────────────── */
+.text-balance {
+  text-wrap: balance;
+}
+
+/* ─── Loading skeleton animation ────────────────────────────────────── */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+.skeleton {
+  background: linear-gradient(
+    90deg,
+    var(--bg-muted) 25%,
+    var(--bg-subtle) 50%,
+    var(--bg-muted) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+  border-radius: var(--r-md);
+}
+
+/* ─── Improved focus for accessibility ───────────────────────────────── */
+/* High contrast focus for keyboard users */
+@media (prefers-contrast: more) {
+  :focus-visible {
+    outline: 3px solid var(--text-primary);
+    outline-offset: 3px;
   }
 }

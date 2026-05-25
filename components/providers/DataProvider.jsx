@@ -14,16 +14,14 @@ import { resetHydratedSession } from "@/lib/store/projectStore";
  * 1. On sign-in:  claim anonymous projects → hydrate from server
  * 2. On sign-out: clear localStorage and reset store
  *
- * Sign-out detection uses isSignedIn state transitions rather than
- * Clerk's addListener (which has an unstable callback signature in v6).
+ * Performance: Uses a short timeout before hydration to avoid blocking
+ * the initial render on slower connections / new devices.
  */
 export function DataProvider({ children }) {
   const { isSignedIn, isLoaded, user } = useUser();
   const hydrateFromServer = useProjectStore((s) => s.hydrateFromServer);
 
-  // Track the last known signed-in user ID to detect transitions
   const prevUserIdRef = useRef(null);
-  // Prevent double-hydration for the same user session
   const syncedUserIdRef = useRef(null);
 
   useEffect(() => {
@@ -33,13 +31,10 @@ export function DataProvider({ children }) {
     const previousUserId = prevUserIdRef.current;
 
     // ── Sign-out detected ────────────────────────────────────────
-    // Transition from a known user → null means sign-out occurred.
     if (previousUserId !== null && currentUserId === null) {
       clearMomentumStorage();
       syncedUserIdRef.current = null;
-      // Reset the Zustand store to empty state
       useProjectStore.setState({ projects: [], hydrated: false });
-      // Reset session-level hydration guard so next sign-in can hydrate afresh
       resetHydratedSession();
     }
 
@@ -51,7 +46,8 @@ export function DataProvider({ children }) {
 
     syncedUserIdRef.current = currentUserId;
 
-    (async () => {
+    // Small delay to not block initial render on cold devices
+    const timer = setTimeout(async () => {
       try {
         const { count } = await claimAnonymousProjects();
         if (count > 0) {
@@ -62,7 +58,9 @@ export function DataProvider({ children }) {
       } finally {
         hydrateFromServer();
       }
-    })();
+    }, 100);
+
+    return () => clearTimeout(timer);
   }, [isLoaded, isSignedIn, user?.id, hydrateFromServer]);
 
   return <>{children}</>;

@@ -27,8 +27,6 @@ import {
   FaChartBar,
 } from "react-icons/fa";
 
-// ─── Greeting system ──────────────────────────────────────────────────
-
 function getTimeGreeting(t) {
   const h = new Date().getHours();
   if (h < 5) return t("greeting_midnight");
@@ -58,13 +56,10 @@ const RETURNING_MOTIVATION_KEYS = [
   "returning_motivation_6",
 ];
 
-// ─── Dashboard greeting ───────────────────────────────────────────────
-
 function DashboardGreeting({ user, projectCount }) {
   const { t } = useI18n();
   const timeGreeting = getTimeGreeting(t);
   const isSignedIn = !!user;
-
   const dayIndex = Math.floor(Date.now() / 86400000);
 
   if (!isSignedIn) {
@@ -73,11 +68,11 @@ function DashboardGreeting({ user, projectCount }) {
     const Icon = greetingDef.icon;
     return (
       <div className="mb-2">
-        <div className="flex items-center gap-2 mb-1">
-          <span className="text-xl">
+        <div className="flex items-center gap-2 mb-1 flex-wrap">
+          <span className="text-xl leading-none">
             <Icon />
           </span>
-          <h1 className="font-display font-semibold text-xl sm:text-2xl text-[var(--text-primary)]">
+          <h1 className="font-display font-semibold text-lg sm:text-2xl text-[var(--text-primary)]">
             {t(greetingDef.key)}
           </h1>
         </div>
@@ -95,7 +90,7 @@ function DashboardGreeting({ user, projectCount }) {
 
   return (
     <div className="mb-2">
-      <h1 className="font-display font-semibold text-xl sm:text-2xl text-[var(--text-primary)]">
+      <h1 className="font-display font-semibold text-lg sm:text-2xl text-[var(--text-primary)]">
         {timeGreeting}, {firstName} <FaSmile className="inline" />
       </h1>
       <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
@@ -105,48 +100,16 @@ function DashboardGreeting({ user, projectCount }) {
   );
 }
 
-export const faqSchema = {
-  "@context": "https://schema.org",
-  "@type": "FAQPage",
-  mainEntity: [
-    {
-      "@type": "Question",
-      name: "Is Momentum free to use?",
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: "Yes. You can create and execute one project without signing up. Sign up free to manage up to 4 projects with full sync.",
-      },
-    },
-    {
-      "@type": "Question",
-      name: "How does the AI planning work?",
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: "You describe your goal in plain language. Momentum AI breaks it into phases, milestones, and concrete tasks sized for under 2 hours each.",
-      },
-    },
-    {
-      "@type": "Question",
-      name: "What is the pressure score?",
-      acceptedAnswer: {
-        "@type": "Answer",
-        text: "Momentum calculates a project pressure score based on idle days, missed milestones, active blockers, and low progress to nudge you before a project stalls.",
-      },
-    },
-  ],
-};
-
-// ─── Main dashboard ───────────────────────────────────────────────────
-
 function DashboardContent() {
   const { t } = useI18n();
-  const { user, isLoaded } = useUser();
+  const { user, isLoaded, isSignedIn } = useUser();
   const projects = useProjectStore((s) => s.projects);
-  const { isSignedIn } = useUser();
 
   const active = projects.filter((p) => !p.completionDate);
   const completed = projects.filter((p) => p.completionDate);
   const [showImport, setShowImport] = useState(false);
+
+  // Show guest landing for completely new visitors (no projects, not signed in)
   if (!isLoaded || (!isSignedIn && projects.length === 0)) {
     return (
       <div className="flex h-screen overflow-hidden">
@@ -168,13 +131,13 @@ function DashboardContent() {
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopBar />
         <main className="flex-1 overflow-y-auto">
-          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-            <div className="flex items-start justify-between mb-6 sm:mb-8 gap-4">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
+            {/* Header row */}
+            <div className="flex items-start justify-between mb-5 sm:mb-8 gap-3">
               <div className="flex-1 min-w-0">
                 {isLoaded && (
                   <DashboardGreeting user={user} projectCount={active.length} />
                 )}
-
                 <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
                   {active.length === 0
                     ? t("dashboard_no_active")
@@ -219,17 +182,17 @@ function DashboardContent() {
                     <span className="hidden sm:inline">
                       {t("dashboard_new_project")}
                     </span>
-                    <span className="sm:hidden">{t("dashboard_new")}</span>
+                    <span className="sm:hidden">New</span>
                   </Button>
                 </Link>
               </div>
             </div>
 
             {projects.length === 0 && <EmptyState />}
-            {}
+
             {active.length > 0 && (
               <section className="mb-8 sm:mb-10">
-                <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3 sm:mb-4">
+                <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3 sm:mb-4">
                   {t("dashboard_active")}
                 </p>
                 <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -241,8 +204,8 @@ function DashboardContent() {
             )}
 
             {completed.length > 0 && (
-              <section className="pb-16 lg:pb-4">
-                <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3 sm:mb-4">
+              <section className="pb-20 lg:pb-4">
+                <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3 sm:mb-4">
                   {t("dashboard_shipped")}
                 </p>
                 <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -268,33 +231,33 @@ function DashboardContent() {
 
 function GuestLanding({ t }) {
   return (
-    <div className="max-w-4xl mx-auto px-4 sm:px-6 py-16 sm:py-24">
-      {/* Hero — indexable H1 */}
-      <h1 className="font-display font-bold text-4xl sm:text-5xl lg:text-6xl text-[var(--text-primary)] leading-tight tracking-tight mb-6">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-10 sm:py-20">
+      {/* Hero */}
+      <h1 className="font-display font-bold text-3xl sm:text-5xl text-[var(--text-primary)] leading-tight tracking-tight mb-4 sm:mb-6">
         {t("guest_hero_title_1")}{" "}
         <span style={{ color: "var(--violet)" }}>
           {t("guest_hero_title_2")}
         </span>
       </h1>
-      <p className="text-lg sm:text-xl text-[var(--text-secondary)] max-w-2xl leading-relaxed mb-10">
+      <p className="text-base sm:text-xl text-[var(--text-secondary)] max-w-2xl leading-relaxed mb-8 sm:mb-10">
         {t("guest_hero_subtitle")}
       </p>
 
       {/* CTA */}
-      <div className="flex flex-col sm:flex-row gap-4 mb-20">
-        <a
+      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4 mb-14 sm:mb-20">
+        <Link
           href="/new"
-          className="inline-flex items-center justify-center h-12 px-8 rounded-[var(--r-md)] bg-[var(--violet)] text-white font-semibold text-base hover:bg-[var(--violet-dim)] transition-colors"
+          className="inline-flex items-center justify-center h-12 px-8 rounded-[var(--r-md)] bg-[var(--violet)] text-white font-semibold text-base hover:bg-[var(--violet-dim)] transition-colors w-full sm:w-auto"
         >
           {t("guest_cta_primary")}
-        </a>
-        <span className="text-sm text-[var(--text-tertiary)] self-center">
+        </Link>
+        <span className="text-sm text-[var(--text-tertiary)]">
           {t("guest_cta_free")}
         </span>
       </div>
 
-      {/* Feature grid — indexable content */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-20">
+      {/* Feature grid */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-14 sm:mb-20">
         {[
           {
             icon: FaRobot,
@@ -316,15 +279,15 @@ function GuestLanding({ t }) {
           return (
             <div
               key={f.title}
-              className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5"
+              className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5"
             >
-              <span className="text-3xl mb-3 block">
+              <span className="text-2xl sm:text-3xl mb-2 sm:mb-3 block text-[var(--violet)]">
                 <Icon className="inline" />
               </span>
-              <h2 className="font-display font-semibold text-base text-[var(--text-primary)] mb-2">
+              <h2 className="font-display font-semibold text-sm sm:text-base text-[var(--text-primary)] mb-1.5 sm:mb-2">
                 {f.title}
               </h2>
-              <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+              <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed">
                 {f.desc}
               </p>
             </div>
@@ -332,40 +295,28 @@ function GuestLanding({ t }) {
         })}
       </div>
 
-      {/* FAQ — rich snippet eligible */}
-      <div className="mb-16">
-        <h2 className="font-display font-semibold text-2xl text-[var(--text-primary)] mb-6">
-          {t("guest_faq_title")}{" "}
+      {/* FAQ */}
+      <div className="mb-10 sm:mb-16">
+        <h2 className="font-display font-semibold text-xl sm:text-2xl text-[var(--text-primary)] mb-4 sm:mb-6">
+          {t("guest_faq_title")}
         </h2>
         {[
-          {
-            q: t("guest_faq_1_q"),
-            a: t("guest_faq_1_a"),
-          },
-          {
-            q: t("guest_faq_2_q"),
-            a: t("guest_faq_2_a"),
-          },
-          {
-            q: t("guest_faq_3_q"),
-            a: t("guest_faq_3_a"),
-          },
-          {
-            q: t("guest_faq_4_q"),
-            a: t("guest_faq_4_a"),
-          },
+          { q: t("guest_faq_1_q"), a: t("guest_faq_1_a") },
+          { q: t("guest_faq_2_q"), a: t("guest_faq_2_a") },
+          { q: t("guest_faq_3_q"), a: t("guest_faq_3_a") },
+          { q: t("guest_faq_4_q"), a: t("guest_faq_4_a") },
         ].map(({ q, a }) => (
           <details
             key={q}
-            className="border-b border-[var(--border)] py-4 group"
+            className="border-b border-[var(--border)] py-3 sm:py-4 group"
           >
-            <summary className="text-sm font-medium text-[var(--text-primary)] cursor-pointer list-none flex items-center justify-between">
-              {q}
-              <span className="text-[var(--text-tertiary)] group-open:rotate-180 transition-transform">
+            <summary className="text-sm font-medium text-[var(--text-primary)] cursor-pointer list-none flex items-center justify-between gap-3">
+              <span className="flex-1">{q}</span>
+              <span className="text-[var(--text-tertiary)] group-open:rotate-180 transition-transform shrink-0">
                 ▾
               </span>
             </summary>
-            <p className="text-sm text-[var(--text-secondary)] mt-3 leading-relaxed">
+            <p className="text-sm text-[var(--text-secondary)] mt-2 sm:mt-3 leading-relaxed">
               {a}
             </p>
           </details>

@@ -26,10 +26,10 @@ const variants = {
 };
 
 const sizes = {
-  sm: "h-8  px-3  text-sm  gap-1.5",
-  md: "h-10 px-4  text-sm  gap-2",
-  lg: "h-12 px-6  text-base gap-2.5",
-  icon: "h-9  w-9   text-sm  p-0 justify-center",
+  sm: "h-9 px-3 text-sm gap-1.5",
+  md: "h-10 px-4 text-sm gap-2",
+  lg: "h-11 sm:h-12 px-5 sm:px-6 text-sm sm:text-base gap-2 sm:gap-2.5",
+  icon: "h-9 w-9 text-sm p-0 justify-center",
 };
 
 export const Button = forwardRef(function Button(
@@ -52,11 +52,13 @@ export const Button = forwardRef(function Button(
       ref={ref}
       disabled={disabled || loading}
       className={[
-        "inline-flex items-center font-medium rounded-[var(--r-md)] border",
+        "inline-flex items-center justify-center font-medium rounded-[var(--r-md)] border",
         "transition-all duration-[var(--dur-base)] ease-[var(--ease-smooth)]",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]",
         "disabled:opacity-40 disabled:pointer-events-none",
         "select-none cursor-pointer",
+        // Minimum touch target on mobile
+        "min-h-[36px]",
         v.base,
         v.border,
         s,
@@ -79,11 +81,12 @@ export const Button = forwardRef(function Button(
 function Spinner() {
   return (
     <svg
-      className="animate-spin"
+      className="animate-spin shrink-0"
       width="14"
       height="14"
       viewBox="0 0 14 14"
       fill="none"
+      aria-hidden="true"
     >
       <circle
         cx="7"
