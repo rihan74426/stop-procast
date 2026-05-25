@@ -85,6 +85,45 @@ function RegenPermissionBanner({ onKeep, onRegenerate, t }) {
   );
 }
 
+// Add stable serializer / input key builder to avoid false "stale" detections
+function stableSerializeClarifyAnswers(answers) {
+  // produce a deterministic array of answers based on numeric indices
+  if (!answers || typeof answers !== "object") return "[]";
+  const keys = Object.keys(answers)
+    .filter((k) => k != null)
+    .sort((a, b) => {
+      // sort numerically when possible e.g. "0","1"... else lexicographic
+      const na = Number.isFinite(Number(a)) ? Number(a) : a;
+      const nb = Number.isFinite(Number(b)) ? Number(b) : b;
+      if (typeof na === "number" && typeof nb === "number") return na - nb;
+      return String(a).localeCompare(String(b));
+    });
+  const arr = keys.map((k) => {
+    const v = answers[k];
+    if (v == null) return "";
+    // normalize whitespace so insignificant changes don't flip the key
+    return String(v).replace(/\s+/g, " ").trim();
+  });
+  return JSON.stringify(arr);
+}
+
+function buildInputKey({
+  idea = "",
+  scopeLevel = "",
+  clarifyAnswers = {},
+  locale = "",
+  limitAllowed = false,
+}) {
+  const ideaNorm = String(idea ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const clar = stableSerializeClarifyAnswers(clarifyAnswers);
+  // include locale and allowed flag to ensure exact matching when relevant
+  return `${ideaNorm}||${scopeLevel}||${clar}||${locale}||${
+    limitAllowed ? "1" : "0"
+  }`;
+}
+
 export default function NewProjectPage() {
   return (
     <DataProvider>
@@ -185,9 +224,15 @@ function NewProjectContent() {
   );
   const handleScopeChange = useCallback((v) => setScopeLevel(v), []);
 
-  const inputKey = `${idea.trim()}||${scopeLevel}||${JSON.stringify(
-    clarifyAnswers
-  )}`;
+  // replace inputKey with buildInputKey to make stale detection deterministic
+  const inputKey = buildInputKey({
+    idea,
+    scopeLevel,
+    clarifyAnswers,
+    locale,
+    limitAllowed,
+  });
+
   const blueprintIsStale =
     blueprint !== null && blueprintKey !== null && inputKey !== blueprintKey;
   const showRegenBanner = blueprintIsStale && (step === 2 || step === 3);
@@ -230,6 +275,15 @@ function NewProjectContent() {
     setGenCharCount(0);
     setGenError(null);
     rawRef.current = "";
+
+    // capture the exact input key for this generation run
+    const generationInputKey = buildInputKey({
+      idea: currentIdea,
+      scopeLevel: currentScope,
+      clarifyAnswers: currentAnswers,
+      locale: currentLocale,
+      limitAllowed: currentAllowed,
+    });
 
     stopWaitRef.current = startWaitSequence(currentT);
 
@@ -303,10 +357,10 @@ function NewProjectContent() {
       toast.success(currentT("toast_blueprint_ready"), { duration: 3000 });
 
       setBlueprint(parsed);
-      const currentInputKey = `${currentIdea.trim()}||${currentScope}||${JSON.stringify(
-        currentAnswers
-      )}`;
-      setBlueprintKey(currentInputKey);
+
+      // set the blueprintKey to the stable generation input key captured earlier
+      setBlueprintKey(generationInputKey);
+
       setGenStatus("done");
       setStep(4);
       setMaxReached((prev) => Math.max(prev, 4));
@@ -375,9 +429,19 @@ function NewProjectContent() {
   }, [runGeneration]);
 
   const handleKeepPlan = useCallback(() => {
-    setBlueprintKey(inputKey);
+    // When user explicitly chooses to keep the current plan, mark the blueprint
+    // as matching the current inputs (use stable key) — this prevents spurious
+    // stale banners caused by object key order or whitespace.
+    const currentKey = buildInputKey({
+      idea,
+      scopeLevel,
+      clarifyAnswers,
+      locale,
+      limitAllowed,
+    });
+    setBlueprintKey(currentKey);
     toast.success(t("toast_keep_plan"), { duration: 2000 });
-  }, [inputKey, t]);
+  }, [idea, scopeLevel, clarifyAnswers, locale, limitAllowed, t]);
 
   const handleCommit = useCallback(
     async ({ deadline }) => {
