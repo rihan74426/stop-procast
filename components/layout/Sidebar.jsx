@@ -45,18 +45,12 @@ export function Sidebar() {
     }
   }, [pathname]);
 
-  // Close sidebar on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
 
-  // Lock body scroll when mobile sidebar open
   useEffect(() => {
-    if (mobileOpen) {
-      document.body.style.overflow = "hidden";
-    } else {
-      document.body.style.overflow = "";
-    }
+    document.body.style.overflow = mobileOpen ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
@@ -64,11 +58,35 @@ export function Sidebar() {
 
   const showFeedbackBadge = !feedbackSeen && pathname !== "/feedback";
 
+  // Dashboard href: /dashboard for authed users, / for guests
+  const dashHref = isSignedIn ? "/dashboard" : "/";
+  const dashActive = pathname === "/dashboard" || pathname === "/";
+
   const navItems = [
-    { href: "/", label: t("nav_dashboard"), icon: FiGrid },
-    { href: "/new", label: t("nav_new_project"), icon: FiPlus },
-    { href: "/feedback", label: t("feedback_title"), icon: FiMessageSquare },
-    { href: "/settings", label: t("nav_settings"), icon: FiSettings },
+    {
+      href: dashHref,
+      label: t("nav_dashboard"),
+      icon: FiGrid,
+      active: dashActive,
+    },
+    {
+      href: "/new",
+      label: t("nav_new_project"),
+      icon: FiPlus,
+      active: pathname === "/new",
+    },
+    {
+      href: "/feedback",
+      label: t("feedback_title"),
+      icon: FiMessageSquare,
+      active: pathname === "/feedback",
+    },
+    {
+      href: "/settings",
+      label: t("nav_settings"),
+      icon: FiSettings,
+      active: pathname === "/settings",
+    },
   ];
 
   const SidebarContent = ({ onClose }) => (
@@ -103,7 +121,7 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Logo on desktop */}
+      {/* Desktop logo */}
       <div className="hidden lg:flex items-center gap-2 px-4 py-4 border-b border-[var(--border)]">
         <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center shrink-0">
           <Image
@@ -124,36 +142,33 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="p-3 flex flex-col gap-0.5" aria-label="Main navigation">
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onClose}
-              className={[
-                "flex items-center gap-2.5 px-3 py-2.5 rounded-[var(--r-md)] text-sm",
-                "transition-colors duration-[var(--dur-fast)]",
-                "min-h-[var(--touch-min)] lg:min-h-0",
-                active
-                  ? "bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium"
-                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]",
-              ].join(" ")}
-              aria-current={active ? "page" : undefined}
-            >
-              <Icon size={15} className="shrink-0" />
-              <span className="truncate">{label}</span>
-              {href === "/feedback" && showFeedbackBadge && (
-                <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium shrink-0">
-                  new
-                </span>
-              )}
-            </Link>
-          );
-        })}
+        {navItems.map(({ href, label, icon: Icon, active }) => (
+          <Link
+            key={href + label}
+            href={href}
+            onClick={onClose}
+            className={[
+              "flex items-center gap-2.5 px-3 py-2.5 rounded-[var(--r-md)] text-sm",
+              "transition-colors duration-[var(--dur-fast)]",
+              "min-h-[var(--touch-min)] lg:min-h-0",
+              active
+                ? "bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium"
+                : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]",
+            ].join(" ")}
+            aria-current={active ? "page" : undefined}
+          >
+            <Icon size={15} className="shrink-0" />
+            <span className="truncate">{label}</span>
+            {href === "/feedback" && showFeedbackBadge && (
+              <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium shrink-0">
+                new
+              </span>
+            )}
+          </Link>
+        ))}
       </nav>
 
-      {/* Active projects */}
+      {/* Active projects quick-links */}
       {activeProjects.length > 0 && (
         <div className="px-3 pb-3 mt-1">
           <p className="text-[10px] text-[var(--text-tertiary)] font-semibold uppercase tracking-widest px-3 mb-2">
@@ -244,17 +259,15 @@ export function Sidebar() {
         <SidebarContent onClose={() => setMobileOpen(false)} />
       </aside>
 
-      {/* Mobile FAB — only shown when sidebar is closed */}
+      {/* Mobile FAB */}
       <button
         onClick={() => setMobileOpen(true)}
-        style={{
-          backgroundColor: "#7F77DD",
-        }}
+        style={{ backgroundColor: "#7F77DD" }}
         className={[
           "fixed bottom-5 left-4 z-30 lg:hidden",
-          "h-12 w-12 rounded-full bg-[var(--violet)] text-white shadow-[var(--shadow-lg)]",
+          "h-12 w-12 rounded-full text-white shadow-[var(--shadow-lg)]",
           "flex items-center justify-center transition-all duration-200",
-          "hover:bg-[var(--violet-dim)] active:scale-95 ",
+          "hover:opacity-90 active:scale-95",
           mobileOpen
             ? "opacity-0 pointer-events-none scale-90"
             : "opacity-100 scale-100",

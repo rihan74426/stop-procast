@@ -2,34 +2,50 @@
 
 import { forwardRef } from "react";
 
+/**
+ * Button — variant colours use CSS design tokens so they automatically
+ * adapt between light and dark mode without going all-black / all-white.
+ *
+ * primary  → violet fill (brand action)
+ * ghost    → transparent + border, text-secondary (secondary action)
+ * danger   → coral tint fill, coral text → coral fill + white on hover
+ * emerald  → green fill (positive / completion)
+ * subtle   → muted surface, secondary text (tertiary action)
+ */
+
 const variants = {
-  primary: {
-    base: "bg-[var(--violet)] text-white hover:bg-[var(--violet-dim)] active:scale-[0.97]",
-    border: "border-transparent",
-  },
-  ghost: {
-    base: "bg-transparent text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] active:scale-[0.97]",
-    border: "border-[var(--border)]",
-  },
-  danger: {
-    base: "bg-[var(--coral-bg)] text-[var(--coral)] hover:bg-[var(--coral)] hover:text-white active:scale-[0.97]",
-    border: "border-[var(--coral)]",
-  },
-  emerald: {
-    base: "bg-[var(--emerald)] text-white hover:bg-[var(--emerald-dim)] active:scale-[0.97]",
-    border: "border-transparent",
-  },
-  subtle: {
-    base: "bg-[var(--bg-subtle)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-muted)] active:scale-[0.97]",
-    border: "border-transparent",
-  },
+  primary: [
+    "bg-[var(--violet)] text-white",
+    "hover:bg-[var(--violet-dim)]",
+    "border-transparent",
+  ],
+  ghost: [
+    "bg-transparent text-[var(--text-secondary)]",
+    "hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]",
+    "border-[var(--border)]",
+  ],
+  danger: [
+    "bg-[var(--coral-bg)] text-[var(--coral)]",
+    "hover:bg-[var(--coral)] hover:text-white",
+    "border-[var(--coral)]",
+  ],
+  emerald: [
+    "bg-[var(--emerald)] text-white",
+    "hover:bg-[var(--emerald-dim)]",
+    "border-transparent",
+  ],
+  subtle: [
+    "bg-[var(--bg-subtle)] text-[var(--text-secondary)]",
+    "hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
+    "border-transparent",
+  ],
 };
 
 const sizes = {
-  sm: "h-9 px-3 text-sm gap-1.5",
-  md: "h-10 px-4 text-sm gap-2",
+  sm: "h-9  px-3          text-sm  gap-1.5",
+  md: "h-10 px-4          text-sm  gap-2",
   lg: "h-11 sm:h-12 px-5 sm:px-6 text-sm sm:text-base gap-2 sm:gap-2.5",
-  icon: "h-9 w-9 text-sm p-0 justify-center",
+  icon: "h-9  w-9 p-0       text-sm  justify-center",
 };
 
 export const Button = forwardRef(function Button(
@@ -44,24 +60,30 @@ export const Button = forwardRef(function Button(
   },
   ref
 ) {
-  const v = variants[variant];
-  const s = sizes[size];
+  const vArr = variants[variant] ?? variants.primary;
+  const s = sizes[size] ?? sizes.md;
 
   return (
     <button
       ref={ref}
       disabled={disabled || loading}
       className={[
+        // layout + shape
         "inline-flex items-center justify-center font-medium rounded-[var(--r-md)] border",
+        // motion
         "transition-all duration-[var(--dur-base)] ease-[var(--ease-smooth)]",
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)]",
+        "active:scale-[0.97]",
+        // focus
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-1",
+        // disabled
         "disabled:opacity-40 disabled:pointer-events-none",
-        "select-none cursor-pointer",
-        // Minimum touch target on mobile
-        "min-h-[36px]",
-        v.base,
-        v.border,
+        // base
+        "select-none cursor-pointer min-h-[36px]",
+        // variant tokens
+        ...vArr,
+        // size
         s,
+        // caller overrides (last, highest specificity)
         className,
       ].join(" ")}
       {...props}
