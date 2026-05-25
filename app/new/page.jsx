@@ -68,13 +68,13 @@ function RegenPermissionBanner({ onKeep, onRegenerate, t }) {
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={onRegenerate}
-              className="h-8 px-4 text-xs font-semibold rounded-[var(--r-md)] bg-[var(--amber)] text-white hover:opacity-90 active:scale-[0.97] transition-all"
+              className="h-8 px-4 text-xs font-semibold rounded-[var(--r-md)] bg-[var(--amber)] text-white hover:opacity-90 active:scale-[0.97] transition-all appearance-none -webkit-appearance-none focus:outline-none focus:ring-2 focus:ring-[var(--amber)]"
             >
               {t("regen_regenerate")}
             </button>
             <button
               onClick={onKeep}
-              className="h-8 px-4 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all"
+              className="h-8 px-4 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all appearance-none -webkit-appearance-none focus:outline-none focus:ring-2 focus:ring-[var(--border)]"
             >
               {t("regen_keep")}
             </button>
@@ -470,7 +470,7 @@ function NewProjectContent() {
         <TopBar />
 
         {/* Step breadcrumb — compact on mobile */}
-        <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-3 sm:px-6 py-2.5 sm:py-4 sticky top-0 z-10">
+        <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-3 sm:px-6 py-2.5 sm:py-4 sticky top-0 z-10 backdrop-blur-sm shadow-sm">
           <div className="max-w-2xl mx-auto">
             <div className="flex items-center gap-1 sm:gap-2">
               {STEP_LABELS_KEYS.map((label, i) => {
@@ -479,28 +479,37 @@ function NewProjectContent() {
                 const isDonePast = isVisited && i < step;
                 const isClickable = isVisited && !isActive;
                 return (
-                  <div key={i} className="flex items-center gap-1 sm:gap-2">
+                  <div key={i} className="flex items-center gap-1 sm:gap-2 ">
                     <button
                       onClick={() => isClickable && goTo(i)}
                       disabled={!isClickable}
+                      aria-current={isActive ? "step" : undefined}
+                      aria-disabled={!isClickable}
+                      style={{
+                        borderRadius: "1.5rem",
+                        padding: "5px",
+                      }}
                       className={[
-                        "flex items-center gap-1 sm:gap-1.5 transition-all",
+                        "flex items-center gap-1 sm:gap-1.5 transition-all p-2",
+                        // remove any default browser background and ensure consistent focus behavior
+                        "appearance-none -webkit-appearance-none bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--violet)] rounded",
                         isClickable
-                          ? "cursor-pointer hover:opacity-80"
+                          ? "cursor-pointer hover:opacity-90"
                           : "cursor-default",
                       ].join(" ")}
                     >
                       <div
                         className={[
-                          "w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-medium transition-all duration-300",
+                          "w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs sm:text-xs font-medium transition-all duration-300 shadow-sm",
                           isDonePast
                             ? "bg-[var(--emerald)] text-white"
                             : isActive
                             ? "bg-[var(--violet)] text-white"
                             : isVisited
-                            ? "bg-[var(--bg-muted)] text-[var(--violet-dim)] ring-1 ring-[var(--violet)]"
+                            ? "bg-[var(--bg-muted)] text-[var(--violet-dim)] ring-1 ring-[var(--violet)/20]"
                             : "bg-[var(--bg-muted)] text-[var(--text-tertiary)]",
                         ].join(" ")}
+                        aria-hidden="true"
                       >
                         {isDonePast ? "✓" : i + 1}
                       </div>
@@ -523,6 +532,7 @@ function NewProjectContent() {
                             ? "bg-[var(--emerald)]"
                             : "bg-[var(--border)]"
                         }`}
+                        aria-hidden="true"
                       />
                     )}
                   </div>
