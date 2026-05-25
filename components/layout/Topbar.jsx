@@ -101,7 +101,7 @@ export function TopBar() {
           </button>
 
           {langOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-44 rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)] overflow-hidden z-50">
+            <div className="absolute right-5 top-full mt-1.5 w-44 rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)] overflow-hidden z-50">
               {LANGUAGES.map((lang) => (
                 <button
                   key={lang.code}

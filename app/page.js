@@ -133,7 +133,7 @@ function LandingNav() {
 
             {langOpen && (
               <div
-                className="absolute right-0 top-full mt-1.5 w-44 rounded-[var(--r-lg)] border overflow-hidden z-50"
+                className="absolute right-5 top-full mt-1.5 w-44 rounded-[var(--r-lg)] border overflow-hidden z-50"
                 style={{
                   borderColor: "var(--border)",
                   background: "var(--bg-elevated)",
