@@ -14,6 +14,7 @@ import { generateClarifyQuestions } from "@/lib/ai/clientGenerate";
 import { parseClarifyQuestions } from "@/lib/ai/parser";
 import { createToastSequence } from "@/lib/toastSequence";
 import { useI18n } from "@/lib/i18n";
+import { SimilarProjectsBanner } from "@/components/intake/SimilarProjectsBanner";
 
 // ─── GhostInput ───────────────────────────────────────────────────────
 
@@ -417,6 +418,12 @@ export function StepClarify({
           </div>
         </div>
       )}
+      <SimilarProjectsBanner
+        idea={idea}
+        onUseTemplate={(p) => {
+          /* redirect or prefill */
+        }}
+      />
 
       {!loading && questions.length > 0 && (
         <div className="flex flex-col gap-3" aria-live="polite">

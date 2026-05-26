@@ -420,4 +420,4 @@ RESEND_API_KEY=...          # required in production for email export
 - [ ] StepCapture `t()` for example text and ghost hints (lower priority — mostly content)
 
 project publicization for to see everyone. and the search can refer to that project not to regenerate. keep this into the next version plan.
-also the bengali and arabic choosen font will be added in the next version.
+the feedback with star, we'll use my portfolio feedback sdk and ui

@@ -21,6 +21,8 @@ import { parseBlueprint } from "@/lib/ai/parser";
 import { loadUserProfile, buildProfileContext } from "@/lib/userProfile";
 import { useI18n } from "@/lib/i18n";
 import { BiSolidPencil } from "react-icons/bi";
+import { isTosAccepted } from "@/lib/tos";
+import { TosModal } from "@/components/ui/TosModal";
 
 const STEP_LABELS_KEYS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
 
@@ -117,6 +119,7 @@ function NewProjectContent() {
   const [scopeLevel, setScopeLevel] = useState("standard");
   const [blueprint, setBlueprint] = useState(null);
   const [blueprintKey, setBlueprintKey] = useState(null);
+  const [showTos, setShowTos] = useState(false);
 
   // Generation state
   const [genStatus, setGenStatus] = useState("idle");
@@ -150,6 +153,10 @@ function NewProjectContent() {
     };
   }, [idea, clarifyAnswers, scopeLevel, limitAllowed, locale]);
 
+  if (!isTosAccepted()) {
+    setShowTos(true); // add this state
+    return;
+  }
   // Keep t() fresh
   const tRef = useRef(t);
   useEffect(() => {
@@ -678,6 +685,14 @@ function NewProjectContent() {
             </div>
           </div>
         </main>
+        <TosModal
+          open={showTos}
+          onAccept={() => {
+            setShowTos(false);
+            runGeneration();
+          }}
+          onDecline={() => setShowTos(false)}
+        />
         <SavePromptModal />
       </div>
     </div>

@@ -14,6 +14,7 @@ import {
   FiMenu,
   FiX,
   FiMessageSquare,
+  FiCompass,
 } from "react-icons/fi";
 import { FaCloud } from "react-icons/fa";
 
@@ -56,7 +57,8 @@ export function Sidebar() {
   const showFeedbackBadge = !feedbackSeen && pathname !== "/feedback";
 
   const navItems = [
-    { href: "/", label: t("nav_dashboard"), icon: FiGrid },
+    { href: "/dashboard", label: t("nav_dashboard"), icon: FiGrid },
+    { href: "/explore", label: t("nav_explore"), icon: FiCompass },
     { href: "/new", label: t("nav_new_project"), icon: FiPlus },
     { href: "/feedback", label: "Feedback", icon: FiMessageSquare },
     { href: "/settings", label: t("nav_settings"), icon: FiSettings },

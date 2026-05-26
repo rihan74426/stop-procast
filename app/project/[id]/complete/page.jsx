@@ -10,6 +10,7 @@ import { TopBar } from "@/components/layout/Topbar";
 import { Button } from "@/components/ui/Button";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { useI18n } from "@/lib/i18n";
+import { PublicizePanel } from "@/components/completion/PublicizePanel";
 
 function CompleteContent({ id }) {
   const { t } = useI18n();
@@ -52,6 +53,10 @@ function CompleteContent({ id }) {
                 </p>
                 <ProjectStats project={project} />
               </div>
+              <PublicizePanel
+                project={project}
+                onPublicized={(data) => console.log("Published", data)}
+              />
 
               <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                 <Button
