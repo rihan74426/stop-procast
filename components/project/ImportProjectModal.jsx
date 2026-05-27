@@ -7,6 +7,7 @@ import { createProject } from "@/lib/schema";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
 import { FiFileMinus, FiFilePlus } from "react-icons/fi";
+import { useI18n } from "@/lib/i18n";
 
 /**
  * ImportProjectModal — accepts a Momentum JSON export and imports it as a new project.
@@ -20,6 +21,8 @@ export function ImportProjectModal({ open, onClose }) {
   const [errorMsg, setErrorMsg] = useState("");
   const [preview, setPreview] = useState(null);
   const [parsed, setParsed] = useState(null);
+
+  const { t } = useI18n();
 
   const reset = () => {
     setStatus("idle");
@@ -40,9 +43,7 @@ export function ImportProjectModal({ open, onClose }) {
 
     if (!file.name.endsWith(".json")) {
       setStatus("error");
-      setErrorMsg(
-        "Only .json files are supported. Export from project → Export JSON first."
-      );
+      setErrorMsg(t("import_error_only_json"));
       return;
     }
 
@@ -61,15 +62,11 @@ export function ImportProjectModal({ open, onClose }) {
         } else if (raw.projectTitle !== undefined) {
           project = raw;
         } else {
-          throw new Error(
-            "Unrecognised format. File must be a Momentum project export."
-          );
+          throw new Error(t("import_error_format"));
         }
 
         if (!project?.projectTitle) {
-          throw new Error(
-            "Project has no title. Is this a valid Momentum export?"
-          );
+          throw new Error(t("import_error_no_title"));
         }
 
         setParsed(project);
@@ -83,7 +80,7 @@ export function ImportProjectModal({ open, onClose }) {
         setStatus("ready");
       } catch (err) {
         setStatus("error");
-        setErrorMsg(err.message || "Failed to parse JSON file.");
+        setErrorMsg(err?.message || t("import_error_parse"));
       }
     };
     reader.readAsText(file);
@@ -126,12 +123,17 @@ export function ImportProjectModal({ open, onClose }) {
       }, 800);
     } catch {
       setStatus("error");
-      setErrorMsg("Failed to import project. Please try again.");
+      setErrorMsg(t("import_error_import"));
     }
   };
 
   return (
-    <Modal open={open} onClose={handleClose} title="Import Project" size="md">
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title={t("import_title")}
+      size="md"
+    >
       <div className="flex flex-col gap-5">
         {status === "success" ? (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
@@ -139,21 +141,16 @@ export function ImportProjectModal({ open, onClose }) {
               ✓
             </div>
             <p className="font-semibold text-[var(--text-primary)]">
-              Project imported!
+              {t("import_success_title")}
             </p>
             <p className="text-sm text-[var(--text-secondary)]">
-              Taking you there now…
+              {t("import_success_desc")}
             </p>
           </div>
         ) : (
           <>
             <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-              Import a project you previously exported as JSON. Tasks will be
-              reset to{" "}
-              <span className="font-medium text-[var(--text-primary)]">
-                todo
-              </span>{" "}
-              so you can start fresh with the same plan.
+              {t("import_desc")}
             </p>
 
             {/* Drop zone / file picker */}
@@ -179,11 +176,12 @@ export function ImportProjectModal({ open, onClose }) {
                     {preview.title}
                   </p>
                   <p className="text-xs text-[var(--text-secondary)]">
-                    {preview.phases} phases · {preview.tasks} tasks
+                    {preview.phases} {t("import_phases")} · {preview.tasks}{" "}
+                    {t("import_tasks")}
                     {preview.timeline ? ` · ${preview.timeline}` : ""}
                   </p>
                   <p className="text-xs text-[var(--text-tertiary)] underline">
-                    Click to choose a different file
+                    {t("import_dropzone_different")}
                   </p>
                 </>
               ) : (
@@ -192,14 +190,10 @@ export function ImportProjectModal({ open, onClose }) {
                     <FiFilePlus />
                   </span>
                   <p className="text-sm text-[var(--text-secondary)] text-center">
-                    Click to select a{" "}
-                    <span className="font-medium text-[var(--text-primary)]">
-                      .json
-                    </span>{" "}
-                    export file
+                    {t("import_dropzone_click")}
                   </p>
                   <p className="text-xs text-[var(--text-tertiary)]">
-                    Exported from Project → Export JSON
+                    {t("import_dropzone_hint")}
                   </p>
                 </>
               )}
@@ -214,7 +208,7 @@ export function ImportProjectModal({ open, onClose }) {
             {status === "ready" && preview && (
               <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-surface)] p-4 flex flex-col gap-2">
                 <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-medium mb-1">
-                  Preview
+                  {t("import_preview_label")}
                 </p>
                 <p className="font-display font-semibold text-base text-[var(--text-primary)]">
                   {preview.title}
@@ -224,10 +218,10 @@ export function ImportProjectModal({ open, onClose }) {
                 </p>
                 <div className="flex flex-wrap gap-2 mt-1">
                   <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)]">
-                    {preview.phases} phases
+                    {preview.phases} {t("import_phases")}
                   </span>
                   <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)]">
-                    {preview.tasks} tasks reset to todo
+                    {preview.tasks} {t("import_tasks")}
                   </span>
                   {preview.timeline && (
                     <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)]">
@@ -240,14 +234,20 @@ export function ImportProjectModal({ open, onClose }) {
 
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={handleClose}>
-                Cancel
+                {t("import_cancel")}
               </Button>
               <Button
                 onClick={handleImport}
+                style={{ backgroundColor: "var(--violet)", color: "white" }}
+                className="bg-[var(--violet)] text-white hover:bg-[var(--violet-dark)]"
                 disabled={status !== "ready"}
                 loading={status === "importing"}
               >
-                {`${status === "importing" ? "Importing" : "Import"} project`}
+                {`${
+                  status === "importing"
+                    ? t("import_importing")
+                    : t("import_title")
+                }`}
               </Button>
             </div>
           </>

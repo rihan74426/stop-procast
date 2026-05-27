@@ -130,11 +130,28 @@
   --border-focus: var(--violet);
   --border-subtle: #1c1c22;
 
+  /* Brand colors — adjusted for dark backgrounds */
+  --violet: #8f88e8;
+  --violet-dim: #a8a3ee;
   --violet-bg: rgba(127, 119, 221, 0.15);
+
+  --emerald: #22b885;
+  --emerald-dim: #2dc98f;
   --emerald-bg: rgba(29, 158, 117, 0.15);
+
+  --amber: #d4891e;
   --amber-bg: rgba(186, 117, 23, 0.15);
+
+  --coral: #e8683a;
   --coral-bg: rgba(216, 90, 48, 0.15);
+
+  --rose: #c04570;
   --rose-bg: rgba(153, 53, 86, 0.15);
+
+  /* Slate scale */
+  --slate-4: #3a3a48;
+  --slate-5: #5a5a6e;
+  --slate-6: #9898a8;
 
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.3);
   --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
@@ -159,6 +176,11 @@ html {
 }
 
 /* ─── Universal font stack ───────────────────────────────────────────── */
+button {
+  padding: calc(var(--spacing) * 1);
+  border-radius: var(--radius-2xl);
+}
+
 body,
 input,
 textarea,
@@ -365,4 +387,13 @@ input[type="date"]::-webkit-calendar-picker-indicator {
     outline: 3px solid var(--text-primary);
     outline-offset: 3px;
   }
+}
+
+.btn-violet {
+  background: var(--violet);
+  color: white;
+  transition: background var(--dur-base) var(--ease-smooth);
+}
+.btn-violet:hover {
+  background: var(--violet-dim);
 }

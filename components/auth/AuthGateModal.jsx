@@ -92,7 +92,7 @@ export function AuthGateModal({ open, onClose, onContinueAnyway }) {
               <button
                 onClick={onClose}
                 className="w-full h-11 rounded-[var(--r-md)] font-semibold text-sm text-white transition-all active:scale-[0.98]"
-                style={{ background: "var(--violet)" }}
+                style={{ background: "var(--violet)", padding: "5px" }}
                 onMouseEnter={(e) =>
                   (e.currentTarget.style.background = "var(--violet-dim)")
                 }
@@ -115,6 +115,9 @@ export function AuthGateModal({ open, onClose, onContinueAnyway }) {
 
             <button
               onClick={onContinueAnyway}
+              style={{
+                borderRadius: "2.5rem",
+              }}
               className="w-full py-2 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
             >
               {t("auth_gate_skip")}

@@ -63,6 +63,7 @@ export function TopBar() {
               onError={(e) => {
                 e.currentTarget.style.display = "none";
               }}
+              priority
             />
           </div>
           <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)] hidden xs:block sm:block">

@@ -7,30 +7,37 @@ import { NetworkMonitor } from "@/components/ui/NetworkMonitor";
 import { NotificationInit } from "@/components/ui/NotificationInit";
 import { LANGUAGES } from "@/lib/i18n/translations";
 import { THEME_SCRIPT } from "@/lib/theme";
+import { PuterLoader } from "@/components/providers/PuterLoader";
 
 const SITE_URL =
   process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
   "https://momentumio.vercel.app";
 
 export const metadata = {
-  metadataBase: new URL(SITE_URL),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_APP_URL || "https://momentumio.vercel.app"
+  ),
   title: {
-    default: "Momentum — Finish What You Start",
+    default: "Momentum — AI Project Planner | Finish What You Start",
     template: "%s | Momentum",
   },
   description:
-    "Turn any idea, goal, or plan into structured action. AI-powered project planning with built-in accountability and streak tracking.",
+    "Free AI-powered project planning tool. Turn any idea into a structured action plan with phases, milestones, and daily accountability. Beat procrastination and ship your projects.",
   applicationName: "Momentum",
-  authors: [{ name: "Momentum" }],
+  authors: [{ name: "Nuruddin", url: "https://nuruddin-webician.vercel.app" }],
   keywords: [
-    "project planning",
-    "AI planning",
-    "productivity",
-    "goal tracking",
-    "task management",
-    "anti-procrastination",
+    "AI project planner",
+    "free project planning tool",
+    "project management app",
+    "AI productivity tool",
+    "beat procrastination",
+    "project execution tracker",
+    "goal planning app",
+    "task management AI",
+    "project blueprint generator",
+    "streak tracker app",
   ],
-  creator: "Momentum",
+  creator: "Nuruddin",
   publisher: "Momentum",
   robots: {
     index: true,
@@ -97,10 +104,9 @@ export default function RootLayout({ children }) {
     <ClerkProvider>
       <html lang="en" suppressHydrationWarning>
         <head>
-          {/* 1. Theme script — eliminates dark-mode flash */}
           <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />
 
-          {/* 2. Preconnects — establish TCP/TLS early for critical origins */}
+          {/* Preconnect only — fonts load via @font-face unicode-range in globals.css */}
           <link rel="preconnect" href="https://fonts.googleapis.com" />
           <link
             rel="preconnect"
@@ -108,15 +114,10 @@ export default function RootLayout({ children }) {
             crossOrigin="anonymous"
           />
 
-          {/*
-           * 3. Font stylesheet — use display=optional to prevent layout shift
-           * on first load. Fonts load but don't block rendering.
-           * Changed from display=swap (causes CLS on cold devices) to
-           * display=optional (renders immediately with fallback, no flash).
-           */}
+          {/* Only Fredoka needed — Bengali/Arabic load via unicode-range @font-face */}
           <link
             rel="stylesheet"
-            href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&family=Anek+Bangla:wght@100;300;400;500;600;700;800&family=Tajawal:wght@300;400;500;700&display=swap"
+            href="https://fonts.googleapis.com/css2?family=Fredoka:wght@300;400;500;600;700&display=optional"
           />
 
           {/* 4. JSON-LD structured data */}
@@ -153,22 +154,6 @@ export default function RootLayout({ children }) {
               }),
             }}
           />
-
-          {/* 5. Puter credential bootstrap — runs before React, uses defer on script */}
-          {hasPuterCreds && (
-            <script
-              dangerouslySetInnerHTML={{
-                __html: `(function(){try{
-  var a=${JSON.stringify(puterAppId)};
-  var t=${JSON.stringify(puterAuthToken)};
-  if(a&&!localStorage.getItem("puter.app.id"))localStorage.setItem("puter.app.id",a);
-  if(t&&!localStorage.getItem("puter.auth.token"))localStorage.setItem("puter.auth.token",t);
-}catch(e){}})();`,
-              }}
-            />
-          )}
-          {/* Puter loads async — never blocks initial render */}
-          {hasPuterCreds && <script src="https://js.puter.com/v2/" async />}
         </head>
         <body>
           <ThemeProvider>
@@ -177,6 +162,11 @@ export default function RootLayout({ children }) {
               <ToastContainer />
               <NetworkMonitor />
               <NotificationInit />
+              {/* Load puter after hydration — not in <head> */}
+              <PuterLoader
+                appId={process.env.NEXT_PUBLIC_PUTER_APP_ID ?? ""}
+                authToken={process.env.NEXT_PUBLIC_PUTER_AUTH_TOKEN ?? ""}
+              />
             </I18nProvider>
           </ThemeProvider>
         </body>

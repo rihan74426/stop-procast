@@ -105,6 +105,7 @@ export function Sidebar() {
                 onError={(e) => {
                   e.currentTarget.style.display = "none";
                 }}
+                loading="lazy" // ADD THIS
               />
             </div>
             <span className="font-display font-semibold text-sm text-[var(--text-primary)]">
@@ -133,6 +134,7 @@ export function Sidebar() {
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}
+            loading="lazy" // ADD THIS
           />
         </div>
         <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)]">

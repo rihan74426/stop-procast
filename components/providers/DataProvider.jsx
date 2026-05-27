@@ -25,6 +25,10 @@ export function DataProvider({ children }) {
   const syncedUserIdRef = useRef(null);
 
   useEffect(() => {
+    useProjectStore.getState().loadLocal();
+  }, []);
+
+  useEffect(() => {
     if (!isLoaded) return;
 
     const currentUserId = user?.id ?? null;

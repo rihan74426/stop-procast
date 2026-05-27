@@ -36,40 +36,7 @@ import {
 } from "react-icons/fa";
 import { MdDelete } from "react-icons/md";
 import { DataProvider } from "@/components/providers/DataProvider";
-
-function ConfirmModal({
-  open,
-  onClose,
-  onConfirm,
-  title,
-  description,
-  confirmLabel,
-  confirmVariant = "danger",
-  loading,
-}) {
-  const { t } = useI18n();
-  return (
-    <Modal open={open} onClose={onClose} title={title} size="sm">
-      <div className="flex flex-col gap-5">
-        <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
-          {description}
-        </p>
-        <div className="flex gap-2 justify-end">
-          <Button variant="ghost" onClick={onClose} disabled={loading}>
-            {t("common_cancel")}
-          </Button>
-          <Button
-            variant={confirmVariant}
-            onClick={onConfirm}
-            loading={loading}
-          >
-            {confirmLabel}
-          </Button>
-        </div>
-      </div>
-    </Modal>
-  );
-}
+import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
 function ProjectPageClient({ id }) {
   const router = useRouter();
@@ -251,7 +218,7 @@ function ProjectPageClient({ id }) {
                 {!isCompleted && <NextAction project={project} />}
 
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
-                  <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3 sm:mb-4">
+                  <p className=" text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3 sm:mb-4">
                     {t("project_all_tasks")}
                   </p>
                   <TaskList project={project} />

@@ -1,3 +1,4 @@
+// app/robots/route.js
 export async function GET() {
   const siteUrl =
     process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
@@ -5,6 +6,10 @@ export async function GET() {
   const lines = [
     "User-agent: *",
     "Allow: /",
+    "Allow: /new",
+    "Allow: /feedback",
+    "Disallow: /dashboard",
+    "Disallow: /project/",
     "Disallow: /api/",
     "Disallow: /_next/",
     "Sitemap: " + siteUrl + "/sitemap.xml",
