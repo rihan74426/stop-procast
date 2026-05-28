@@ -548,9 +548,10 @@ export function StepCapture({ value, onChange, onNext }) {
         )}
       </div>
 
-      <div className="flex justify-end">
+      <div className="flex justify-end ">
         <Button
           onClick={onNext}
+          style={{ background: "var(--violet)" }}
           disabled={!canProceed}
           size="lg"
           className="gap-2 sm:gap-3 w-full sm:w-auto justify-center"

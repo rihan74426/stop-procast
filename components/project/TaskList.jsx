@@ -48,7 +48,7 @@ export function TaskList({ project }) {
           <div key={phase.id}>
             <button
               onClick={() => toggle(phase.id)}
-              className="w-full flex items-center gap-3 mb-3 group"
+              className="w-full flex rounded-2xl p-2 items-center gap-3 mb-3 group"
             >
               <span
                 className={`text-xs transition-transform ${

@@ -1,0 +1,32 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/daily-reminders",
+      "schedule": "0 6 * * *"
+    },
+    {
+      "path": "/api/cron/daily-reminders/streak-check",
+      "schedule": "0 20 * * *"
+    }
+  ],
+  "functions": {
+    "app/api/generate/route.js": {
+      "maxDuration": 60
+    },
+    "app/api/cron/daily-reminders/route.js": {
+      "maxDuration": 30
+    },
+    "app/api/cron/daily-reminders/streak-check/route.js": {
+      "maxDuration": 30
+    },
+    "app/api/export-email/route.js": {
+      "maxDuration": 30
+    },
+    "app/api/projects/route.js": {
+      "maxDuration": 15
+    },
+    "app/api/projects/[id]/route.js": {
+      "maxDuration": 15
+    }
+  }
+}

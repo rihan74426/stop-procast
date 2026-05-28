@@ -28,9 +28,9 @@ export function NextAction({ project }) {
 
   if (!next) {
     return (
-      <div className="rounded-[var(--r-xl)] border-2 border-dashed border-[var(--emerald)] bg-[var(--emerald-bg)] px-6 py-8 text-center">
+      <div className="rounded-[var(--r-xl)] border-2 border-dashed border-[var(--emerald)] bg-[var(--emerald-bg)] px-5 py-6 text-center">
         <p className="text-2xl mb-2">🎯</p>
-        <p className="font-medium text-[var(--emerald-dim)]">
+        <p className="font-semibold text-[var(--emerald-dim)]">
           {t("next_action_empty_title")}
         </p>
         <p className="text-sm text-[var(--text-secondary)] mt-1">
@@ -42,14 +42,14 @@ export function NextAction({ project }) {
 
   return (
     <div className="rounded-[var(--r-xl)] border-2 border-[var(--violet)] bg-[var(--bg-elevated)] overflow-hidden">
-      <div className="px-5 py-3 bg-[var(--violet-bg)] border-b border-[var(--violet)]">
+      <div className="px-4 sm:px-5 py-2.5 bg-[var(--violet-bg)] border-b border-[var(--violet)]">
         <p className="text-xs font-semibold text-[var(--violet-dim)] uppercase tracking-wider">
           {t("next_action_label")}
         </p>
       </div>
 
-      <div className="px-5 py-5 flex items-start justify-between gap-4">
-        <p className="font-display font-semibold text-xl text-[var(--text-primary)] leading-snug flex-1">
+      <div className="px-4 sm:px-5 py-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <p className="font-display font-semibold text-lg sm:text-xl text-[var(--text-primary)] leading-snug flex-1 min-w-0">
           {next}
         </p>
         <Button
@@ -58,14 +58,14 @@ export function NextAction({ project }) {
           onClick={handleDone}
           loading={marking}
           disabled={!nextTask}
-          className="shrink-0"
+          className="shrink-0 w-full sm:w-auto justify-center"
         >
           {t("next_action_mark_done")}
         </Button>
       </div>
 
       {nextTask?.notes && (
-        <div className="px-5 pb-4 text-sm text-[var(--text-secondary)]">
+        <div className="px-4 sm:px-5 pb-4 text-sm text-[var(--text-secondary)] border-t border-[var(--border)] pt-3 mt-0">
           {nextTask.notes}
         </div>
       )}

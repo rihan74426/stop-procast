@@ -34,6 +34,35 @@ const SCOPE_META = {
   ambitious: { badge: "amber", color: "var(--amber)" },
 };
 
+// Scope display data — labels and hints hardcoded as fallbacks,
+// overridden by translation keys when present.
+const SCOPE_DISPLAY = {
+  lean: {
+    labelKey: "scope_lean_label",
+    labelFallback: "Lean",
+    hintKey: "scope_lean_hint",
+    hintFallback: "2 phases · fast start",
+  },
+  standard: {
+    labelKey: "scope_standard_label",
+    labelFallback: "Standard",
+    hintKey: "scope_standard_hint",
+    hintFallback: "3 phases · balanced",
+  },
+  ambitious: {
+    labelKey: "scope_ambitious_label",
+    labelFallback: "Ambitious",
+    hintKey: "scope_ambitious_hint",
+    hintFallback: "4–5 phases · deep mode",
+  },
+};
+
+// Safe t() wrapper: returns fallback if the key resolves to itself (i.e. key not found)
+function tSafe(t, key, fallback) {
+  const result = t(key);
+  return result && result !== key ? result : fallback;
+}
+
 // ─── Streaming progress UI ────────────────────────────────────────────
 
 const StreamingProgress = memo(function StreamingProgress({
@@ -42,7 +71,27 @@ const StreamingProgress = memo(function StreamingProgress({
   t,
 }) {
   const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
+  const display = SCOPE_DISPLAY[scopeLevel] ?? SCOPE_DISPLAY.standard;
   const isDeep = scopeLevel === "ambitious";
+
+  const scopeLabel = tSafe(t, display.labelKey, display.labelFallback);
+  const scopeHint = tSafe(t, display.hintKey, display.hintFallback);
+
+  const deepDesc = tSafe(
+    t,
+    "scope_deep_desc",
+    "Using advanced AI for your ambitious plan — this takes a little longer"
+  );
+  const deepTime = tSafe(
+    t,
+    "scope_deep_time",
+    "Deep plans usually take 30–90 seconds"
+  );
+  const normalTime = tSafe(
+    t,
+    "scope_normal_time",
+    "Usually takes 15–40 seconds"
+  );
 
   // Compute which stage we are in based on char count
   const stage =
@@ -53,15 +102,6 @@ const StreamingProgress = memo(function StreamingProgress({
     charCount === Infinity
       ? 100
       : Math.min(98, Math.round((charCount / 3200) * 100));
-
-  const scopeLabel =
-    t(`intake_scope_${scopeLevel}`) ||
-    scopeLevel.charAt(0).toUpperCase() + scopeLevel.slice(1);
-  const scopeHint = {
-    lean: t("scope_lean_hint") || "2 phases · fast start",
-    standard: t("scope_standard_hint") || "3 phases · balanced",
-    ambitious: t("scope_ambitious_hint") || "4–5 phases · deep mode",
-  }[scopeLevel];
 
   return (
     <div className="flex flex-col gap-5">
@@ -76,10 +116,7 @@ const StreamingProgress = memo(function StreamingProgress({
           )}
         </div>
         <p className="text-sm text-[var(--text-secondary)]">
-          {isDeep
-            ? t("scope_deep_desc") ||
-              "Using advanced AI for your ambitious plan — this takes a little longer"
-            : scopeHint}
+          {isDeep ? deepDesc : scopeHint}
         </p>
       </div>
 
@@ -96,7 +133,9 @@ const StreamingProgress = memo(function StreamingProgress({
         </span>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium text-[var(--violet-dim)]">
-            {pct === 100 ? t("common_done") + "!" : t(stage.key) || stage.key}
+            {pct === 100
+              ? t("common_done") + "!"
+              : tSafe(t, stage.key, stage.key)}
           </p>
           <div className="mt-1.5 h-1.5 rounded-full bg-[var(--bg-muted)] overflow-hidden">
             <div
@@ -129,16 +168,14 @@ const StreamingProgress = memo(function StreamingProgress({
               <span className="shrink-0 text-sm">
                 {done ? (active ? "⟳" : "✓") : "○"}
               </span>
-              <span className="truncate">{t(s.key) || s.key}</span>
+              <span className="truncate">{tSafe(t, s.key, s.key)}</span>
             </div>
           );
         })}
       </div>
 
       <p className="text-xs text-center text-[var(--text-tertiary)]">
-        {isDeep
-          ? t("scope_deep_time") || "Deep plans usually take 30–90 seconds"
-          : t("scope_normal_time") || "Usually takes 15–40 seconds"}
+        {isDeep ? deepTime : normalTime}
       </p>
     </div>
   );
@@ -163,7 +200,7 @@ export function StepReview({
   const [showAuthGate, setShowAuthGate] = useState(false);
   const toastSequenceRef = useRef(null);
 
-  // Manage toast sequence during generation — pass locale so messages are translated
+  // Manage toast sequence during generation
   useEffect(() => {
     if (genStatus === "streaming" && !toastSequenceRef.current) {
       toastSequenceRef.current = createToastSequence("blueprint", locale);
@@ -198,6 +235,11 @@ export function StepReview({
     onCommit(blueprint);
   }, [onCommit, blueprint]);
 
+  // Scope display
+  const display = SCOPE_DISPLAY[scopeLevel] ?? SCOPE_DISPLAY.standard;
+  const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
+  const scopeLabel = tSafe(t, display.labelKey, display.labelFallback);
+
   // Greeting bar
   const name = user?.firstName || user?.username || null;
   const greeting = isSignedIn
@@ -215,14 +257,6 @@ export function StepReview({
       </div>
     );
   }
-
-  // Scope labels resolved via t() with fallbacks
-  const scopeLabels = {
-    lean: t("scope_lean_label") || "Lean",
-    standard: t("scope_standard_label") || "Standard",
-    ambitious: t("scope_ambitious_label") || "Ambitious",
-  };
-  const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
 
   // ── Loading while checking limit ──────────────────────────────────
   if (limitLoading && genStatus === "idle") {
@@ -349,9 +383,7 @@ export function StepReview({
             <span className="text-sm text-[var(--emerald)] font-medium">
               {t("intake_review_ready")}
             </span>
-            <Badge variant={scopeInfo.badge}>
-              {scopeLabels[scopeLevel] || scopeLevel}
-            </Badge>
+            <Badge variant={scopeInfo.badge}>{scopeLabel}</Badge>
             {scopeLevel === "ambitious" && (
               <Badge variant="amber">🔬 {t("intake_review_deep")}</Badge>
             )}
@@ -373,7 +405,7 @@ export function StepReview({
           }}
         >
           <span style={{ color: scopeInfo.color }} className="font-semibold">
-            {scopeLabels[scopeLevel]} {t("intake_review_meta_scope")}
+            {scopeLabel} {t("intake_review_meta_scope")}
           </span>
           <span className="text-[var(--text-secondary)]">
             {blueprint.phases.length} {t("intake_review_meta_phases")}

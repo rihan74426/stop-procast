@@ -2,9 +2,12 @@
 
 import { phaseProgress } from "@/lib/utils/progress";
 import { useProjectStore } from "@/lib/store/projectStore";
+import { useI18n } from "@/lib/i18n";
 
 export function PhaseTimeline({ project }) {
   const updatePhase = useProjectStore((s) => s.updatePhase);
+
+  const { t } = useI18n();
 
   if (!project.phases?.length) return null;
 
@@ -48,18 +51,33 @@ export function PhaseTimeline({ project }) {
                         : "text-[var(--text-tertiary)]"
                     }`}
                   >
-                    {phase.name}
+                    {t(phase.name)}
                   </p>
-                  {(isActive || isDone) && (
-                    <span
-                      className="text-xs shrink-0 font-medium"
-                      style={{
-                        color: isDone ? "var(--emerald)" : "var(--violet)",
-                      }}
-                    >
-                      {isDone ? "Done" : `${progress}%`}
-                    </span>
-                  )}
+
+                  {/* status label: Done / progress% / Upcoming (localized) */}
+                  <span
+                    className="text-xs shrink-0 font-medium"
+                    style={{
+                      color: isDone
+                        ? "var(--emerald)"
+                        : isActive
+                        ? "var(--violet)"
+                        : "var(--text-tertiary)",
+                    }}
+                    title={
+                      isDone
+                        ? t("phase_status_done")
+                        : isActive
+                        ? t("phase_status_active")
+                        : t("phase_status_upcoming")
+                    }
+                  >
+                    {isDone
+                      ? t("phase_status_done")
+                      : isActive
+                      ? `${progress}%`
+                      : t("phase_status_upcoming")}
+                  </span>
                 </div>
                 <div className="h-1.5 rounded-full bg-[var(--bg-muted)] overflow-hidden">
                   <div
@@ -130,12 +148,18 @@ export function PhaseTimeline({ project }) {
                     {phase.name}
                   </p>
                   {isDone && (
-                    <span className="text-[10px] text-[var(--emerald)] shrink-0 font-medium">
+                    <span
+                      className="text-[10px] text-[var(--emerald)] shrink-0 font-medium"
+                      title={t("phase_status_done")}
+                    >
                       ✓
                     </span>
                   )}
                   {isActive && (
-                    <span className="text-[10px] text-[var(--violet)] shrink-0 font-medium tabular-nums">
+                    <span
+                      className="text-[10px] text-[var(--violet)] shrink-0 font-medium tabular-nums"
+                      title={t("phase_status_active")}
+                    >
                       {progress}%
                     </span>
                   )}

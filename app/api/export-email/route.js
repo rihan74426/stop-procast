@@ -1,6 +1,7 @@
 import { tryConnectDB } from "@/lib/db/mongoose";
 import Project from "@/lib/models/Project";
 import { auth } from "@clerk/nextjs/server";
+import { toMarkdown, projectSlug } from "@/lib/utils/toMarkdown";
 
 const isDev = process.env.NODE_ENV !== "production";
 
@@ -107,13 +108,13 @@ export async function POST(request) {
     const attachments = [];
     if (format === "markdown" || format === "both") {
       attachments.push({
-        filename: `${slug(project.projectTitle)}.md`,
+        filename: `${projectSlug(project.projectTitle)}.md`,
         content: Buffer.from(markdownContent).toString("base64"),
       });
     }
     if (format === "json" || format === "both") {
       attachments.push({
-        filename: `${slug(project.projectTitle)}.json`,
+        filename: `${projectSlug(project.projectTitle)}.json`,
         content: Buffer.from(jsonContent).toString("base64"),
       });
     }
@@ -146,15 +147,6 @@ export async function POST(request) {
     console.error("[export-email] error:", err);
     return Response.json({ error: "Failed to send export" }, { status: 500 });
   }
-}
-
-function slug(title) {
-  return (
-    (title || "project")
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-|-$/g, "") || "momentum-project"
-  );
 }
 
 function buildEmailHtml(p) {
@@ -200,40 +192,4 @@ function buildEmailHtml(p) {
   </div>
 </div>
 </body></html>`;
-}
-
-function toMarkdown(p) {
-  const lines = [];
-  lines.push(`# ${p.projectTitle}`);
-  lines.push("");
-  if (p.oneLineGoal) lines.push(`> ${p.oneLineGoal}`);
-  lines.push(`*Exported from Momentum on ${new Date().toLocaleDateString()}*`);
-  lines.push("");
-  if (p.problemStatement) {
-    lines.push("## Problem");
-    lines.push(p.problemStatement);
-    lines.push("");
-  }
-  if (p.successCriteria?.length) {
-    lines.push("## Success Criteria");
-    p.successCriteria.forEach((c) => lines.push(`- ${c}`));
-    lines.push("");
-  }
-  p.phases?.forEach((phase, i) => {
-    lines.push(`## Phase ${i + 1}: ${phase.name}`);
-    if (phase.objective) lines.push(phase.objective);
-    lines.push("");
-    const phaseTasks = p.tasks?.filter((t) => t.phaseId === phase.id) || [];
-    phaseTasks.forEach((t) =>
-      lines.push(`- [${t.status === "done" ? "x" : " "}] ${t.title}`)
-    );
-    if (phaseTasks.length) lines.push("");
-  });
-  const activeBlockers = p.blockers?.filter((b) => b.status === "active") ?? [];
-  if (activeBlockers.length) {
-    lines.push("## Active Blockers");
-    activeBlockers.forEach((b) => lines.push(`- ${b.description}`));
-    lines.push("");
-  }
-  return lines.join("\n");
 }

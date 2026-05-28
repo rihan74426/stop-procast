@@ -26,10 +26,6 @@ import { TosModal } from "@/components/ui/TosModal";
 
 const STEP_LABELS_KEYS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
 
-// ─── Wait sequence ────────────────────────────────────────────────────
-// Each message fires after the previous one's delay has elapsed.
-// Returns a cancel function that dismisses any active toast and clears timers.
-
 function startWaitSequence(t) {
   const MESSAGES = [
     { after: 6000, key: "wait_thinking" },
@@ -59,11 +55,9 @@ function startWaitSequence(t) {
   };
 }
 
-// ─── Regen permission banner ──────────────────────────────────────────
-
 function RegenPermissionBanner({ onKeep, onRegenerate, t }) {
   return (
-    <div className="mb-6 rounded-[var(--r-lg)] border-2 border-[var(--amber)] bg-[var(--amber-bg)] px-4 py-4">
+    <div className="mb-5 rounded-[var(--r-lg)] border-2 border-[var(--amber)] bg-[var(--amber-bg)] px-4 py-4">
       <div className="flex items-start gap-3">
         <span className="text-xl shrink-0 mt-0.5">✏️</span>
         <div className="flex-1 min-w-0">
@@ -76,13 +70,13 @@ function RegenPermissionBanner({ onKeep, onRegenerate, t }) {
           <div className="flex gap-2 flex-wrap">
             <button
               onClick={onRegenerate}
-              className="h-8 px-4 text-xs font-semibold rounded-[var(--r-md)] bg-[var(--amber)] text-white hover:opacity-90 active:scale-[0.97] transition-all"
+              className="h-8 px-4 text-xs font-semibold rounded-[var(--r-md)] bg-[var(--amber)] text-white hover:opacity-90 active:scale-[0.97] transition-all appearance-none -webkit-appearance-none focus:outline-none focus:ring-2 focus:ring-[var(--amber)]"
             >
               {t("regen_regenerate")}
             </button>
             <button
               onClick={onKeep}
-              className="h-8 px-4 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all"
+              className="h-8 px-4 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all appearance-none -webkit-appearance-none focus:outline-none focus:ring-2 focus:ring-[var(--border)]"
             >
               {t("regen_keep")}
             </button>
@@ -93,7 +87,44 @@ function RegenPermissionBanner({ onKeep, onRegenerate, t }) {
   );
 }
 
-// ─── Main page ────────────────────────────────────────────────────────
+// Add stable serializer / input key builder to avoid false "stale" detections
+function stableSerializeClarifyAnswers(answers) {
+  // produce a deterministic array of answers based on numeric indices
+  if (!answers || typeof answers !== "object") return "[]";
+  const keys = Object.keys(answers)
+    .filter((k) => k != null)
+    .sort((a, b) => {
+      // sort numerically when possible e.g. "0","1"... else lexicographic
+      const na = Number.isFinite(Number(a)) ? Number(a) : a;
+      const nb = Number.isFinite(Number(b)) ? Number(b) : b;
+      if (typeof na === "number" && typeof nb === "number") return na - nb;
+      return String(a).localeCompare(String(b));
+    });
+  const arr = keys.map((k) => {
+    const v = answers[k];
+    if (v == null) return "";
+    // normalize whitespace so insignificant changes don't flip the key
+    return String(v).replace(/\s+/g, " ").trim();
+  });
+  return JSON.stringify(arr);
+}
+
+function buildInputKey({
+  idea = "",
+  scopeLevel = "",
+  clarifyAnswers = {},
+  locale = "",
+  limitAllowed = false,
+}) {
+  const ideaNorm = String(idea ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
+  const clar = stableSerializeClarifyAnswers(clarifyAnswers);
+  // include locale and allowed flag to ensure exact matching when relevant
+  return `${ideaNorm}||${scopeLevel}||${clar}||${locale}||${
+    limitAllowed ? "1" : "0"
+  }`;
+}
 
 export default function NewProjectPage() {
   return (
@@ -121,12 +152,10 @@ function NewProjectContent() {
   const [blueprintKey, setBlueprintKey] = useState(null);
   const [showTos, setShowTos] = useState(false);
 
-  // Generation state
   const [genStatus, setGenStatus] = useState("idle");
   const [genCharCount, setGenCharCount] = useState(0);
   const [genError, setGenError] = useState(null);
 
-  // Refs
   const rawRef = useRef("");
   const readerRef = useRef(null);
   const rafRef = useRef(null);
@@ -135,7 +164,6 @@ function NewProjectContent() {
   const isMountedRef = useRef(true);
   const MAX_RETRIES = 2;
 
-  // Keep gen inputs fresh without stale closures
   const genInputsRef = useRef({
     idea,
     clarifyAnswers,
@@ -153,10 +181,6 @@ function NewProjectContent() {
     };
   }, [idea, clarifyAnswers, scopeLevel, limitAllowed, locale]);
 
-  if (!isTosAccepted()) {
-    setShowTos(true); // add this state
-    return;
-  }
   // Keep t() fresh
   const tRef = useRef(t);
   useEffect(() => {
@@ -170,7 +194,6 @@ function NewProjectContent() {
     };
   }, []);
 
-  // Puter credential bootstrap
   useEffect(() => {
     const appId = process.env.NEXT_PUBLIC_PUTER_APP_ID;
     const authToken = process.env.NEXT_PUBLIC_PUTER_AUTH_TOKEN;
@@ -185,8 +208,6 @@ function NewProjectContent() {
       setShowEarlyAuthGate(true);
   }, [limitLoading, limitAllowed, isSignedIn]);
 
-  // ── Navigation helpers ────────────────────────────────────────────
-
   const goTo = useCallback(
     (target) => {
       if (target < 0 || target > maxReached) return;
@@ -200,8 +221,6 @@ function NewProjectContent() {
     setMaxReached((prev) => Math.max(prev, target));
   }, []);
 
-  // ── Input handlers ────────────────────────────────────────────────
-
   const handleIdeaChange = useCallback((v) => setIdea(v), []);
   const handleClarifyChange = useCallback(
     (i, v) => setClarifyAnswers((prev) => ({ ...prev, [i]: v })),
@@ -209,17 +228,18 @@ function NewProjectContent() {
   );
   const handleScopeChange = useCallback((v) => setScopeLevel(v), []);
 
-  // ── Blueprint staleness ───────────────────────────────────────────
-  // Key includes idea + scope + clarify answers together
-  const inputKey = `${idea.trim()}||${scopeLevel}||${JSON.stringify(
-    clarifyAnswers
-  )}`;
+  // replace inputKey with buildInputKey to make stale detection deterministic
+  const inputKey = buildInputKey({
+    idea,
+    scopeLevel,
+    clarifyAnswers,
+    locale,
+    limitAllowed,
+  });
+
   const blueprintIsStale =
     blueprint !== null && blueprintKey !== null && inputKey !== blueprintKey;
-  // Show regen banner only on scope (step 2) and review (step 3) steps
   const showRegenBanner = blueprintIsStale && (step === 2 || step === 3);
-
-  // ── Generation cleanup ────────────────────────────────────────────
 
   const stopGeneration = useCallback(() => {
     if (stopWaitRef.current) {
@@ -228,9 +248,7 @@ function NewProjectContent() {
     }
     try {
       readerRef.current?.cancel();
-    } catch {
-      /* ignore */
-    }
+    } catch {}
     readerRef.current = null;
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current);
@@ -240,8 +258,6 @@ function NewProjectContent() {
 
   useEffect(() => () => stopGeneration(), [stopGeneration]);
 
-  // ── Core generation ───────────────────────────────────────────────
-
   const runGeneration = useCallback(async () => {
     const {
       idea: currentIdea,
@@ -250,7 +266,6 @@ function NewProjectContent() {
       limitAllowed: currentAllowed,
       locale: currentLocale,
     } = genInputsRef.current;
-
     const currentT = tRef.current;
 
     if (!currentAllowed) {
@@ -265,7 +280,15 @@ function NewProjectContent() {
     setGenError(null);
     rawRef.current = "";
 
-    // Start wait sequence with translated messages
+    // capture the exact input key for this generation run
+    const generationInputKey = buildInputKey({
+      idea: currentIdea,
+      scopeLevel: currentScope,
+      clarifyAnswers: currentAnswers,
+      locale: currentLocale,
+      limitAllowed: currentAllowed,
+    });
+
     stopWaitRef.current = startWaitSequence(currentT);
 
     try {
@@ -301,7 +324,6 @@ function NewProjectContent() {
 
         if (firstChunk && chunk.length > 0) {
           firstChunk = false;
-          // Cancel wait sequence — AI has responded
           if (stopWaitRef.current) {
             stopWaitRef.current();
             stopWaitRef.current = null;
@@ -313,9 +335,7 @@ function NewProjectContent() {
 
         if (rafRef.current) cancelAnimationFrame(rafRef.current);
         rafRef.current = requestAnimationFrame(() => {
-          if (isMountedRef.current) {
-            setGenCharCount(rawRef.current.length);
-          }
+          if (isMountedRef.current) setGenCharCount(rawRef.current.length);
         });
       }
 
@@ -323,10 +343,8 @@ function NewProjectContent() {
       readerRef.current = null;
 
       if (!isMountedRef.current) return;
-
-      if (rawRef.current.trim().length < 50) {
+      if (rawRef.current.trim().length < 50)
         throw new Error(currentT("common_error"));
-      }
 
       const parsed = parseBlueprint(rawRef.current);
       retryCountRef.current = 0;
@@ -336,33 +354,28 @@ function NewProjectContent() {
         stopWaitRef.current = null;
       }
 
-      // Signal 100% on progress bar, then transition
       setGenCharCount(Infinity);
       await new Promise((r) => setTimeout(r, 300));
-
       if (!isMountedRef.current) return;
 
       toast.success(currentT("toast_blueprint_ready"), { duration: 3000 });
 
       setBlueprint(parsed);
-      // Capture current inputKey at the time generation completes
-      const currentInputKey = `${currentIdea.trim()}||${currentScope}||${JSON.stringify(
-        currentAnswers
-      )}`;
-      setBlueprintKey(currentInputKey);
+
+      // set the blueprintKey to the stable generation input key captured earlier
+      setBlueprintKey(generationInputKey);
+
       setGenStatus("done");
       setStep(4);
       setMaxReached((prev) => Math.max(prev, 4));
     } catch (e) {
       if (!isMountedRef.current) return;
-
       if (stopWaitRef.current) {
         stopWaitRef.current();
         stopWaitRef.current = null;
       }
       readerRef.current = null;
 
-      // Auto-retry on rate limit
       if (
         (e.code === "RATE_LIMITED" || e.status === 429) &&
         retryCountRef.current < MAX_RETRIES
@@ -396,8 +409,6 @@ function NewProjectContent() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stopGeneration]);
 
-  // ── Generation triggers ───────────────────────────────────────────
-
   const handleStartGeneration = useCallback(() => {
     retryCountRef.current = 0;
     advance(3);
@@ -416,19 +427,25 @@ function NewProjectContent() {
     setGenStatus("streaming");
     setGenCharCount(0);
     setGenError(null);
-    // Ensure we're on the review step
     setStep(3);
     setMaxReached((prev) => Math.max(prev, 3));
     runGeneration();
   }, [runGeneration]);
 
   const handleKeepPlan = useCallback(() => {
-    // Stamp the current input key as accepted — banner won't reappear
-    setBlueprintKey(inputKey);
+    // When user explicitly chooses to keep the current plan, mark the blueprint
+    // as matching the current inputs (use stable key) — this prevents spurious
+    // stale banners caused by object key order or whitespace.
+    const currentKey = buildInputKey({
+      idea,
+      scopeLevel,
+      clarifyAnswers,
+      locale,
+      limitAllowed,
+    });
+    setBlueprintKey(currentKey);
     toast.success(t("toast_keep_plan"), { duration: 2000 });
-  }, [inputKey, t]);
-
-  // ── Commit ────────────────────────────────────────────────────────
+  }, [idea, scopeLevel, clarifyAnswers, locale, limitAllowed, t]);
 
   const handleCommit = useCallback(
     async ({ deadline }) => {
@@ -469,15 +486,13 @@ function NewProjectContent() {
     [blueprint, scopeLevel, addProject, router, t]
   );
 
-  // ── Limit gate full-page UI ───────────────────────────────────────
-
   if (!limitLoading && !limitAllowed && !isSignedIn) {
     return (
       <div className="flex h-screen overflow-hidden">
         <Sidebar />
         <div className="flex-1 flex flex-col overflow-hidden min-w-0">
           <TopBar />
-          <main className="flex-1 overflow-y-auto">
+          <main className="flex-1 overflow-y-auto bg-[var(--bg-elevated)]">
             <div className="flex items-center justify-center px-4 py-12">
               <div className="w-full max-w-md text-center flex flex-col gap-6">
                 <div className="text-5xl">🎯</div>
@@ -516,46 +531,53 @@ function NewProjectContent() {
     );
   }
 
-  // ── Wizard UI ─────────────────────────────────────────────────────
-
   return (
     <div className="flex h-screen overflow-hidden">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopBar />
 
-        {/* Step breadcrumb */}
-        <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-4 sm:px-6 py-3 sm:py-4 sticky top-0 z-10">
+        {/* Step breadcrumb — compact on mobile */}
+        <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-3 sm:px-6 py-2.5 sm:py-4 sticky top-0 z-10 backdrop-blur-sm shadow-sm">
           <div className="max-w-2xl mx-auto">
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-1 sm:gap-2">
               {STEP_LABELS_KEYS.map((label, i) => {
                 const isActive = i === step;
                 const isVisited = i <= maxReached;
                 const isDonePast = isVisited && i < step;
                 const isClickable = isVisited && !isActive;
                 return (
-                  <div key={i} className="flex items-center gap-1.5 sm:gap-2">
+                  <div key={i} className="flex items-center gap-1 sm:gap-2 ">
                     <button
                       onClick={() => isClickable && goTo(i)}
                       disabled={!isClickable}
+                      aria-current={isActive ? "step" : undefined}
+                      aria-disabled={!isClickable}
+                      style={{
+                        borderRadius: "1.5rem",
+                        padding: "5px",
+                      }}
                       className={[
-                        "flex items-center gap-1.5 sm:gap-2 transition-all",
+                        "flex items-center gap-1 sm:gap-1.5 transition-all p-2",
+                        // remove any default browser background and ensure consistent focus behavior
+                        "appearance-none -webkit-appearance-none bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--violet)] rounded",
                         isClickable
-                          ? "cursor-pointer hover:opacity-80"
+                          ? "cursor-pointer hover:opacity-90"
                           : "cursor-default",
                       ].join(" ")}
                     >
                       <div
                         className={[
-                          "w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-medium transition-all duration-300",
+                          "w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs sm:text-xs font-medium transition-all duration-300 shadow-sm",
                           isDonePast
                             ? "bg-[var(--emerald)] text-white"
                             : isActive
                             ? "bg-[var(--violet)] text-white"
                             : isVisited
-                            ? "bg-[var(--bg-muted)] text-[var(--violet-dim)] ring-1 ring-[var(--violet)]"
+                            ? "bg-[var(--bg-muted)] text-[var(--violet-dim)] ring-1 ring-[var(--violet)/20]"
                             : "bg-[var(--bg-muted)] text-[var(--text-tertiary)]",
                         ].join(" ")}
+                        aria-hidden="true"
                       >
                         {isDonePast ? "✓" : i + 1}
                       </div>
@@ -573,11 +595,12 @@ function NewProjectContent() {
                     </button>
                     {i < STEP_LABELS_KEYS.length - 1 && (
                       <div
-                        className={`h-px w-4 sm:w-8 transition-colors duration-300 ${
+                        className={`h-px w-3 sm:w-6 transition-colors duration-300 ${
                           i < step
                             ? "bg-[var(--emerald)]"
                             : "bg-[var(--border)]"
                         }`}
+                        aria-hidden="true"
                       />
                     )}
                   </div>
@@ -585,8 +608,7 @@ function NewProjectContent() {
               })}
               {blueprintIsStale && step !== 2 && step !== 3 && (
                 <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-[var(--amber-bg)] text-[var(--amber)] border border-[var(--amber)] whitespace-nowrap shrink-0 flex items-center gap-1">
-                  <BiSolidPencil size={9} />{" "}
-                  {t("regen_banner_title").split(" ").slice(0, 1).join("")}
+                  <BiSolidPencil size={9} /> Changed
                 </span>
               )}
             </div>
@@ -594,7 +616,7 @@ function NewProjectContent() {
         </div>
 
         <main className="flex-1 overflow-y-auto">
-          <div className="flex items-start justify-center px-4 sm:px-6 py-8 sm:py-12">
+          <div className="flex items-start justify-center px-4 sm:px-6 py-6 sm:py-12">
             <div className="w-full max-w-2xl">
               {step === 0 && (
                 <StepCapture
@@ -603,7 +625,6 @@ function NewProjectContent() {
                   onNext={() => advance(1)}
                 />
               )}
-
               {step === 1 && (
                 <StepClarify
                   idea={idea}
@@ -615,7 +636,6 @@ function NewProjectContent() {
                   onQuestionsLoaded={setCachedQuestions}
                 />
               )}
-
               {step === 2 && (
                 <>
                   {showRegenBanner && (
@@ -633,7 +653,6 @@ function NewProjectContent() {
                   />
                 </>
               )}
-
               {step === 3 && (
                 <>
                   {showRegenBanner && (
@@ -660,7 +679,6 @@ function NewProjectContent() {
                   />
                 </>
               )}
-
               {step === 4 && blueprint && (
                 <StepCommit
                   blueprint={blueprint}
@@ -668,7 +686,6 @@ function NewProjectContent() {
                   onConfirm={handleCommit}
                 />
               )}
-
               {step === 4 && !blueprint && (
                 <div className="flex flex-col gap-4 items-center py-12">
                   <p className="text-[var(--text-secondary)]">

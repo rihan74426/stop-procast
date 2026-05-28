@@ -27,9 +27,8 @@ export function Sidebar() {
   const projects = useProjectStore((s) => s.projects);
   const activeProjects = projects.filter((p) => !p.completionDate);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [feedbackSeen, setFeedbackSeen] = useState(true); // default true to avoid flash
+  const [feedbackSeen, setFeedbackSeen] = useState(true);
 
-  // Load feedback-seen state from localStorage after mount
   useEffect(() => {
     try {
       setFeedbackSeen(!!localStorage.getItem(FEEDBACK_SEEN_KEY));
@@ -38,15 +37,12 @@ export function Sidebar() {
     }
   }, []);
 
-  // Mark feedback as seen when on the feedback page
   useEffect(() => {
     if (pathname === "/feedback") {
       try {
         localStorage.setItem(FEEDBACK_SEEN_KEY, "1");
         setFeedbackSeen(true);
-      } catch {
-        /* ignore */
-      }
+      } catch {}
     }
   }, [pathname]);
 
@@ -54,11 +50,21 @@ export function Sidebar() {
     setMobileOpen(false);
   }, [pathname]);
 
+  useEffect(() => {
+    document.body.style.overflow = mobileOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [mobileOpen]);
+
   const showFeedbackBadge = !feedbackSeen && pathname !== "/feedback";
 
+  // Dashboard href: /dashboard for authed users, / for guests
+  const dashHref = "/dashboard";
+  const dashActive = pathname === "/dashboard" || pathname === "/";
+
   const navItems = [
-    { href: "/dashboard", label: t("nav_dashboard"), icon: FiGrid },
-    { href: "/explore", label: t("nav_explore"), icon: FiCompass },
+    { href: "/", label: t("nav_dashboard"), icon: FiGrid },
     { href: "/new", label: t("nav_new_project"), icon: FiPlus },
     { href: "/feedback", label: "Feedback", icon: FiMessageSquare },
     { href: "/settings", label: t("nav_settings"), icon: FiSettings },
@@ -66,20 +72,21 @@ export function Sidebar() {
 
   const SidebarContent = ({ onClose }) => (
     <div className="flex flex-col h-full w-56">
-      {/* Mobile close */}
+      {/* Mobile header */}
       {onClose && (
         <div className="flex items-center justify-between px-3 py-3 border-b border-[var(--border)] lg:hidden">
           <div className="flex items-center gap-2">
-            <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center">
+            <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center shrink-0">
               <Image
-                src="/logo.png"
+                src="/favicon.png"
                 alt="Momentum"
                 width={28}
-                height={40}
+                height={28}
                 className="object-cover"
                 onError={(e) => {
                   e.currentTarget.style.display = "none";
                 }}
+                loading="lazy" // ADD THIS
               />
             </div>
             <span className="font-display font-semibold text-sm text-[var(--text-primary)]">
@@ -88,25 +95,27 @@ export function Sidebar() {
           </div>
           <button
             onClick={onClose}
-            className="h-8 w-8 flex items-center justify-center rounded-[var(--r-md)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]"
+            className="h-9 w-9 flex items-center justify-center rounded-[var(--r-md)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] transition-colors"
+            aria-label="Close menu"
           >
-            <FiX size={14} />
+            <FiX size={16} />
           </button>
         </div>
       )}
 
-      {/* Logo on desktop */}
+      {/* Desktop logo */}
       <div className="hidden lg:flex items-center gap-2 px-4 py-4 border-b border-[var(--border)]">
-        <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center">
+        <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center shrink-0">
           <Image
-            src="/logo.png"
+            src="/favicon.png"
             alt="Momentum"
             width={28}
-            height={40}
+            height={28}
             className="object-cover"
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}
+            loading="lazy" // ADD THIS
           />
         </div>
         <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)]">
@@ -115,39 +124,37 @@ export function Sidebar() {
       </div>
 
       {/* Nav */}
-      <nav className="p-3 flex flex-col gap-1">
-        {navItems.map(({ href, label, icon: Icon }) => {
-          const active = pathname === href;
-          return (
-            <Link
-              key={href}
-              href={href}
-              onClick={onClose}
-              className={[
-                "flex items-center gap-2.5 px-3 py-2 rounded-[var(--r-md)] text-sm",
-                "transition-colors duration-[var(--dur-fast)]",
-                active
-                  ? "bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium"
-                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]",
-              ].join(" ")}
-            >
-              <Icon />
-              {label}
-              {/* Show "new" badge only until user visits feedback page */}
-              {href === "/feedback" && showFeedbackBadge && (
-                <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium">
-                  new
-                </span>
-              )}
-            </Link>
-          );
-        })}
+      <nav className="p-3 flex flex-col gap-0.5" aria-label="Main navigation">
+        {navItems.map(({ href, label, icon: Icon, active }) => (
+          <Link
+            key={href + label}
+            href={href}
+            onClick={onClose}
+            className={[
+              "flex items-center gap-2.5 px-3 py-2.5 rounded-[var(--r-md)] text-sm",
+              "transition-colors duration-[var(--dur-fast)]",
+              "min-h-[var(--touch-min)] lg:min-h-0",
+              active
+                ? "bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium"
+                : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]",
+            ].join(" ")}
+            aria-current={active ? "page" : undefined}
+          >
+            <Icon size={15} className="shrink-0" />
+            <span className="truncate">{label}</span>
+            {href === "/feedback" && showFeedbackBadge && (
+              <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium shrink-0">
+                new
+              </span>
+            )}
+          </Link>
+        ))}
       </nav>
 
-      {/* Active projects */}
+      {/* Active projects quick-links */}
       {activeProjects.length > 0 && (
-        <div className="px-3 pb-3 mt-2">
-          <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider px-3 mb-2">
+        <div className="px-3 pb-3 mt-1">
+          <p className="text-[10px] text-[var(--text-tertiary)] font-semibold uppercase tracking-widest px-3 mb-2">
             {t("nav_active")}
           </p>
           <div className="flex flex-col gap-0.5">
@@ -157,15 +164,18 @@ export function Sidebar() {
                 href={`/project/${p.id}`}
                 onClick={onClose}
                 className={[
-                  "flex items-center gap-2 px-3 py-1.5 rounded-[var(--r-md)] text-sm",
+                  "flex items-center gap-2 px-3 py-2 rounded-[var(--r-md)] text-sm",
                   "transition-colors duration-[var(--dur-fast)]",
+                  "min-h-[var(--touch-min)] lg:min-h-0",
                   pathname === `/project/${p.id}`
-                    ? "bg-[var(--bg-subtle)] text-[var(--text-primary)]"
+                    ? "bg-[var(--bg-subtle)] text-[var(--text-primary)] font-medium"
                     : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]",
                 ].join(" ")}
               >
                 <span className="w-1.5 h-1.5 rounded-full bg-[var(--emerald)] shrink-0" />
-                <span className="truncate">{p.projectTitle || "Untitled"}</span>
+                <span className="truncate min-w-0">
+                  {p.projectTitle || "Untitled"}
+                </span>
               </Link>
             ))}
           </div>
@@ -179,8 +189,8 @@ export function Sidebar() {
         {isLoaded && !isSignedIn ? (
           <SignInButton mode="modal">
             <button className="w-full rounded-[var(--r-md)] bg-[var(--violet-bg)] border border-[var(--violet)] px-3 py-2.5 text-left transition-colors hover:bg-[var(--violet)] hover:text-white group">
-              <p className="text-xs font-medium text-[var(--violet-dim)] group-hover:text-white transition-colors">
-                <FaCloud className="inline" /> {t("nav_sign_in")}
+              <p className="text-xs font-semibold text-[var(--violet-dim)] group-hover:text-white transition-colors flex items-center gap-1.5">
+                <FaCloud className="shrink-0" /> {t("nav_sign_in")}
               </p>
               <p className="text-xs text-[var(--text-tertiary)] group-hover:text-white/70 transition-colors mt-0.5">
                 Sign in to keep your data
@@ -201,10 +211,12 @@ export function Sidebar() {
 
   return (
     <>
+      {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-56 shrink-0 border-r border-[var(--border)] bg-[var(--bg-elevated)] flex-col h-full">
         <SidebarContent />
       </aside>
 
+      {/* Mobile overlay */}
       {mobileOpen && (
         <div
           className="fixed inset-0 z-40 lg:hidden"
@@ -213,30 +225,39 @@ export function Sidebar() {
             backdropFilter: "blur(4px)",
           }}
           onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
         />
       )}
 
+      {/* Mobile drawer */}
       <aside
         className={[
-          "fixed inset-y-0 left-0 z-50 w-56 bg-[var(--bg-elevated)] border-r border-[var(--border)] flex flex-col",
+          "fixed inset-y-0 left-0 z-50 w-64 bg-[var(--bg-elevated)] border-r border-[var(--border)] flex flex-col",
           "transition-transform duration-300 ease-[var(--ease-smooth)] lg:hidden",
           mobileOpen ? "translate-x-0" : "-translate-x-full",
         ].join(" ")}
+        aria-label="Navigation"
+        aria-hidden={!mobileOpen}
       >
         <SidebarContent onClose={() => setMobileOpen(false)} />
       </aside>
 
+      {/* Mobile FAB */}
       <button
         onClick={() => setMobileOpen(true)}
+        style={{ backgroundColor: "#7F77DD" }}
         className={[
-          "fixed bottom-4 left-4 z-30 lg:hidden",
-          "h-11 w-11 rounded-full bg-[var(--violet)] text-white shadow-[var(--shadow-lg)]",
-          "flex items-center justify-center transition-all duration-200 hover:bg-[var(--violet-dim)] active:scale-95",
-          mobileOpen ? "opacity-0 pointer-events-none" : "opacity-100",
+          "fixed bottom-5 left-4 z-30 lg:hidden",
+          "h-12 w-12 rounded-full text-white shadow-[var(--shadow-lg)]",
+          "flex items-center justify-center transition-all duration-200",
+          "hover:opacity-90 active:scale-95",
+          mobileOpen
+            ? "opacity-0 pointer-events-none scale-90"
+            : "opacity-100 scale-100",
         ].join(" ")}
-        aria-label="Open menu"
+        aria-label="Open navigation menu"
       >
-        <FiMenu size={16} />
+        <FiMenu size={18} />
       </button>
     </>
   );

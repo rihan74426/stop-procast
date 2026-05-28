@@ -1,12 +1,5 @@
 "use client";
 
-/**
- * app/feedback/page.jsx
- *
- * Fully public — no auth required to view, vote, or submit.
- * Admin panel visible only when user has { publicMetadata: { role: "admin" } } in Clerk.
- */
-
 import { useState, useEffect, useCallback } from "react";
 import { useUser } from "@clerk/nextjs";
 import { TopBar } from "@/components/layout/Topbar";
@@ -17,6 +10,7 @@ import { Badge } from "@/components/ui/Badge";
 import { Modal } from "@/components/ui/Modal";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { getSessionId } from "@/lib/sessionId";
+import { useI18n } from "@/lib/i18n";
 import { BiBug, BiBulb, BiStar } from "react-icons/bi";
 import {
   FiHelpCircle,
@@ -26,37 +20,38 @@ import {
   FiShield,
 } from "react-icons/fi";
 
-// ─── Config ───────────────────────────────────────────────────────────
+// ─── Static config ────────────────────────────────────────────────────
 
-const TYPE_META = {
-  bug: { label: "Bug", icon: BiBug, color: "coral" },
-  suggestion: { label: "Idea", icon: BiBulb, color: "violet" },
-  praise: { label: "Praise", icon: BiStar, color: "emerald" },
-  question: { label: "Question", icon: FiHelpCircle, color: "amber" },
+const TYPE_ICONS = {
+  bug: BiBug,
+  suggestion: BiBulb,
+  praise: BiStar,
+  question: FiHelpCircle,
 };
 
-const STATUS_META = {
-  open: { label: "Open", color: "violet" },
-  in_progress: { label: "In Progress", color: "amber" },
-  resolved: { label: "Resolved", color: "emerald" },
-  wont_fix: { label: "Won't Fix", color: "coral" },
-  duplicate: { label: "Duplicate", color: "slate" },
+const TYPE_COLORS = {
+  bug: "coral",
+  suggestion: "violet",
+  praise: "emerald",
+  question: "amber",
+};
+
+const STATUS_COLORS = {
+  open: "violet",
+  in_progress: "amber",
+  resolved: "emerald",
+  wont_fix: "coral",
+  duplicate: "slate",
 };
 
 const STATUS_OPTIONS = [
-  { id: "open", label: "Open" },
-  { id: "in_progress", label: "In Progress" },
-  { id: "resolved", label: "Resolved" },
-  { id: "wont_fix", label: "Won't Fix" },
-  { id: "duplicate", label: "Duplicate" },
+  "open",
+  "in_progress",
+  "resolved",
+  "wont_fix",
+  "duplicate",
 ];
-
-const FILTERS = [
-  { id: "all", label: "All" },
-  { id: "open", label: "Open" },
-  { id: "in_progress", label: "In Progress" },
-  { id: "resolved", label: "Resolved" },
-];
+const FILTER_IDS = ["all", "open", "in_progress", "resolved"];
 
 function timeAgo(iso) {
   if (!iso) return "";
@@ -67,9 +62,10 @@ function timeAgo(iso) {
   return `${Math.floor(secs / 86400)}d ago`;
 }
 
-// ─── Admin Panel Modal ────────────────────────────────────────────────
+// ─── Admin Panel ──────────────────────────────────────────────────────
 
 function AdminPanel({ item, onClose, onUpdated }) {
+  const { t } = useI18n();
   const [status, setStatus] = useState(item.status);
   const [adminNote, setAdminNote] = useState(item.adminNote ?? "");
   const [saving, setSaving] = useState(false);
@@ -87,32 +83,32 @@ function AdminPanel({ item, onClose, onUpdated }) {
       onUpdated(data.item);
       onClose();
     } catch {
-      // silent — keep modal open
+      // keep modal open
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <Modal open onClose={onClose} title="Admin: Update Report" size="sm">
+    <Modal open onClose={onClose} title={t("feedback_admin_title")} size="sm">
       <div className="flex flex-col gap-4">
         <div>
           <p className="text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-2">
-            Status
+            {t("feedback_admin_status")}
           </p>
           <div className="grid grid-cols-2 gap-2">
             {STATUS_OPTIONS.map((opt) => (
               <button
-                key={opt.id}
-                onClick={() => setStatus(opt.id)}
+                key={opt}
+                onClick={() => setStatus(opt)}
                 className={[
                   "py-2 px-3 text-xs font-medium rounded-[var(--r-md)] border transition-all text-left",
-                  status === opt.id
+                  status === opt
                     ? "bg-[var(--violet)] text-white border-[var(--violet)]"
                     : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--violet)]",
                 ].join(" ")}
               >
-                {opt.label}
+                {t(`feedback_status_${opt}`)}
               </button>
             ))}
           </div>
@@ -120,23 +116,23 @@ function AdminPanel({ item, onClose, onUpdated }) {
 
         <div>
           <label className="block text-xs font-medium text-[var(--text-tertiary)] uppercase tracking-wider mb-1.5">
-            Team note (visible to users)
+            {t("feedback_admin_note")}
           </label>
           <textarea
             rows={3}
             value={adminNote}
             onChange={(e) => setAdminNote(e.target.value)}
-            placeholder="Optional note for the community…"
+            placeholder={t("feedback_admin_note_placeholder")}
             className="w-full px-3 py-2.5 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--violet)]"
           />
         </div>
 
         <div className="flex gap-2 justify-end">
           <Button variant="ghost" size="sm" onClick={onClose}>
-            Cancel
+            {t("feedback_admin_cancel")}
           </Button>
           <Button size="sm" loading={saving} onClick={handleSave}>
-            Save changes
+            {t("feedback_admin_save")}
           </Button>
         </div>
       </div>
@@ -147,6 +143,7 @@ function AdminPanel({ item, onClose, onUpdated }) {
 // ─── Submit Modal ─────────────────────────────────────────────────────
 
 function SubmitModal({ open, onClose, onSuccess }) {
+  const { t } = useI18n();
   const [type, setType] = useState("suggestion");
   const [title, setTitle] = useState("");
   const [body, setBody] = useState("");
@@ -158,6 +155,7 @@ function SubmitModal({ open, onClose, onSuccess }) {
     setBody("");
     setStatus("idle");
   };
+
   const handleClose = () => {
     reset();
     onClose();
@@ -188,19 +186,27 @@ function SubmitModal({ open, onClose, onSuccess }) {
     }
   };
 
-  const SelectedIcon = TYPE_META[type]?.icon;
+  // type key mapping: "suggestion" → "idea" for the translation key
+  const typeI18nKey = (k) => `feedback_type_${k === "suggestion" ? "idea" : k}`;
+
+  const SelectedIcon = TYPE_ICONS[type];
 
   return (
-    <Modal open={open} onClose={handleClose} title="Share feedback" size="md">
+    <Modal
+      open={open}
+      onClose={handleClose}
+      title={t("feedback_submit_title")}
+      size="md"
+    >
       <div className="flex flex-col gap-5">
         {status === "done" ? (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
             <FiCheckCircle className="text-5xl text-[var(--emerald)]" />
             <p className="font-semibold text-[var(--text-primary)]">
-              Thanks for your feedback!
+              {t("feedback_success_title")}
             </p>
             <p className="text-sm text-[var(--text-secondary)]">
-              It's now live on the board.
+              {t("feedback_success_desc")}
             </p>
           </div>
         ) : (
@@ -208,11 +214,11 @@ function SubmitModal({ open, onClose, onSuccess }) {
             {/* Type picker */}
             <div>
               <p className="text-xs font-medium text-[var(--text-secondary)] uppercase tracking-wider mb-2">
-                Type
+                {t("feedback_type")}
               </p>
               <div className="grid grid-cols-4 gap-2">
-                {Object.entries(TYPE_META).map(([key, meta]) => {
-                  const Icon = meta.icon;
+                {Object.keys(TYPE_ICONS).map((key) => {
+                  const Icon = TYPE_ICONS[key];
                   return (
                     <button
                       key={key}
@@ -227,7 +233,7 @@ function SubmitModal({ open, onClose, onSuccess }) {
                       <span className="text-lg">
                         <Icon />
                       </span>
-                      {meta.label}
+                      {t(typeI18nKey(key))}
                     </button>
                   );
                 })}
@@ -237,7 +243,10 @@ function SubmitModal({ open, onClose, onSuccess }) {
             {/* Title */}
             <div>
               <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                Title <span className="text-[var(--coral)]">*</span>
+                {t("feedback_title_label")}{" "}
+                <span className="text-[var(--coral)]">
+                  {t("feedback_title_required")}
+                </span>
               </label>
               <input
                 type="text"
@@ -256,15 +265,17 @@ function SubmitModal({ open, onClose, onSuccess }) {
                 className="w-full h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)]"
               />
               <p className="text-xs text-[var(--text-tertiary)] mt-1 text-right">
-                {title.length}/120
+                {t("feedback_title_count", { n: title.length })}
               </p>
             </div>
 
             {/* Body */}
             <div>
               <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
-                Details{" "}
-                <span className="text-[var(--text-tertiary)]">(optional)</span>
+                {t("feedback_details")}{" "}
+                <span className="text-[var(--text-tertiary)]">
+                  {t("feedback_details_optional")}
+                </span>
               </label>
               <textarea
                 rows={4}
@@ -279,13 +290,13 @@ function SubmitModal({ open, onClose, onSuccess }) {
                 className="w-full px-3 py-2.5 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none focus:outline-none focus:ring-2 focus:ring-[var(--violet)]"
               />
               <p className="text-xs text-[var(--text-tertiary)] mt-1 text-right">
-                {body.length}/2000
+                {t("feedback_details_count", { n: body.length })}
               </p>
             </div>
 
             {status === "error" && (
               <p className="text-sm text-[var(--coral)] rounded-[var(--r-md)] bg-[var(--coral-bg)] border border-[var(--coral)] px-3 py-2">
-                Something went wrong. Please try again.
+                {t("feedback_error_submit")}
               </p>
             )}
 
@@ -295,14 +306,14 @@ function SubmitModal({ open, onClose, onSuccess }) {
                 onClick={handleClose}
                 disabled={status === "submitting"}
               >
-                Cancel
+                {t("feedback_cancel")}
               </Button>
               <Button
                 onClick={handleSubmit}
                 loading={status === "submitting"}
                 disabled={title.trim().length < 5}
               >
-                Submit{" "}
+                {t("feedback_submit_btn")}{" "}
                 {SelectedIcon && (
                   <span className="ml-1">
                     <SelectedIcon />
@@ -320,11 +331,21 @@ function SubmitModal({ open, onClose, onSuccess }) {
 // ─── Feedback card ────────────────────────────────────────────────────
 
 function FeedbackCard({ item, sessionId, isAdmin, onUpvote, onAdminEdit }) {
-  const typeMeta = TYPE_META[item.type] ?? TYPE_META.suggestion;
-  const statusMeta = STATUS_META[item.status] ?? STATUS_META.open;
+  const { t } = useI18n();
+
+  const TypeIcon = TYPE_ICONS[item.type] ?? TYPE_ICONS.suggestion;
+  const typeColor = TYPE_COLORS[item.type] ?? "violet";
+  const statusColor = STATUS_COLORS[item.status] ?? "violet";
+
+  // Map "suggestion" → "idea" for translation key
+  const typeLabelKey =
+    item.type === "suggestion"
+      ? "feedback_type_idea"
+      : `feedback_type_${item.type}`;
+  const statusLabelKey = `feedback_status_${item.status}`;
+
   const hasVoted = item.upvotedBy?.includes(sessionId);
   const isResolved = item.status === "resolved";
-  const TypeIcon = typeMeta.icon;
 
   return (
     <div
@@ -340,13 +361,13 @@ function FeedbackCard({ item, sessionId, isAdmin, onUpvote, onAdminEdit }) {
         <button
           onClick={() => !hasVoted && onUpvote(item.id)}
           disabled={hasVoted}
+          title={hasVoted ? t("feedback_already_voted") : t("feedback_upvote")}
           className={[
             "flex flex-col items-center gap-0.5 min-w-[40px] py-1.5 rounded-[var(--r-md)] border transition-all",
             hasVoted
               ? "border-[var(--violet)] bg-[var(--violet-bg)] text-[var(--violet-dim)] cursor-default"
               : "border-[var(--border)] text-[var(--text-tertiary)] hover:border-[var(--violet)] hover:text-[var(--violet-dim)] hover:bg-[var(--violet-bg)]",
           ].join(" ")}
-          title={hasVoted ? "Already upvoted" : "Upvote"}
         >
           <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
             <path
@@ -376,7 +397,6 @@ function FeedbackCard({ item, sessionId, isAdmin, onUpvote, onAdminEdit }) {
             >
               {item.title}
             </p>
-            {/* Admin edit button */}
             {isAdmin && (
               <button
                 onClick={() => onAdminEdit(item)}
@@ -396,7 +416,7 @@ function FeedbackCard({ item, sessionId, isAdmin, onUpvote, onAdminEdit }) {
           {item.adminNote && (
             <div className="rounded-[var(--r-md)] bg-[var(--violet-bg)] border border-[var(--violet)] px-3 py-2 mb-2.5">
               <p className="text-xs font-medium text-[var(--violet-dim)] mb-0.5 flex items-center gap-1">
-                <FiMapPin size={10} /> Team note
+                <FiMapPin size={10} /> {t("feedback_team_note")}
               </p>
               <p className="text-xs text-[var(--text-secondary)]">
                 {item.adminNote}
@@ -405,8 +425,8 @@ function FeedbackCard({ item, sessionId, isAdmin, onUpvote, onAdminEdit }) {
           )}
 
           <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant={typeMeta.color}>{typeMeta.label}</Badge>
-            <Badge variant={statusMeta.color}>{statusMeta.label}</Badge>
+            <Badge variant={typeColor}>{t(typeLabelKey)}</Badge>
+            <Badge variant={statusColor}>{t(statusLabelKey)}</Badge>
             <span className="text-xs text-[var(--text-tertiary)] ml-auto">
               {timeAgo(item.createdAt)}
             </span>
@@ -420,8 +440,8 @@ function FeedbackCard({ item, sessionId, isAdmin, onUpvote, onAdminEdit }) {
 // ─── Main page ────────────────────────────────────────────────────────
 
 function FeedbackContent() {
+  const { t } = useI18n();
   const { user, isLoaded } = useUser();
-  // Admin = Clerk publicMetadata.role === "admin"
   const isAdmin = isLoaded && user?.publicMetadata?.role === "admin";
 
   const [items, setItems] = useState([]);
@@ -429,7 +449,7 @@ function FeedbackContent() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState("all");
   const [showModal, setShowModal] = useState(false);
-  const [adminItem, setAdminItem] = useState(null); // item being edited by admin
+  const [adminItem, setAdminItem] = useState(null);
   const [sessionId, setSessionId] = useState(null);
 
   useEffect(() => {
@@ -481,7 +501,7 @@ function FeedbackContent() {
 
   const handleSuccess = (newItem) => {
     setItems((prev) => [newItem, ...prev]);
-    setTotal((t) => t + 1);
+    setTotal((n) => n + 1);
   };
 
   const handleAdminUpdated = (updated) => {
@@ -490,6 +510,17 @@ function FeedbackContent() {
 
   const openCount = items.filter((i) => i.status === "open").length;
   const resolvedCount = items.filter((i) => i.status === "resolved").length;
+  const inProgressCount = items.filter(
+    (i) => i.status === "in_progress"
+  ).length;
+
+  const filterCount = (id) => {
+    if (id === "all") return total;
+    if (id === "open") return openCount;
+    if (id === "resolved") return resolvedCount;
+    if (id === "in_progress") return inProgressCount;
+    return items.filter((i) => i.status === id).length;
+  };
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -503,7 +534,7 @@ function FeedbackContent() {
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <h1 className="font-display font-semibold text-xl sm:text-2xl text-[var(--text-primary)]">
-                    Feedback & Bug Reports
+                    {t("feedback_title")}
                   </h1>
                   {isAdmin && (
                     <span className="flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-[var(--violet-bg)] text-[var(--violet-dim)] border border-[var(--violet)] font-medium">
@@ -512,8 +543,11 @@ function FeedbackContent() {
                   )}
                 </div>
                 <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
-                  Public board · {total} report{total !== 1 ? "s" : ""} ·{" "}
-                  {resolvedCount} resolved
+                  {t("feedback_subtitle")} · {total}{" "}
+                  {total !== 1
+                    ? t("feedback_reports_plural")
+                    : t("feedback_reports")}{" "}
+                  · {resolvedCount} {t("feedback_resolved")}
                 </p>
               </div>
               <Button
@@ -529,23 +563,33 @@ function FeedbackContent() {
                     strokeLinecap="round"
                   />
                 </svg>
-                <span className="hidden sm:inline">New report</span>
-                <span className="sm:hidden">Report</span>
+                <span className="hidden sm:inline">
+                  {t("feedback_new_report")}
+                </span>
+                <span className="sm:hidden">{t("feedback_report")}</span>
               </Button>
             </div>
 
             {/* Stats */}
             <div className="grid grid-cols-4 gap-2 sm:gap-3 mb-6">
               {[
-                { label: "Total", value: total, color: "var(--text-primary)" },
-                { label: "Open", value: openCount, color: "var(--violet)" },
                 {
-                  label: "In Progress",
-                  value: items.filter((i) => i.status === "in_progress").length,
+                  label: t("feedback_stat_total"),
+                  value: total,
+                  color: "var(--text-primary)",
+                },
+                {
+                  label: t("feedback_stat_open"),
+                  value: openCount,
+                  color: "var(--violet)",
+                },
+                {
+                  label: t("feedback_stat_in_progress"),
+                  value: inProgressCount,
                   color: "var(--amber)",
                 },
                 {
-                  label: "Resolved",
+                  label: t("feedback_stat_resolved"),
                   value: resolvedCount,
                   color: "var(--emerald)",
                 },
@@ -569,31 +613,27 @@ function FeedbackContent() {
 
             {/* Filters */}
             <div className="flex items-center gap-2 mb-5 overflow-x-auto pb-1">
-              {FILTERS.map((f) => (
+              {FILTER_IDS.map((id) => (
                 <button
-                  key={f.id}
-                  onClick={() => setFilter(f.id)}
+                  key={id}
+                  onClick={() => setFilter(id)}
                   className={[
                     "px-3 py-1.5 text-xs rounded-[var(--r-full)] border font-medium transition-all whitespace-nowrap shrink-0",
-                    filter === f.id
+                    filter === id
                       ? "bg-[var(--violet)] text-white border-[var(--violet)]"
                       : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--violet)] hover:text-[var(--violet-dim)]",
                   ].join(" ")}
                 >
-                  {f.label}
-                  {f.id !== "all" && (
+                  {t(`feedback_filter_${id}`)}
+                  {id !== "all" && (
                     <span
                       className={`ml-1.5 ${
-                        filter === f.id
+                        filter === id
                           ? "text-white/70"
                           : "text-[var(--text-tertiary)]"
                       }`}
                     >
-                      {f.id === "open"
-                        ? openCount
-                        : f.id === "resolved"
-                        ? resolvedCount
-                        : items.filter((i) => i.status === f.id).length}
+                      {filterCount(id)}
                     </span>
                   )}
                 </button>
@@ -624,17 +664,19 @@ function FeedbackContent() {
                 <FiMail className="text-5xl mb-4 text-[var(--text-tertiary)]" />
                 <p className="font-display font-semibold text-lg text-[var(--text-primary)] mb-2">
                   {filter === "all"
-                    ? "No reports yet"
-                    : `No ${filter.replace("_", " ")} reports`}
+                    ? t("feedback_empty_all")
+                    : t("feedback_empty_filtered", {
+                        filter: t(`feedback_filter_${filter}`),
+                      })}
                 </p>
                 <p className="text-sm text-[var(--text-secondary)] mb-6 max-w-xs">
                   {filter === "all"
-                    ? "Be the first to share feedback, report a bug, or suggest an improvement."
-                    : "Nothing here. Try a different filter."}
+                    ? t("feedback_empty_desc_all")
+                    : t("feedback_empty_desc_filtered")}
                 </p>
                 {filter === "all" && (
                   <Button onClick={() => setShowModal(true)} size="sm">
-                    Share feedback
+                    {t("feedback_share")}
                   </Button>
                 )}
               </div>
@@ -656,17 +698,17 @@ function FeedbackContent() {
             {!loading && items.length > 0 && (
               <div className="mt-8 rounded-[var(--r-xl)] border-2 border-dashed border-[var(--border)] p-6 text-center">
                 <p className="text-sm font-medium text-[var(--text-primary)] mb-1">
-                  Have something to add?
+                  {t("feedback_have_more")}
                 </p>
                 <p className="text-xs text-[var(--text-secondary)] mb-4">
-                  Every report helps make Momentum better. Takes 30 seconds.
+                  {t("feedback_every_helps")}
                 </p>
                 <Button
                   variant="ghost"
                   size="sm"
                   onClick={() => setShowModal(true)}
                 >
-                  + Add report
+                  {t("feedback_add_report")}
                 </Button>
               </div>
             )}

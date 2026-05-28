@@ -9,14 +9,13 @@ export function Footer() {
   return (
     <footer className="border-t border-[var(--border)] bg-[var(--bg-elevated)] mt-auto">
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        {/* Main footer content */}
         <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6 sm:gap-8">
           {/* Brand */}
           <div className="flex flex-col items-center sm:items-start gap-2 text-center sm:text-left">
             <div className="flex items-center gap-2">
-              <div className="w-6 h-6 rounded-[var(--r-sm)] bg-[var(--violet)] flex items-center justify-center overflow-hidden shrink-0">
+              <div className="w-6 h-6 rounded-[var(--r-sm)] flex items-center justify-center overflow-hidden shrink-0">
                 <img
-                  src="/logo.png"
+                  src="/favicon.png"
                   alt="Momentum"
                   className="w-full h-full object-contain"
                   onError={(e) => {
@@ -29,8 +28,7 @@ export function Footer() {
               </span>
             </div>
             <p className="text-xs text-[var(--text-tertiary)] max-w-[240px] leading-relaxed">
-              Turn ideas, learning, experiments and habits into clear plans and
-              consistent progress.
+              {t("footer_tagline")}
             </p>
           </div>
 
@@ -40,33 +38,30 @@ export function Footer() {
               href="/"
               className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
             >
-              Dashboard
+              {t("nav_dashboard")}
             </Link>
             <Link
               href="/new"
               className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
             >
-              New Project
+              {t("nav_new_project")}
             </Link>
             <Link
               href="/settings"
               className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
             >
-              Settings
+              {t("nav_settings")}
             </Link>
           </div>
         </div>
 
-        {/* Divider */}
         <div className="my-5 sm:my-6 border-t border-[var(--border-subtle)]" />
 
-        {/* Bottom row: copyright + developer CTA */}
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
           <p className="text-xs text-[var(--text-tertiary)] order-2 sm:order-1">
-            © {new Date().getFullYear()} Momentum. All rights reserved.
+            {t("footer_copyright", { year: String(new Date().getFullYear()) })}
           </p>
 
-          {/* Developer CTA */}
           <a
             href="https://nuruddin-webician.vercel.app/"
             target="_blank"
@@ -85,7 +80,7 @@ export function Footer() {
               </svg>
             </div>
             <span className="text-xs text-[var(--text-secondary)] group-hover:text-[var(--violet-dim)] transition-colors font-medium">
-              Built by{" "}
+              {t("footer_built_by")}{" "}
               <span className="text-[var(--text-primary)] group-hover:text-[var(--violet-dim)]">
                 Nuruddin
               </span>
