@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { useState, useEffect } from "react";
+
 import { useI18n } from "@/lib/i18n/context";
 import {
   FiGrid,
@@ -65,6 +66,8 @@ export function Sidebar() {
 
   const navItems = [
     { href: "/", label: t("nav_dashboard"), icon: FiGrid },
+    { href: "/explore", label: t("nav_explore"), icon: FiCompass },
+
     { href: "/new", label: t("nav_new_project"), icon: FiPlus },
     { href: "/feedback", label: "Feedback", icon: FiMessageSquare },
     { href: "/settings", label: t("nav_settings"), icon: FiSettings },

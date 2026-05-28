@@ -12,6 +12,7 @@ import { LANGUAGES } from "@/lib/i18n/translations";
 import { useRouter } from "next/navigation";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { clearMomentumStorage } from "@/lib/clearStorage";
+import { FiCompass } from "react-icons/fi";
 
 export function TopBar() {
   const { theme, toggle } = useTheme();
@@ -72,7 +73,15 @@ export function TopBar() {
         </Link>
 
         <div className="flex-1 min-w-0" />
-
+        {/* Explore link - icon visible on all sizes, label shown from md+ */}
+        <Link
+          href="/explore"
+          className="h-9 px-2 sm:px-2.5 flex items-center gap-2 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all mr-2 shrink-0"
+          aria-label={t("nav_explore")}
+        >
+          <FiCompass className="text-base" />
+          <span className="hidden md:inline">{t("nav_explore")}</span>
+        </Link>
         {/* Language picker */}
         <div ref={langRef} className="relative">
           <button

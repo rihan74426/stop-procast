@@ -419,16 +419,14 @@ RESEND_API_KEY=...          # required in production for email export
 - [ ] PhaseTimeline `t()` for "Done" label and phase status strings
 - [ ] StepCapture `t()` for example text and ghost hints (lower priority — mostly content)
 
-<<<<<<< HEAD
 the user types and the text-editor founds a title or idea match, then it suggests that a similar project already exists, do you want to check it first?
 
 also ask them if they want their project to be shown to everyone to spread help and knowledge?
 
 project publicization for to see everyone. and the search can refer to that project not to regenerate. keep this into the next version plan.
-<<<<<<< HEAD
 the feedback with star, we'll use my portfolio feedback sdk and ui
-=======
 also the bengali and arabic choosen font will be added in the next version.
 
 the top bar should have a home button and the sidebar logo should have route button to home. also the feedback nav should be available in the home page
->>>>>>> 2c9234191dc912d1a5de0d2f8e9f3cf86118253a
+
+the projects should have a get and open to all route. and it is not getting anything. improve it.
