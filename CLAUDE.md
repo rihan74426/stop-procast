@@ -1,432 +1,160 @@
-@AGENTS.md
-@PLAN.md
+# CLAUDE.md — v1.2.0 Additions
 
-# Momentum — Project Intelligence File
-
-Single source of truth. Read before writing any code.
+# Paste this section into CLAUDE.md after Phase 13, replacing Phase 14 backlog.
 
 ---
 
-## What this app is
-
-**Momentum** is a _Project Execution OS_. User drops a raw idea → AI builds a structured plan → app holds them accountable until it ships. Core: anti-procrastination pressure, streaks, next-action focus.
-
----
-
-## Current phase status
-
-| Phase | Name                                   | Status  |
-| ----- | -------------------------------------- | ------- |
-| 1     | Foundation & Design System             | ✅ Done |
-| 2     | Data Layer & State                     | ✅ Done |
-| 3     | Core Pages & AI Intake                 | ✅ Done |
-| 4     | Execution Mode & Pressure              | ✅ Done |
-| 5     | Completion, Postmortem, Polish         | ✅ Done |
-| 6     | Auth, DB, AI Integration               | ✅ Done |
-| 7     | i18n, Model Picker, PDF Export         | ✅ Done |
-| 8     | Puter.js, Anon Limit, Import           | ✅ Done |
-| 9     | Nav Fix, Toast, Feedback & Admin       | ✅ Done |
-| 10    | Bug Fixes: Ghost, AI, Store            | ✅ Done |
-| 11    | Parser Auto-Repair, Edit Detection, UX | ✅ Done |
-| 12    | Production Hardening (14 fixes)        | ✅ Done |
-| 13    | Full i18n, Clarify Toast, Regen Fix    | ✅ Done |
-
----
-
-## Phase 13 — Full i18n, Clarify Toast, Regen Fix
+## Phase 14 — Public Projects, Explore Gallery, ToS Gate (v1.2.0)
 
 **Status: ✅ Done**
 
-### What was fixed / added
+### Core contract change — PUBLIC BY DEFAULT
 
-#### `lib/i18n/translations.js` — Complete key audit
+Every project created is `isPublic: true` by default.
 
-- Added **100+ missing translation keys** covering every visible string in the app.
-- New key groups: `next_action_*`, `streak_*`, `blocker_*`, `task_*`, `pressure_*`, `completion_*`, `postmortem_*`, `stats_*`, `confirm_*`, `toast_*`, `wait_*`, `clarify_toast_*`, `blueprint_toast_*`, `regen_*`, `import_*`, `save_prompt_*`, `network_*`, `empty_state_*`, `card_*`, `feedback_*`, `export_email_*`, `common_*`, `intake_commit_*`, `intake_clarify_*`, `intake_review_*`.
-- All 7 languages updated: `en`, `bn`, `ar`, `fr`, `es`, `de`, `zh`.
-- Bengali (`bn`) — fully translated all new keys.
+- No login required to VIEW any project via `/project/[id]`
+- Owners can toggle visibility to private via the project page action button
+- The `publicQuality` AI score is a **ranking signal only** — never a gate
+- Anonymous users see a read-only view with a fork CTA
 
-#### `lib/toastSequence.js` — i18n-aware
+### Files changed / created
 
-- `createToastSequence(context, locale)` now accepts a `locale` parameter.
-- Messages resolved from `translations[locale]` at sequence-start time.
-- Keys for questions: `clarify_toast_generating/analyzing/crafting/polishing/working`.
-- Keys for blueprint: `blueprint_toast_analysing/mapping/defining/writing/blockers/tools/finalising`.
-- Falls back to English if locale key missing.
-
-#### `components/intake/StepClarify.jsx` — Toast sequence fixed
-
-- **Was broken**: no toasts fired during question fetch.
-- **Fixed**: `createToastSequence("questions", locale)` called at start of `fetchQuestions()`.
-- Sequence dismissed with `toastSeqRef.current.success(t("clarify_toast_ready"))` on success.
-- Sequence dismissed with `toastSeqRef.current.error(t("clarify_toast_error"))` on failure.
-- Toast sequence cleaned up on unmount via `toastSeqRef.current?.unmount()`.
-- All UI strings use `t()`: title, desc, loading text, error messages, buttons.
-
-#### `components/intake/StepReview.jsx` — Locale-aware toast sequence
-
-- `createToastSequence("blueprint", locale)` — passes locale from `useI18n()`.
-- Progress stage labels use `t(stage.key)` instead of hardcoded English.
-- All UI strings translated: limit gate, error state, streaming UI, blueprint display, sign-in nudge.
-
-#### `app/new/page.jsx` — i18n wait sequence + regen fix
-
-- `startWaitSequence(t)` receives `t` function — all 4 wait messages use translation keys.
-- `RegenPermissionBanner` receives `t` prop and uses `t("regen_banner_title/desc/regenerate/keep")`.
-- `handleRegeneratePlan` now correctly sets `genStatus("streaming")`, resets to step 3, then calls `runGeneration()` — no more blank screen after regen.
-- Blueprint key computed inside `runGeneration()` from current `genInputsRef` values — eliminates stale closure issue.
-- `tRef` tracks latest `t` function so `runGeneration` always uses current locale's messages.
-
-#### `lib/store/projectStore.js` — i18n toast messages
-
-- `tr(key)` helper reads `momentum_locale` from localStorage (store runs outside React).
-- All `toast.*` calls use `tr()` for translated messages.
-- `toast_syncing`, `toast_sync_saved`, `toast_sync_offline`, `toast_save_local`, `toast_sync_warn` keys used.
-
-#### `components/ui/NetworkMonitor.jsx` — i18n
-
-- Uses `useI18n()` → `t("network_offline")` and `t("network_online")`.
-
-#### Components fully i18n'd (all strings use `t()`):
-
-- `components/project/NextAction.jsx` — `next_action_*` keys
-- `components/project/StreakBanner.jsx` — `streak_*` keys
-- `components/project/BlockerPanel.jsx` — `blocker_*` keys
-- `components/project/TaskList.jsx` — `task_*` keys
-- `components/project/ProjectPressure.jsx` — `pressure_*` keys
-- `components/project/EmailExportModal.jsx` — `export_email_*` keys
-- `components/completion/Postmortem.jsx` — `postmortem_*` keys
-- `components/completion/ProjectStats.jsx` — `stats_*` keys
-- `components/dashboard/EmptyState.jsx` — `empty_state_*` keys
-- `components/dashboard/ProjectCard.jsx` — `card_*` keys
-- `components/ui/SavePromptModal.jsx` — `save_prompt_*` keys
-- `components/intake/StepCommit.jsx` — `intake_commit_*` keys
-- `app/project/[id]/page.jsx` — confirm modals, export toasts, all labels
-- `app/project/[id]/complete/page.jsx` — `completion_*` keys
-
-#### `app/settings/page.jsx` — patch
-
-- `"Notifications"` title → `t("settings_notifications")`
-- Hardcoded description → `t("settings_notifications_desc")`
+| File                                          | What changed                                                                                                                                                               |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `lib/models/Project.js`                       | `isPublic: true` default; removed `isPublic/publicQuality/publicSlug/category/tags/forkedFrom/forkCount` from `TaskSchema` (they belong on the root doc only); new indexes |
+| `app/api/projects/[id]/route.js`              | GET now public — owner gets full data, non-owner gets anonymized view if `isPublic: true`                                                                                  |
+| `app/project/[id]/ProjectPageClient.jsx`      | Fetches from API when project not in local store; shows `PublicViewBanner` + read-only task list for non-owners; visibility toggle button for owners                       |
+| `components/layout/Topbar.jsx`                | Home button (`FiHome`) added as first item; logo links to `/dashboard` if signed in, `/` otherwise                                                                         |
+| `components/layout/Sidebar.jsx`               | Logo `<Link href="/">` on desktop; Explore + Feedback in nav items                                                                                                         |
+| `components/landing/LandingContent.jsx`       | Explore + Feedback links in nav and footer                                                                                                                                 |
+| `app/api/explore/route.js`                    | Removed `publicQuality: { $ne: null }` gate; quality used for sort only                                                                                                    |
+| `app/api/explore/similar/route.js`            | Removed quality gate; broader OR search across title/goal/tags/category                                                                                                    |
+| `lib/tos.js`                                  | sessionStorage + localStorage ToS acceptance tracker                                                                                                                       |
+| `components/ui/TosModal.jsx`                  | One-time agreement modal before first AI generation                                                                                                                        |
+| `lib/ai/publicize.js`                         | AI quality scoring (0–100) + auto-categorize + tag extraction                                                                                                              |
+| `app/api/projects/[id]/publicize/route.js`    | POST: score + publish; DELETE: unpublish                                                                                                                                   |
+| `app/api/explore/route.js`                    | Paginated public gallery with category/tag/search/sort                                                                                                                     |
+| `app/api/explore/similar/route.js`            | Fuzzy keyword match for /new duplicate detection                                                                                                                           |
+| `app/explore/page.jsx`                        | Public gallery with filters, sort, search, skeleton loading                                                                                                                |
+| `components/intake/SimilarProjectsBanner.jsx` | Debounced banner in StepClarify                                                                                                                                            |
+| `components/completion/PublicizePanel.jsx`    | Opt-in panel on completion page for AI scoring + listing                                                                                                                   |
+| `lib/i18n/v1_2_0_keys.js`                     | All new translation keys (en + bn provided)                                                                                                                                |
 
 ---
 
-## i18n Rules — CRITICAL
+## Public Project Visibility — CRITICAL
 
-### Translation key structure
+### Default behavior
 
-Keys are `domain_sub_detail`. Never use raw English strings in JSX — always `t("key")`.
-
-### Store-level translations
-
-The Zustand store runs outside React and cannot use `useI18n()`. Use the `tr(key)` helper in `lib/store/projectStore.js` which reads `momentum_locale` from localStorage.
-
-### Toast sequence locale
-
-Always pass `locale` when creating a toast sequence:
-
-```js
-const { locale, t } = useI18n();
-const seq = createToastSequence("blueprint", locale); // ← locale required
+```
+isPublic: true   ← default for ALL new projects
 ```
 
-### Adding new translations
+- Any project with `isPublic: true` is accessible at `/project/[id]` without auth
+- `publicQuality` null = unscored = still shown in `/explore`, just ranked lower
+- Owner toggling visibility calls `updateProject(id, { isPublic: false })`
 
-1. Add the key to `en` first (canonical).
-2. Add to all 6 other languages (`bn`, `ar`, `fr`, `es`, `de`, `zh`).
-3. Update `CLAUDE.md` with the new key group.
-4. Never hard-code visible strings in JSX — always use `t()`.
+### GET /api/projects/[id] access matrix
 
-### Missing key fallback
+| Visitor        | Project state     | Response                                               |
+| -------------- | ----------------- | ------------------------------------------------------ |
+| Owner (authed) | any               | Full data, `isOwner: true`                             |
+| Anyone         | `isPublic: true`  | Anonymized (no userId/sessionId), `isPublicView: true` |
+| Anyone         | `isPublic: false` | 404                                                    |
 
-`t(key)` falls back: `locale dict → en dict → key itself`. So a missing key shows the key name, making it easy to spot.
+### Private fields stripped from public responses
+
+`userId`, `sessionId`, `isAnonymous`, `_id`, `__v`  
+Task details, blockers, postmortem, streakDays, lastActivityAt, dailyNextAction are excluded from `/api/explore` projection but ARE included in `/api/projects/[id]` public view (intentional — they help viewers understand the full plan).
 
 ---
 
-## Clarify Toast Sequence — CRITICAL
+## ToS Gate — CRITICAL
 
-`StepClarify` must show a toast sequence while `generateClarifyQuestions()` runs. Pattern:
+### How it works
+
+- `isTosAccepted()` checks `sessionStorage` first, then `localStorage`
+- `acceptTos(persist)` — `persist: true` for signed-in users (survives tab close)
+- Gate fires in `app/new/page.jsx` inside `handleStartGeneration` before `runGeneration()`
+- Once accepted, never shown again in the same session (or ever for signed-in users)
+
+### Integration pattern
 
 ```js
-// Start sequence
-toastSeqRef.current = createToastSequence("questions", locale);
-toastSeqRef.current.start();
-
-try {
-  const text = await generateClarifyQuestions(idea, locale);
-  // ...
-  toastSeqRef.current?.success(t("clarify_toast_ready"));
-  toastSeqRef.current = null;
-} catch {
-  toastSeqRef.current?.error(t("clarify_toast_error"));
-  toastSeqRef.current = null;
+// In handleStartGeneration (app/new/page.jsx):
+if (!isTosAccepted()) {
+  setShowTos(true);
+  return;
 }
-```
+runGeneration();
 
-Always clean up on unmount:
-
-```js
-useEffect(() => {
-  mountedRef.current = true;
-  return () => {
-    mountedRef.current = false;
-    toastSeqRef.current?.unmount();
-  };
-}, []);
-```
-
----
-
-## Regen Logic — CRITICAL
-
-### Blueprint key
-
-```js
-const inputKey = `${idea.trim()}||${scopeLevel}||${JSON.stringify(
-  clarifyAnswers
-)}`;
-const blueprintIsStale =
-  blueprint !== null && blueprintKey !== null && inputKey !== blueprintKey;
-const showRegenBanner = blueprintIsStale && (step === 2 || step === 3);
-```
-
-### handleRegeneratePlan
-
-```js
-const handleRegeneratePlan = useCallback(() => {
-  retryCountRef.current = 0;
-  setBlueprint(null);
-  setBlueprintKey(null);
-  setGenStatus("streaming");
-  setGenCharCount(0);
-  setGenError(null);
-  setStep(3); // Go to review step
-  setMaxReached((prev) => Math.max(prev, 3));
-  runGeneration(); // Start generation immediately
-}, [runGeneration]);
-```
-
-### handleKeepPlan
-
-```js
-const handleKeepPlan = useCallback(() => {
-  setBlueprintKey(inputKey); // Stamp current inputs as accepted
-  toast.success(t("toast_keep_plan"), { duration: 2000 });
-}, [inputKey, t]);
-```
-
-### Blueprint key stamped inside runGeneration
-
-The key is captured from `genInputsRef.current` **inside** `runGeneration()` after parse succeeds — never from stale closure:
-
-```js
-const currentInputKey = `${currentIdea.trim()}||${currentScope}||${JSON.stringify(
-  currentAnswers
-)}`;
-setBlueprintKey(currentInputKey);
+// In JSX:
+<TosModal
+  open={showTos}
+  onAccept={() => {
+    setShowTos(false);
+    runGeneration();
+  }}
+  onDecline={() => setShowTos(false)}
+/>;
 ```
 
 ---
 
-## Wait Sequence — CRITICAL
+## Explore + Similar — CRITICAL
 
-`startWaitSequence(t)` in `app/new/page.jsx` uses the `t` function:
+### /api/explore query contract
 
-```js
-function startWaitSequence(t) {
-  const MESSAGES = [
-    { after: 6000, key: "wait_thinking" },
-    { after: 15000, key: "wait_switching" },
-    { after: 28000, key: "wait_still_working" },
-    { after: 42000, key: "wait_almost" },
-  ];
-  // ...shows one toast at a time, dismissing previous before showing next
-}
-```
+- `isPublic: true` is the only hard filter
+- `publicQuality` drives sort order (desc), nulls sort last
+- Category, tag, text search are optional filters
+- No auth required — fully public + cached 60s
 
-Pass a fresh `tRef.current` so locale changes are reflected:
+### /api/explore/similar query contract
 
-```js
-const tRef = useRef(t);
-useEffect(() => {
-  tRef.current = t;
-}, [t]);
-// Inside runGeneration:
-stopWaitRef.current = startWaitSequence(tRef.current);
-```
+- Called from `SimilarProjectsBanner` in `StepClarify` (debounced 1200ms)
+- Returns ≤3 results ranked by quality desc
+- No quality gate — any `isPublic` project qualifies
+- Results dismissed per session if user clicks ×
+
+### Fork flow
+
+Non-owner public view shows "Use as template" CTA → links to `/new?fork=${id}`  
+`app/new/page.jsx` should check `sessionStorage.getItem("momentum_fork_template")` on mount and pre-fill the idea field.
 
 ---
 
-## Phase 12 — Production Hardening (14 fixes)
+## TopBar + Sidebar — CRITICAL
 
-[Previous content preserved — see git history]
+### TopBar
 
-Key fixes:
+- First item: `<FiHome>` icon button → `/`
+- Logo → `/dashboard` if signed in, `/` if not
+- Explore link always visible in TopBar
 
-- `clientGenerate.js` — `"use client"` + lazy puter import
-- `Notifications.js` — removed `"use client"` directive
-- `projectStore.js` — `hydrateFromServer` finally block, `completeProject` snapshot inside Immer, `debouncedRemoteUpdate` failure counter
-- `StepReview.jsx` — `handleRetry` resets `hasStarted.current`, progress bar reaches 100%
-- `export/route.js` — `tryConnectDB()`, 500KB payload cap
-- `export-email/route.js` — 503 in production when RESEND_API_KEY absent
-- `generate/route.js` — `X-RateLimit-*` headers on all responses
-- `puter.js` — PUTER_LOAD_TIMEOUT 2000ms, PUTER_POLL_INTERVAL 50ms
-- `StepClarify.jsx` — `hasFetched` ref remount fix
-- `project/[id]/page.jsx` — `window.confirm()` → `ConfirmModal`
+### Sidebar
 
----
+- Desktop logo `<Link href="/">` — routes home on click
+- Nav order: Dashboard → Explore → New Project → Feedback → Settings
+- Feedback badge ("new") shown until first visit
 
-## AI Architecture — CRITICAL
+### Landing page nav
 
-### Two-tier AI system
-
-| Scope     | Provider         | Location        | Cost         |
-| --------- | ---------------- | --------------- | ------------ |
-| lean      | puter.js         | **client-side** | Free ∞       |
-| standard  | puter.js         | **client-side** | Free ∞       |
-| ambitious | OpenRouter (API) | **server-side** | Rate limited |
-
-**Puter.js is a browser SDK — it CANNOT run in Next.js API routes.**
-
-### Entry point: `lib/ai/clientGenerate.js`
-
-- `"use client"` required at top.
-- Puter imported lazily via `await import("./puter")`.
-- `generateBlueprint()` → puter for lean/standard, API route for ambitious or puter failure.
-- `generateClarifyQuestions(idea, locale)` → puter first, API fallback.
-- `generateReengage(project, locale)` → puter first, API fallback.
+- Center links: Explore, Feedback (hidden on mobile)
+- Footer links: Feedback, Explore
+- Brand logo links to `/` (already on home page — no-op but consistent)
 
 ---
 
-## Anonymous project limit — CRITICAL
+## What NOT to do (v1.2.0 additions)
 
-- Anonymous: 1 project per session.
-- Server-side enforcement via `POST /api/projects` and `GET /api/projects/check-limit`.
-- `useProjectLimit()` hook — fetches check on mount.
-- `StepReview` receives `limitAllowed` + `limitLoading` props.
+- Do NOT gate `/explore` or `/api/explore` behind auth
+- Do NOT use `publicQuality` as a filter/gate — only as a sort key
+- Do NOT expose `userId`, `sessionId`, or `postmortem.answers` in public project responses
+- Do NOT show Blockers panel, Streak banner, or Pressure widget to non-owners
+- Do NOT call `/api/projects/[id]/publicize` without verifying project is completed first
+- Do NOT show the ToS modal more than once per session for the same user
+- Do NOT add `isPublic`, `publicQuality`, etc. to `TaskSchema` — they belong on root `ProjectSchema` only
 
----
-
-## Store patterns — CRITICAL
-
-### Immer projectId capture
-
-Always capture IDs **before** the `set()` call:
-
-```js
-const project = createProject(data);
-const projectId = project.id; // capture BEFORE set()
-set((s) => {
-  s.projects.push(project);
-});
-return projectId;
-```
-
-### completeProject snapshot
-
-Stats captured **inside** the Immer `set()` callback, stored in `snapshotForRemote`, used for PATCH after `set()` commits.
-
----
-
-## Confirm dialogs — CRITICAL
-
-**Never use `window.confirm()`**. Always use `ConfirmModal` from `app/project/[id]/page.jsx`.
-
----
-
-## MongoDB: graceful degradation
-
-All API routes use `tryConnectDB()` (never `connectDB()`). DB outage degrades to localStorage-only.
-
----
-
-## Auth model
-
-Auth is **optional** — every feature works without signing in.
-
-- Anonymous: 1 project limit, sessionId-keyed MongoDB + localStorage.
-- Signed-in: unlimited, userId-keyed MongoDB, full sync.
-- Admin: Clerk `publicMetadata.role === "admin"`.
-
----
-
-## Tech stack
-
-| Layer      | Technology                         |
-| ---------- | ---------------------------------- |
-| Framework  | Next.js 15 (App Router)            |
-| Styling    | Tailwind CSS v4 + CSS custom props |
-| State      | Zustand + Immer                    |
-| Auth       | Clerk (optional)                   |
-| Database   | MongoDB via Mongoose               |
-| AI Primary | Puter.js (client-side, free)       |
-| AI Deep    | OpenRouter via API route           |
-| i18n       | Custom context, 7 languages        |
-| PDF export | jsPDF (client-side)                |
-
----
-
-## What NOT to do
-
-- Do NOT use `lib/ai/openrouter.js` — use `lib/ai/client.js` (server) or `lib/ai/clientGenerate.js` (client).
-- Do NOT call puter from API routes.
-- Do NOT import puter at module level in `clientGenerate.js`.
-- Do NOT omit `"use client"` from `clientGenerate.js`.
-- Do NOT add `"use client"` to utility modules like `lib/Notifications.js`.
-- Do NOT use `window.confirm()` or `window.alert()` — use `ConfirmModal`.
-- Do NOT use `connectDB()` in API routes — use `tryConnectDB()`.
-- Do NOT hard-code visible strings in JSX — always use `t("key")`.
-- Do NOT call `createToastSequence()` without passing the `locale` argument.
-- Do NOT regenerate blueprint silently — always show `RegenPermissionBanner` and wait for user choice.
-- Do NOT call `auth.protect()` anywhere.
-- Do NOT add new localStorage keys outside `lib/persistence.js`.
-- Do NOT reset wizard step state or blueprint on back-navigation.
-
----
-
-## .env.local required keys
-
-```
-OPENROUTER_API_KEY=sk-or-v1-...
-OPENROUTER_MODEL=           # primary model
-OPENROUTER_MODEL1=          # fallback model
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-MONGODB_URI=mongodb+srv://...
-CLERK_SECRET_KEY=...
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=...
-NEXT_PUBLIC_PUTER_APP_ID=...
-NEXT_PUBLIC_PUTER_AUTH_TOKEN=...
-RESEND_API_KEY=...          # required in production for email export
-```
-
----
-
-## Phase 14 — Post-MVP Backlog
-
-- [ ] Recurring check-ins and deadline reminders (cron / server actions)
-- [ ] Timeline / Gantt visualization
-- [ ] Dependency mapping between tasks
-- [ ] AI weekly status summary generator
-- [ ] Notes per phase (rich text — Tiptap or similar)
-- [ ] Export to Notion / CSV
-- [ ] Team collaboration (shared projects, assigned tasks)
-- [ ] Analytics dashboard (completion rate, avg time per phase)
-- [ ] Paid tier gating (Stripe) — switch `AI_PROVIDER=anthropic` for premium users
-- [ ] Mobile app (React Native or Expo)
-- [ ] Redis/Upstash rate limiting for hard cross-instance enforcement
-- [ ] Extract `ConfirmModal` to `components/ui/ConfirmModal.jsx` for reuse
-- [ ] Model picker in Settings: map `model1/2/3` IDs to real OpenRouter model strings
-- [ ] PhaseTimeline `t()` for "Done" label and phase status strings
-- [ ] StepCapture `t()` for example text and ghost hints (lower priority — mostly content)
-
-the user types and the text-editor founds a title or idea match, then it suggests that a similar project already exists, do you want to check it first?
-
-also ask them if they want their project to be shown to everyone to spread help and knowledge?
-
-project publicization for to see everyone. and the search can refer to that project not to regenerate. keep this into the next version plan.
-the feedback with star, we'll use my portfolio feedback sdk and ui
-also the bengali and arabic choosen font will be added in the next version.
-
-the top bar should have a home button and the sidebar logo should have route button to home. also the feedback nav should be available in the home page
-
-the projects should have a get and open to all route. and it is not getting anything. improve it.
+never use emojis here.
+the project data needs views, star, and helped mark, also we'll let users to count the download numbers of the project like exports. and we'll inspire the builders with those data in their dashboard. their progress and how many they helped. and how many stars they've got by their built projects.

@@ -6,7 +6,6 @@ import { usePathname } from "next/navigation";
 import { useUser, SignInButton } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { useState, useEffect } from "react";
-
 import { useI18n } from "@/lib/i18n/context";
 import {
   FiGrid,
@@ -60,14 +59,9 @@ export function Sidebar() {
 
   const showFeedbackBadge = !feedbackSeen && pathname !== "/feedback";
 
-  // Dashboard href: /dashboard for authed users, / for guests
-  const dashHref = "/dashboard";
-  const dashActive = pathname === "/dashboard" || pathname === "/";
-
   const navItems = [
-    { href: "/", label: t("nav_dashboard"), icon: FiGrid },
+    { href: "/dashboard", label: t("nav_dashboard"), icon: FiGrid },
     { href: "/explore", label: t("nav_explore"), icon: FiCompass },
-
     { href: "/new", label: t("nav_new_project"), icon: FiPlus },
     { href: "/feedback", label: "Feedback", icon: FiMessageSquare },
     { href: "/settings", label: t("nav_settings"), icon: FiSettings },
@@ -78,7 +72,8 @@ export function Sidebar() {
       {/* Mobile header */}
       {onClose && (
         <div className="flex items-center justify-between px-3 py-3 border-b border-[var(--border)] lg:hidden">
-          <div className="flex items-center gap-2">
+          {/* Logo links home on mobile too */}
+          <Link href="/" onClick={onClose} className="flex items-center gap-2">
             <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center shrink-0">
               <Image
                 src="/favicon.png"
@@ -89,13 +84,13 @@ export function Sidebar() {
                 onError={(e) => {
                   e.currentTarget.style.display = "none";
                 }}
-                loading="lazy" // ADD THIS
+                loading="lazy"
               />
             </div>
             <span className="font-display font-semibold text-sm text-[var(--text-primary)]">
               Momentum
             </span>
-          </div>
+          </Link>
           <button
             onClick={onClose}
             className="h-9 w-9 flex items-center justify-center rounded-[var(--r-md)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] transition-colors"
@@ -106,8 +101,12 @@ export function Sidebar() {
         </div>
       )}
 
-      {/* Desktop logo */}
-      <div className="hidden lg:flex items-center gap-2 px-4 py-4 border-b border-[var(--border)]">
+      {/* Desktop logo — links to home */}
+      <Link
+        href="/"
+        className="hidden lg:flex items-center gap-2 px-4 py-4 border-b border-[var(--border)] hover:bg-[var(--bg-subtle)] transition-colors group"
+        title="Home"
+      >
         <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center shrink-0">
           <Image
             src="/favicon.png"
@@ -118,40 +117,47 @@ export function Sidebar() {
             onError={(e) => {
               e.currentTarget.style.display = "none";
             }}
-            loading="lazy" // ADD THIS
+            loading="lazy"
           />
         </div>
-        <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)]">
+        <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)] group-hover:text-[var(--violet)] transition-colors">
           Momentum
         </span>
-      </div>
+      </Link>
 
       {/* Nav */}
       <nav className="p-3 flex flex-col gap-0.5" aria-label="Main navigation">
-        {navItems.map(({ href, label, icon: Icon, active }) => (
-          <Link
-            key={href + label}
-            href={href}
-            onClick={onClose}
-            className={[
-              "flex items-center gap-2.5 px-3 py-2.5 rounded-[var(--r-md)] text-sm",
-              "transition-colors duration-[var(--dur-fast)]",
-              "min-h-[var(--touch-min)] lg:min-h-0",
-              active
-                ? "bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium"
-                : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]",
-            ].join(" ")}
-            aria-current={active ? "page" : undefined}
-          >
-            <Icon size={15} className="shrink-0" />
-            <span className="truncate">{label}</span>
-            {href === "/feedback" && showFeedbackBadge && (
-              <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium shrink-0">
-                new
-              </span>
-            )}
-          </Link>
-        ))}
+        {navItems.map(({ href, label, icon: Icon }) => {
+          const active =
+            href === "/dashboard"
+              ? pathname === "/dashboard" || pathname === "/"
+              : pathname === href || pathname.startsWith(href + "/");
+
+          return (
+            <Link
+              key={href + label}
+              href={href}
+              onClick={onClose}
+              className={[
+                "flex items-center gap-2.5 px-3 py-2.5 rounded-[var(--r-md)] text-sm",
+                "transition-colors duration-[var(--dur-fast)]",
+                "min-h-[var(--touch-min)] lg:min-h-0",
+                active
+                  ? "bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium"
+                  : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]",
+              ].join(" ")}
+              aria-current={active ? "page" : undefined}
+            >
+              <Icon size={15} className="shrink-0" />
+              <span className="truncate">{label}</span>
+              {href === "/feedback" && showFeedbackBadge && (
+                <span className="ml-auto text-[10px] px-1.5 py-0.5 rounded-full bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium shrink-0">
+                  new
+                </span>
+              )}
+            </Link>
+          );
+        })}
       </nav>
 
       {/* Active projects quick-links */}

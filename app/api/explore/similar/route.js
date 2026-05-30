@@ -1,7 +1,8 @@
 /**
  * GET /api/explore/similar?q=<idea text>
  * Returns up to 3 similar public projects based on title/goal fuzzy match.
- * Used by /new to show "a similar project already exists" before AI generation.
+ * No quality gate — all isPublic projects are candidates.
+ * Quality used only for ranking (best results first).
  */
 
 import { tryConnectDB } from "@/lib/db/mongoose";
@@ -21,6 +22,9 @@ const SIMILAR_PROJECTION = {
   _id: 0,
   userId: 0,
   sessionId: 0,
+  tasks: 0,
+  blockers: 0,
+  postmortem: 0,
 };
 
 export async function GET(request) {
@@ -37,7 +41,7 @@ export async function GET(request) {
       return Response.json({ projects: [] });
     }
 
-    // Extract meaningful keywords (skip common stop words)
+    // Strip stop words to get meaningful keywords
     const stopWords = new Set([
       "a",
       "an",
@@ -67,6 +71,14 @@ export async function GET(request) {
       "build",
       "learn",
       "start",
+      "get",
+      "do",
+      "will",
+      "can",
+      "would",
+      "have",
+      "has",
+      "had",
     ]);
 
     const keywords = q
@@ -74,30 +86,26 @@ export async function GET(request) {
       .replace(/[^a-z0-9\s]/g, " ")
       .split(/\s+/)
       .filter((w) => w.length > 3 && !stopWords.has(w))
-      .slice(0, 5);
+      .slice(0, 6);
 
     if (keywords.length === 0) {
       return Response.json({ projects: [] });
     }
 
-    // Search using keyword OR regex
-    const orClauses = keywords.map((kw) => ({
-      $or: [
-        { projectTitle: { $regex: kw, $options: "i" } },
-        { oneLineGoal: { $regex: kw, $options: "i" } },
-        { tags: { $regex: kw, $options: "i" } },
-      ],
-    }));
+    // OR across all keyword+field combinations — no quality gate
+    const orClauses = keywords.flatMap((kw) => [
+      { projectTitle: { $regex: kw, $options: "i" } },
+      { oneLineGoal: { $regex: kw, $options: "i" } },
+      { tags: { $regex: kw, $options: "i" } },
+      { category: { $regex: kw, $options: "i" } },
+    ]);
 
     const projects = await Project.find(
-      {
-        isPublic: true,
-        publicQuality: { $gte: 72 },
-        $and: [{ $or: orClauses.flatMap((c) => c.$or) }],
-      },
+      { isPublic: true, $or: orClauses },
       SIMILAR_PROJECTION
     )
-      .sort({ publicQuality: -1 })
+      // AI-scored projects ranked first; unscored (null) last
+      .sort({ publicQuality: -1, createdAt: -1 })
       .limit(3)
       .lean();
 

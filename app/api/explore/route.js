@@ -1,14 +1,12 @@
 /**
  * GET /api/explore
  * Public endpoint — returns paginated, anonymized public projects.
- * Supports ?category=&tag=&q=&page=&limit= filtering.
- * No auth required.
+ * All isPublic projects shown — publicQuality used for ranking only, never gating.
  */
 
 import { tryConnectDB } from "@/lib/db/mongoose";
 import Project from "@/lib/models/Project";
 
-// Fields safe to expose publicly — explicitly allowlisted
 const PUBLIC_PROJECTION = {
   id: 1,
   publicSlug: 1,
@@ -24,12 +22,17 @@ const PUBLIC_PROJECTION = {
   phases: 1,
   completionDate: 1,
   createdAt: 1,
-  // Explicitly EXCLUDED: userId, sessionId, tasks (too detailed), blockers, postmortem
   _id: 0,
   __v: 0,
   userId: 0,
   sessionId: 0,
   isAnonymous: 0,
+  tasks: 0,
+  blockers: 0,
+  postmortem: 0,
+  streakDays: 0,
+  lastActivityAt: 0,
+  dailyNextAction: 0,
 };
 
 export async function GET(request) {
@@ -41,7 +44,7 @@ export async function GET(request) {
     const page = Math.max(1, parseInt(searchParams.get("page") ?? "1"));
     const limit = Math.min(24, parseInt(searchParams.get("limit") ?? "12"));
     const skip = (page - 1) * limit;
-    const sort = searchParams.get("sort") ?? "quality"; // quality | recent | popular
+    const sort = searchParams.get("sort") ?? "quality";
 
     const db = await tryConnectDB();
     if (!db) {
@@ -51,8 +54,8 @@ export async function GET(request) {
       );
     }
 
-    // Build query
-    const query = { isPublic: true, publicQuality: { $ne: null } };
+    // Base query — ALL isPublic:true projects, no quality gate
+    const query = { isPublic: true };
     if (category && category !== "All") query.category = category;
     if (tag) query.tags = tag;
     if (q) {
@@ -60,13 +63,15 @@ export async function GET(request) {
         { projectTitle: { $regex: q, $options: "i" } },
         { oneLineGoal: { $regex: q, $options: "i" } },
         { tags: { $regex: q, $options: "i" } },
+        { category: { $regex: q, $options: "i" } },
       ];
     }
 
-    // Sort
+    // Sort options
     const sortMap = {
-      quality: { publicQuality: -1, completionDate: -1 },
-      recent: { completionDate: -1 },
+      quality: { publicQuality: -1, createdAt: -1 },
+      recent: { createdAt: -1 },
+      completed: { completionDate: -1, createdAt: -1 },
     };
     const sortOrder = sortMap[sort] ?? sortMap.quality;
 
@@ -79,7 +84,7 @@ export async function GET(request) {
       Project.countDocuments(query),
     ]);
 
-    // Strip phases details to just names + objectives for the card view
+    // Strip phases to names + objectives only for card view
     const lightweight = projects.map((p) => ({
       ...p,
       phases: (p.phases ?? []).map((ph) => ({

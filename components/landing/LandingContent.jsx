@@ -18,12 +18,13 @@ import {
   FaChartBar,
   FaRobot,
   FaCheckCircle,
-  FaBolt,
   FaArrowRight,
   FaPlay,
 } from "react-icons/fa";
+import { FiMessageSquare, FiCompass } from "react-icons/fi";
 
-/* ─── LandingNav ──────────────────────────────────────────────────────── */
+// ─── LandingNav ────────────────────────────────────────────────────────
+
 function LandingNav() {
   const { theme, toggle } = useTheme();
   const { isSignedIn, isLoaded, user } = useUser();
@@ -65,11 +66,8 @@ function LandingNav() {
           WebkitBackdropFilter: "blur(16px)",
         }}
       >
-        {/* Brand */}
-        <Link
-          href="/"
-          className="flex items-center gap-2 flex-1 shrink-0 group"
-        >
+        {/* Brand — this IS the home page so no separate home link needed */}
+        <Link href="/" className="flex items-center gap-2 group">
           <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center shrink-0">
             <Image
               src="/favicon.png"
@@ -82,10 +80,30 @@ function LandingNav() {
               }}
             />
           </div>
-          <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)] hidden xs:block sm:block">
+          <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)] hidden xs:block sm:block group-hover:text-[var(--violet)] transition-colors">
             Momentum
           </span>
         </Link>
+
+        {/* Center nav links */}
+        <div className="hidden md:flex items-center gap-1 ml-4">
+          <Link
+            href="/explore"
+            className="flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-[var(--r-md)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all"
+          >
+            <FiCompass size={13} />
+            {t("nav_explore")}
+          </Link>
+          <Link
+            href="/feedback"
+            className="flex items-center gap-1.5 h-8 px-3 text-xs font-medium rounded-[var(--r-md)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all"
+          >
+            <FiMessageSquare size={13} />
+            Feedback
+          </Link>
+        </div>
+
+        <div className="flex-1" />
 
         <div className="flex items-center gap-1.5">
           {/* Language picker */}
@@ -133,7 +151,7 @@ function LandingNav() {
 
             {langOpen && (
               <div
-                className="absolute right-5 top-full mt-1.5 w-44 rounded-[var(--r-lg)] border overflow-hidden z-50"
+                className="absolute right-0 top-full mt-1.5 w-44 rounded-[var(--r-lg)] border overflow-hidden z-50"
                 style={{
                   borderColor: "var(--border)",
                   background: "var(--bg-elevated)",
@@ -334,7 +352,8 @@ function LandingNav() {
   );
 }
 
-/* ─── StatPill ────────────────────────────────────────────────────────── */
+// ─── Small reusable sub-components ────────────────────────────────────
+
 function StatPill({ value, label }) {
   return (
     <div className="flex flex-col items-center gap-1">
@@ -354,16 +373,11 @@ function StatPill({ value, label }) {
   );
 }
 
-/* ─── FeatureCard ─────────────────────────────────────────────────────── */
 function FeatureCard({ icon: Icon, color, bg, title, desc, index }) {
   return (
     <div
       className="rounded-[var(--r-lg)] items-center text-center justify-items-center border p-6 flex flex-col gap-4 transition-all duration-300 cursor-default"
-      style={{
-        borderColor: "var(--border)",
-        background: "var(--bg-surface)",
-        animationDelay: `${index * 80}ms`,
-      }}
+      style={{ borderColor: "var(--border)", background: "var(--bg-surface)" }}
       onMouseEnter={(e) => {
         e.currentTarget.style.transform = "translateY(-3px)";
         e.currentTarget.style.boxShadow = "0 12px 32px rgba(0,0,0,.07)";
@@ -399,7 +413,6 @@ function FeatureCard({ icon: Icon, color, bg, title, desc, index }) {
   );
 }
 
-/* ─── StepCard ────────────────────────────────────────────────────────── */
 function StepCard({ number, title, desc, accent, isLast }) {
   return (
     <div className="relative flex gap-5 group">
@@ -439,7 +452,6 @@ function StepCard({ number, title, desc, accent, isLast }) {
   );
 }
 
-/* ─── TestimonialCard ─────────────────────────────────────────────────── */
 function TestimonialCard({ quote, name, role, initials, color }) {
   return (
     <div
@@ -452,7 +464,6 @@ function TestimonialCard({ quote, name, role, initials, color }) {
         e.currentTarget.style.boxShadow = "none";
       }}
     >
-      {/* Stars */}
       <div className="flex gap-0.5">
         {[...Array(5)].map((_, i) => (
           <svg
@@ -461,7 +472,6 @@ function TestimonialCard({ quote, name, role, initials, color }) {
             height="13"
             viewBox="0 0 12 12"
             fill="var(--coral)"
-            xmlns="http://www.w3.org/2000/svg"
           >
             <path d="M6 1l1.35 2.73L10.5 4.2l-2.25 2.2.53 3.1L6 8l-2.78 1.5.53-3.1L1.5 4.2l3.15-.47L6 1z" />
           </svg>
@@ -496,7 +506,8 @@ function TestimonialCard({ quote, name, role, initials, color }) {
   );
 }
 
-/* ─── LandingContent ──────────────────────────────────────────────────── */
+// ─── Main landing content ──────────────────────────────────────────────
+
 export default function LandingContent() {
   const { isSignedIn, isLoaded } = useUser();
   const router = useRouter();
@@ -604,9 +615,8 @@ export default function LandingContent() {
     >
       <LandingNav />
 
-      {/* ── Hero ─────────────────────────────────────────────────────── */}
+      {/* ── Hero ── */}
       <section className="relative overflow-hidden">
-        {/* Ambient glow */}
         <div aria-hidden className="pointer-events-none absolute inset-0">
           <div
             className="absolute left-1/2 top-0 -translate-x-1/2 w-[700px] h-[500px] rounded-full opacity-[0.06]"
@@ -619,7 +629,6 @@ export default function LandingContent() {
         </div>
 
         <div className="relative max-w-4xl mx-auto px-4 sm:px-8 pt-24 pb-20 sm:pt-32 sm:pb-28 text-center">
-          {/* Badge */}
           <div
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold mb-8 border"
             style={{
@@ -630,14 +639,13 @@ export default function LandingContent() {
           >
             <Link
               href="/dashboard"
-              style={{ color: "var(--text-primary)" }}
-              className="h-8 px-3 sm:px-4 flex items-center text-xs font-semibold rounded-[var(--r-md)] transition-all whitespace-nowrap"
+              style={{ color: "var(--violet-dim)" }}
+              className="hover:underline"
             >
-              {t("guest_dashboard_go")}
+              {t("guest_dashboard_go")} →
             </Link>
           </div>
 
-          {/* Headline */}
           <h1
             className="font-display font-bold text-[2.75rem] sm:text-6xl leading-[1.08] tracking-tight mb-6"
             style={{ color: "var(--text-primary)" }}
@@ -648,7 +656,6 @@ export default function LandingContent() {
               style={{ color: "var(--violet)" }}
             >
               {t("guest_hero_title_2")}
-              {/* Underline accent */}
               <svg
                 className="absolute -bottom-1 left-0 w-full"
                 height="6"
@@ -667,7 +674,6 @@ export default function LandingContent() {
             </span>
           </h1>
 
-          {/* Subtitle */}
           <p
             className="text-lg sm:text-xl max-w-2xl mx-auto leading-relaxed mb-10"
             style={{ color: "var(--text-secondary)" }}
@@ -675,7 +681,6 @@ export default function LandingContent() {
             {t("guest_hero_subtitle")}
           </p>
 
-          {/* CTAs */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-5">
             <Link
               href="/new"
@@ -726,7 +731,6 @@ export default function LandingContent() {
             {t("guest_cta_free")}
           </p>
 
-          {/* Social proof */}
           <div
             className="mt-16 flex items-center justify-center gap-6 sm:gap-16 border-t pt-10"
             style={{ borderColor: "var(--border)" }}
@@ -746,7 +750,7 @@ export default function LandingContent() {
         </div>
       </section>
 
-      {/* ── Features ─────────────────────────────────────────────────── */}
+      {/* ── Features ── */}
       <section
         className="border-t border-b py-16 sm:py-20"
         style={{
@@ -769,7 +773,6 @@ export default function LandingContent() {
               {t("guest_features_sub")}
             </p>
           </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {features.map((f, i) => (
               <FeatureCard key={f.title} {...f} index={i} />
@@ -778,7 +781,7 @@ export default function LandingContent() {
         </div>
       </section>
 
-      {/* ── How it works ─────────────────────────────────────────────── */}
+      {/* ── How it works ── */}
       <section className="max-w-2xl mx-auto px-4 sm:px-8 py-16 sm:py-20">
         <div className="text-center mb-12">
           <h2
@@ -794,13 +797,11 @@ export default function LandingContent() {
             {t("guest_how_sub")}
           </p>
         </div>
-
         <div>
           {steps.map((s, i) => (
             <StepCard key={s.number} {...s} isLast={i === steps.length - 1} />
           ))}
         </div>
-
         <div className="text-center mt-4">
           <Link
             href="/new"
@@ -816,7 +817,7 @@ export default function LandingContent() {
         </div>
       </section>
 
-      {/* ── Testimonials ─────────────────────────────────────────────── */}
+      {/* ── Testimonials ── */}
       <section
         className="border-t border-b py-16 sm:py-20"
         style={{
@@ -839,7 +840,6 @@ export default function LandingContent() {
               {t("guest_testimonials_sub")}
             </p>
           </div>
-
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             {testimonials.map((t_) => (
               <TestimonialCard key={t_.name} {...t_} />
@@ -848,7 +848,7 @@ export default function LandingContent() {
         </div>
       </section>
 
-      {/* ── FAQ ──────────────────────────────────────────────────────── */}
+      {/* ── FAQ ── */}
       <section className="max-w-2xl mx-auto px-4 sm:px-8 py-16 sm:py-20">
         <h2
           className="font-display font-bold text-2xl sm:text-3xl text-center mb-10"
@@ -856,7 +856,6 @@ export default function LandingContent() {
         >
           {t("guest_faq_title")}
         </h2>
-
         <div
           className="flex flex-col rounded-[var(--r-lg)] border overflow-hidden"
           style={{ borderColor: "var(--border)" }}
@@ -898,7 +897,6 @@ export default function LandingContent() {
                     ▾
                   </span>
                 </button>
-
                 <div
                   style={{
                     maxHeight: isOpen ? "200px" : "0",
@@ -919,7 +917,7 @@ export default function LandingContent() {
         </div>
       </section>
 
-      {/* ── Bottom CTA ───────────────────────────────────────────────── */}
+      {/* ── Bottom CTA ── */}
       <section
         className="border-t py-20"
         style={{
@@ -928,14 +926,12 @@ export default function LandingContent() {
         }}
       >
         <div className="max-w-xl mx-auto px-4 sm:px-8 text-center">
-          {/* Icon badge */}
           <div
             className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-6"
             style={{ background: "var(--emerald-bg)" }}
           >
             <FaCheckCircle size={26} style={{ color: "var(--emerald)" }} />
           </div>
-
           <h2
             className="font-display font-bold text-2xl sm:text-3xl mb-4"
             style={{ color: "var(--text-primary)" }}
@@ -994,7 +990,7 @@ export default function LandingContent() {
         </div>
       </section>
 
-      {/* ── Footer ───────────────────────────────────────────────────── */}
+      {/* ── Footer ── */}
       <footer
         className="border-t py-8 text-center text-xs"
         style={{ borderColor: "var(--border)", color: "var(--text-tertiary)" }}
@@ -1013,12 +1009,33 @@ export default function LandingContent() {
         >
           Nuruddin
         </a>
+        <span className="mx-3 opacity-30">·</span>
+        <Link
+          href="/feedback"
+          style={{ color: "var(--text-tertiary)" }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--violet)")}
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.color = "var(--text-tertiary)")
+          }
+        >
+          Feedback
+        </Link>
+        <span className="mx-3 opacity-30">·</span>
+        <Link
+          href="/explore"
+          style={{ color: "var(--text-tertiary)" }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--violet)")}
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.color = "var(--text-tertiary)")
+          }
+        >
+          Explore
+        </Link>
       </footer>
     </div>
   );
 }
 
-/* ─── Icons ───────────────────────────────────────────────────────────── */
 function SunIcon() {
   return (
     <svg width="15" height="15" viewBox="0 0 16 16" fill="none">

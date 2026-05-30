@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useProjectStore } from "@/lib/store/projectStore";
@@ -33,18 +33,92 @@ import {
   FaMailBulk,
   FaMarkdown,
   FaRocket,
+  FaLock,
+  FaLockOpen,
 } from "react-icons/fa";
 import { MdDelete } from "react-icons/md";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
+// ─── Public-view read-only banner ─────────────────────────────────────
+
+function PublicViewBanner({ projectTitle }) {
+  const { t } = useI18n();
+  return (
+    <div className="rounded-[var(--r-lg)] border border-[var(--violet)] bg-[var(--violet-bg)] px-4 py-3 flex items-center gap-3 mb-4">
+      <span className="text-lg shrink-0">🌍</span>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-[var(--violet-dim)]">
+          {t("project_public_view_title")}
+        </p>
+        <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+          {t("project_public_view_desc")}
+        </p>
+      </div>
+      <Link href="/new">
+        <Button size="sm" variant="primary">
+          {t("project_public_view_cta")}
+        </Button>
+      </Link>
+    </div>
+  );
+}
+
+// ─── Loading skeleton ─────────────────────────────────────────────────
+
+function ProjectSkeleton() {
+  return (
+    <div className="flex h-screen overflow-hidden">
+      <div className="w-56 shrink-0 border-r border-[var(--border)] bg-[var(--bg-elevated)] hidden lg:block" />
+      <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="h-14 border-b border-[var(--border)] bg-[var(--bg-elevated)]" />
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-5xl mx-auto px-4 sm:px-6 py-8 animate-pulse">
+            <div className="h-4 bg-[var(--bg-muted)] rounded w-48 mb-6" />
+            <div className="h-8 bg-[var(--bg-muted)] rounded w-2/3 mb-3" />
+            <div className="h-4 bg-[var(--bg-muted)] rounded w-full mb-8" />
+            <div className="grid grid-cols-1 lg:grid-cols-[1fr_260px] gap-6">
+              <div className="flex flex-col gap-4">
+                {[1, 2, 3].map((i) => (
+                  <div
+                    key={i}
+                    className="h-32 bg-[var(--bg-muted)] rounded-[var(--r-lg)]"
+                  />
+                ))}
+              </div>
+              <div className="flex flex-col gap-3">
+                {[1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="h-40 bg-[var(--bg-muted)] rounded-[var(--r-lg)]"
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Main component ───────────────────────────────────────────────────
+
 function ProjectPageClient({ id }) {
   const router = useRouter();
   const { t } = useI18n();
 
-  const project = useProjectStore((s) => s.getProject(id));
+  // Try local store first (owner with edit access)
+  const storeProject = useProjectStore((s) => s.getProject(id));
   const deleteProject = useProjectStore((s) => s.deleteProject);
   const completeProject = useProjectStore((s) => s.completeProject);
+  const updateProject = useProjectStore((s) => s.updateProject);
+
+  // Public fallback state
+  const [publicProject, setPublicProject] = useState(null);
+  const [isPublicView, setIsPublicView] = useState(false);
+  const [publicLoading, setPublicLoading] = useState(false);
+  const [publicError, setPublicError] = useState(false);
 
   const [showEmailExport, setShowEmailExport] = useState(false);
   const [confirmModal, setConfirmModal] = useState({
@@ -52,6 +126,40 @@ function ProjectPageClient({ id }) {
     type: null,
     loading: false,
   });
+
+  // If not in store, fetch from public API
+  useEffect(() => {
+    if (storeProject) return; // owner has it — no need
+    setPublicLoading(true);
+    fetch(`/api/projects/${id}`)
+      .then((r) => {
+        if (!r.ok) throw new Error("not found");
+        return r.json();
+      })
+      .then((data) => {
+        setPublicProject(data.project ?? null);
+        setIsPublicView(data.isPublicView ?? false);
+        setPublicLoading(false);
+      })
+      .catch(() => {
+        setPublicError(true);
+        setPublicLoading(false);
+      });
+  }, [id, storeProject]);
+
+  const project = storeProject ?? publicProject;
+  const isOwner = !!storeProject;
+
+  // ── Toggle visibility ───────────────────────────────────────────────
+  const handleToggleVisibility = useCallback(async () => {
+    if (!isOwner || !project) return;
+    const next = !project.isPublic;
+    await updateProject(project.id, { isPublic: next });
+    toast.success(
+      next ? t("toast_project_made_public") : t("toast_project_made_private"),
+      { duration: 3000 }
+    );
+  }, [isOwner, project, updateProject, t]);
 
   const openConfirm = useCallback((type) => {
     setConfirmModal({ open: true, type, loading: false });
@@ -81,10 +189,15 @@ function ProjectPageClient({ id }) {
     }
   }, [confirmModal.type, deleteProject, completeProject, id, router, t]);
 
-  if (!project) {
+  // ── Loading / error states ──────────────────────────────────────────
+
+  if (publicLoading) return <ProjectSkeleton />;
+
+  if (publicError || (!project && !publicLoading)) {
     return (
       <div className="flex h-screen items-center justify-center px-4">
         <div className="text-center">
+          <p className="text-4xl mb-4">🔒</p>
           <p className="text-[var(--text-secondary)] mb-4">
             {t("project_not_found")}
           </p>
@@ -121,7 +234,7 @@ function ProjectPageClient({ id }) {
       const { exportProjectPDF } = await import("@/lib/utils/exportPDF");
       await exportProjectPDF(project);
       toast.dismiss(toastId);
-    } catch (err) {
+    } catch {
       toast.dismiss(toastId);
       toast.error(t("toast_export_pdf_error"));
     }
@@ -141,7 +254,6 @@ function ProjectPageClient({ id }) {
       confirmVariant: "emerald",
     },
   };
-
   const activeConfig = confirmModal.type
     ? confirmConfig[confirmModal.type]
     : null;
@@ -153,6 +265,11 @@ function ProjectPageClient({ id }) {
         <TopBar />
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
+            {/* Public view banner for non-owners */}
+            {isPublicView && !isOwner && (
+              <PublicViewBanner projectTitle={project.projectTitle} />
+            )}
+
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)] mb-4 sm:mb-6 min-w-0">
               <Link
@@ -205,23 +322,72 @@ function ProjectPageClient({ id }) {
                     {isCompleted && (
                       <Badge status="completed">✓ {t("project_done")}</Badge>
                     )}
+                    {/* Public / private indicator */}
+                    <Badge variant={project.isPublic ? "emerald" : "slate"}>
+                      {project.isPublic ? "🌍 Public" : "🔒 Private"}
+                    </Badge>
                   </div>
                 </div>
 
-                <ProjectPressure project={project} />
-                <StreakBanner project={project} />
+                {/* Only show pressure/streak for owners */}
+                {isOwner && <ProjectPressure project={project} />}
+                {isOwner && <StreakBanner project={project} />}
 
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                   <PhaseTimeline project={project} />
                 </div>
 
-                {!isCompleted && <NextAction project={project} />}
+                {isOwner && !isCompleted && <NextAction project={project} />}
 
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
-                  <p className=" text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3 sm:mb-4">
+                  <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3 sm:mb-4">
                     {t("project_all_tasks")}
                   </p>
-                  <TaskList project={project} />
+                  {isOwner ? (
+                    <TaskList project={project} />
+                  ) : (
+                    // Read-only task list for public view
+                    <div className="flex flex-col gap-1">
+                      {project.tasks?.slice(0, 20).map((task) => (
+                        <div
+                          key={task.id}
+                          className="flex items-center gap-3 px-3 py-2 rounded-[var(--r-md)]"
+                        >
+                          <span
+                            className="text-base leading-none"
+                            style={{
+                              color:
+                                task.status === "done"
+                                  ? "var(--emerald)"
+                                  : task.status === "doing"
+                                  ? "var(--violet)"
+                                  : "var(--text-tertiary)",
+                            }}
+                          >
+                            {task.status === "done"
+                              ? "●"
+                              : task.status === "doing"
+                              ? "◑"
+                              : "○"}
+                          </span>
+                          <p
+                            className={`text-sm ${
+                              task.status === "done"
+                                ? "line-through text-[var(--text-tertiary)]"
+                                : "text-[var(--text-primary)]"
+                            }`}
+                          >
+                            {task.title}
+                          </p>
+                        </div>
+                      ))}
+                      {(project.tasks?.length ?? 0) > 20 && (
+                        <p className="text-xs text-[var(--text-tertiary)] px-3 pt-1">
+                          +{project.tasks.length - 20} more tasks
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -236,26 +402,28 @@ function ProjectPageClient({ id }) {
                     {[
                       {
                         label: t("project_done"),
-                        value: project.tasks.filter((t) => t.status === "done")
-                          .length,
+                        value:
+                          project.tasks?.filter((t) => t.status === "done")
+                            .length ?? 0,
                         color: "var(--emerald)",
                       },
                       {
                         label: t("project_todo"),
-                        value: project.tasks.filter((t) => t.status === "todo")
-                          .length,
+                        value:
+                          project.tasks?.filter((t) => t.status === "todo")
+                            .length ?? 0,
                         color: "var(--text-primary)",
                       },
                       {
                         label: t("project_blocked"),
-                        value: project.tasks.filter(
-                          (t) => t.status === "blocked"
-                        ).length,
+                        value:
+                          project.tasks?.filter((t) => t.status === "blocked")
+                            .length ?? 0,
                         color: "var(--coral)",
                       },
                       {
                         label: t("project_streak"),
-                        value: `${project.streakDays}d`,
+                        value: `${project.streakDays ?? 0}d`,
                         color: "var(--amber)",
                       },
                     ].map(({ label, value, color }) => (
@@ -299,10 +467,12 @@ function ProjectPageClient({ id }) {
                   </div>
                 )}
 
-                {/* Blockers */}
-                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
-                  <BlockerPanel project={project} />
-                </div>
+                {/* Blockers — owners only */}
+                {isOwner && (
+                  <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+                    <BlockerPanel project={project} />
+                  </div>
+                )}
 
                 {/* Tools */}
                 {project.toolsSuggested?.length > 0 && (
@@ -320,68 +490,115 @@ function ProjectPageClient({ id }) {
                   </div>
                 )}
 
-                {/* Actions */}
-                <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 flex flex-col gap-2">
-                  <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-1">
-                    {t("project_actions")}
-                  </p>
+                {/* Actions — owners only */}
+                {isOwner && (
+                  <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 flex flex-col gap-2">
+                    <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-1">
+                      {t("project_actions")}
+                    </p>
 
-                  {!isCompleted && (
+                    {!isCompleted && (
+                      <Button
+                        variant="emerald"
+                        onClick={() => openConfirm("complete")}
+                        className="w-full justify-center"
+                      >
+                        <FaRocket className="shrink-0" />
+                        <span className="truncate">
+                          {t("project_mark_shipped")}
+                        </span>
+                      </Button>
+                    )}
+
+                    {/* Visibility toggle */}
                     <Button
-                      variant="emerald"
-                      onClick={() => openConfirm("complete")}
+                      variant="ghost"
+                      onClick={handleToggleVisibility}
                       className="w-full justify-center"
                     >
-                      <FaRocket className="shrink-0" />
+                      {project.isPublic ? (
+                        <>
+                          <FaLock className="shrink-0" />
+                          <span className="truncate">
+                            {t("project_make_private")}
+                          </span>
+                        </>
+                      ) : (
+                        <>
+                          <FaLockOpen className="shrink-0" />
+                          <span className="truncate">
+                            {t("project_make_public")}
+                          </span>
+                        </>
+                      )}
+                    </Button>
+
+                    <Button
+                      variant="ghost"
+                      onClick={() => setShowEmailExport(true)}
+                      className="w-full justify-center"
+                    >
+                      <FaMailBulk className="shrink-0" />
                       <span className="truncate">
-                        {t("project_mark_shipped")}
+                        {t("project_export_email")}
                       </span>
                     </Button>
-                  )}
+                    <Button
+                      variant="ghost"
+                      onClick={handleExportPDF}
+                      className="w-full justify-center"
+                    >
+                      <FaFilePdf className="shrink-0" />
+                      <span className="truncate">
+                        {t("project_export_pdf")}
+                      </span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={handleExportMarkdown}
+                      className="w-full justify-center"
+                    >
+                      <FaMarkdown className="shrink-0" />
+                      <span className="truncate">{t("project_export_md")}</span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      onClick={handleExportJSON}
+                      className="w-full justify-center"
+                    >
+                      <FaJs className="shrink-0" />
+                      <span className="truncate">
+                        {t("project_export_json")}
+                      </span>
+                    </Button>
+                    <Button
+                      variant="danger"
+                      onClick={() => openConfirm("delete")}
+                      className="w-full justify-center"
+                    >
+                      <MdDelete className="shrink-0" />
+                      <span className="truncate">{t("project_delete")}</span>
+                    </Button>
+                  </div>
+                )}
 
-                  <Button
-                    variant="ghost"
-                    onClick={() => setShowEmailExport(true)}
-                    className="w-full justify-center"
-                  >
-                    <FaMailBulk className="shrink-0" />
-                    <span className="truncate">
-                      {t("project_export_email")}
-                    </span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={handleExportPDF}
-                    className="w-full justify-center"
-                  >
-                    <FaFilePdf className="shrink-0" />
-                    <span className="truncate">{t("project_export_pdf")}</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={handleExportMarkdown}
-                    className="w-full justify-center"
-                  >
-                    <FaMarkdown className="shrink-0" />
-                    <span className="truncate">{t("project_export_md")}</span>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    onClick={handleExportJSON}
-                    className="w-full justify-center"
-                  >
-                    <FaJs className="shrink-0" />
-                    <span className="truncate">{t("project_export_json")}</span>
-                  </Button>
-                  <Button
-                    variant="danger"
-                    onClick={() => openConfirm("delete")}
-                    className="w-full justify-center"
-                  >
-                    <MdDelete className="shrink-0" />
-                    <span className="truncate">{t("project_delete")}</span>
-                  </Button>
-                </div>
+                {/* Public view: fork CTA */}
+                {!isOwner && (
+                  <div className="rounded-[var(--r-lg)] border-2 border-dashed border-[var(--violet)] bg-[var(--violet-bg)] p-4 text-center">
+                    <p className="text-sm font-semibold text-[var(--violet-dim)] mb-2">
+                      {t("project_fork_cta_title")}
+                    </p>
+                    <p className="text-xs text-[var(--text-secondary)] mb-3">
+                      {t("project_fork_cta_desc")}
+                    </p>
+                    <Link
+                      href={`/new?fork=${id}`}
+                      className="inline-flex items-center gap-2 px-4 py-2 rounded-[var(--r-md)] bg-[var(--violet)] text-white text-xs font-semibold hover:bg-[var(--violet-dim)] transition-colors"
+                    >
+                      🍴 {t("project_fork_btn")}
+                    </Link>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -389,11 +606,13 @@ function ProjectPageClient({ id }) {
         </main>
       </div>
 
-      <EmailExportModal
-        open={showEmailExport}
-        onClose={() => setShowEmailExport(false)}
-        project={project}
-      />
+      {isOwner && (
+        <EmailExportModal
+          open={showEmailExport}
+          onClose={() => setShowEmailExport(false)}
+          project={project}
+        />
+      )}
 
       {activeConfig && (
         <ConfirmModal
@@ -408,7 +627,7 @@ function ProjectPageClient({ id }) {
         />
       )}
 
-      <SavePromptModal />
+      {isOwner && <SavePromptModal />}
     </div>
   );
 }

@@ -12,7 +12,7 @@ import { LANGUAGES } from "@/lib/i18n/translations";
 import { useRouter } from "next/navigation";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { clearMomentumStorage } from "@/lib/clearStorage";
-import { FiCompass } from "react-icons/fi";
+import { FiCompass, FiHome } from "react-icons/fi";
 
 export function TopBar() {
   const { theme, toggle } = useTheme();
@@ -48,10 +48,20 @@ export function TopBar() {
 
   return (
     <>
-      <header className="h-14 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex items-center px-3 sm:px-4 gap-1.5 sm:gap-3 sticky top-0 z-30 min-w-0">
-        {/* Logo */}
+      <header className="h-14 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex items-center px-3 sm:px-4 gap-1.5 sm:gap-2 sticky top-0 z-30 min-w-0">
+        {/* Home button — always visible */}
         <Link
           href="/"
+          aria-label="Home"
+          className="h-9 w-9 flex items-center justify-center rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all shrink-0"
+          title={t("nav_home")}
+        >
+          <FiHome size={15} />
+        </Link>
+
+        {/* Logo / brand — links to dashboard if signed in, else home */}
+        <Link
+          href={isSignedIn ? "/dashboard" : "/"}
           className="flex items-center gap-1.5 sm:gap-2 mr-1 sm:mr-2 shrink-0"
         >
           <div className="h-7 w-7 rounded-[var(--r-md)] overflow-hidden flex items-center justify-center shrink-0">
@@ -73,15 +83,17 @@ export function TopBar() {
         </Link>
 
         <div className="flex-1 min-w-0" />
-        {/* Explore link - icon visible on all sizes, label shown from md+ */}
+
+        {/* Explore link */}
         <Link
           href="/explore"
-          className="h-9 px-2 sm:px-2.5 flex items-center gap-2 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all mr-2 shrink-0"
+          className="h-9 px-2 sm:px-2.5 flex items-center gap-2 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all mr-1 shrink-0"
           aria-label={t("nav_explore")}
         >
           <FiCompass className="text-base" />
           <span className="hidden md:inline">{t("nav_explore")}</span>
         </Link>
+
         {/* Language picker */}
         <div ref={langRef} className="relative">
           <button
