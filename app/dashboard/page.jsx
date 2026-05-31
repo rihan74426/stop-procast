@@ -6,6 +6,7 @@ import { useUser } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { ProjectCard } from "@/components/dashboard/ProjectCard";
 import { EmptyState } from "@/components/dashboard/EmptyState";
+import { BuilderStats } from "@/components/dashboard/BuilderStats";
 import { TopBar } from "@/components/layout/Topbar";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { Footer } from "@/components/layout/Footer";
@@ -22,10 +23,10 @@ import {
   FaFire,
   FaBullseye,
   FaChartLine,
-  FaSmile,
 } from "react-icons/fa";
+import { FiSmile } from "react-icons/fi";
 
-/* ─── Greeting helpers (same as before) ─────────────────────────────── */
+/* ─── Greeting helpers ───────────────────────────────────────────────── */
 function getTimeGreeting(t) {
   const h = new Date().getHours();
   if (h < 5) return t("greeting_midnight");
@@ -90,7 +91,7 @@ function DashboardGreeting({ user, projectCount }) {
   return (
     <div className="mb-2">
       <h1 className="font-display font-semibold text-lg sm:text-2xl text-[var(--text-primary)]">
-        {timeGreeting}, {firstName} <FaSmile className="inline" />
+        {timeGreeting}, {firstName} <FiSmile className="inline" />
       </h1>
       <p className="text-xs sm:text-sm text-[var(--text-secondary)] mt-0.5">
         {projectCount > 0 ? t(motivationKey) : t("greeting_no_projects")}
@@ -99,7 +100,7 @@ function DashboardGreeting({ user, projectCount }) {
   );
 }
 
-/* ─── Main dashboard content ─────────────────────────────────────────── */
+/* ─── Main dashboard ─────────────────────────────────────────────────── */
 function DashboardContent() {
   const { t } = useI18n();
   const { user, isLoaded, isSignedIn } = useUser();
@@ -118,7 +119,7 @@ function DashboardContent() {
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
             {/* Header row */}
-            <div className="flex items-start justify-between mb-5 sm:mb-8 gap-3">
+            <div className="flex items-start justify-between mb-5 sm:mb-6 gap-3">
               <div className="flex-1 min-w-0">
                 {isLoaded && (
                   <DashboardGreeting user={user} projectCount={active.length} />
@@ -172,6 +173,11 @@ function DashboardContent() {
                 </Link>
               </div>
             </div>
+
+            {/* Builder stats — only shown to signed-in users with public projects */}
+            {isSignedIn && projects.length > 0 && (
+              <BuilderStats projects={projects} />
+            )}
 
             {/* Empty state */}
             {projects.length === 0 && <EmptyState />}

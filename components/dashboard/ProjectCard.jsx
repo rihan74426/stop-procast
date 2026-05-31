@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/Badge";
 import { overallProgress, activePhase, nextAction } from "@/lib/utils/progress";
 import { projectAgeLabel, timeAgo } from "@/lib/utils/date";
 import { FaFire } from "react-icons/fa";
+import { FiStar, FiEye, FiHeart } from "react-icons/fi";
 import { getPressure, PRESSURE_COLORS, PRESSURE_LABELS } from "@/lib/pressure";
 import { useI18n } from "@/lib/i18n";
 
@@ -16,6 +17,12 @@ export function ProjectCard({ project }) {
   const next = nextAction(project);
   const pressure = getPressure(project);
   const isCompleted = !!project.completionDate;
+
+  // Engagement totals — show if non-zero
+  const stars = project.stars ?? 0;
+  const views = project.views ?? 0;
+  const helpedCount = project.helpedCount ?? 0;
+  const hasEngagement = stars + views + helpedCount > 0;
 
   return (
     <Link href={`/project/${project.id}`} className="block group">
@@ -58,7 +65,7 @@ export function ProjectCard({ project }) {
         {/* Phase + pressure badges */}
         <div className="flex flex-wrap gap-1.5 mb-3">
           {isCompleted ? (
-            <Badge status="completed">✓ {t("project_done")}</Badge>
+            <Badge status="completed">{t("project_done")}</Badge>
           ) : (
             <>
               {phase && <Badge variant="violet">{phase.name}</Badge>}
@@ -99,6 +106,32 @@ export function ProjectCard({ project }) {
                 style={{ color: "var(--coral)" }}
               >
                 <FaFire size={10} /> {project.streakDays}d
+              </span>
+            )}
+            {/* Engagement micro-stats — only for public projects with data */}
+            {hasEngagement && project.isPublic !== false && (
+              <span className="flex items-center gap-2 shrink-0">
+                {stars > 0 && (
+                  <span
+                    className="flex items-center gap-0.5"
+                    style={{ color: "var(--amber)" }}
+                  >
+                    <FiStar size={9} /> {stars}
+                  </span>
+                )}
+                {views > 0 && (
+                  <span className="flex items-center gap-0.5">
+                    <FiEye size={9} /> {views}
+                  </span>
+                )}
+                {helpedCount > 0 && (
+                  <span
+                    className="flex items-center gap-0.5"
+                    style={{ color: "var(--coral)" }}
+                  >
+                    <FiHeart size={9} /> {helpedCount}
+                  </span>
+                )}
               </span>
             )}
             <span className="truncate">{timeAgo(project.lastActivityAt)}</span>

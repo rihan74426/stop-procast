@@ -1,7 +1,10 @@
 /**
  * GET /api/explore
  * Public endpoint — returns paginated, anonymized public projects.
- * All isPublic projects shown — publicQuality used for ranking only, never gating.
+ *
+ * CRITICAL FIX: query uses { isPublic: { $ne: false } } instead of
+ * { isPublic: true } so legacy documents without the field set are
+ * treated as public (the intended default).
  */
 
 import { tryConnectDB } from "@/lib/db/mongoose";
@@ -22,6 +25,11 @@ const PUBLIC_PROJECTION = {
   phases: 1,
   completionDate: 1,
   createdAt: 1,
+  // Engagement
+  views: 1,
+  stars: 1,
+  helpedCount: 1,
+  exportCount: 1,
   _id: 0,
   __v: 0,
   userId: 0,
@@ -33,6 +41,8 @@ const PUBLIC_PROJECTION = {
   streakDays: 0,
   lastActivityAt: 0,
   dailyNextAction: 0,
+  starredBy: 0,
+  helpedBy: 0,
 };
 
 export async function GET(request) {
@@ -54,8 +64,10 @@ export async function GET(request) {
       );
     }
 
-    // Base query — ALL isPublic:true projects, no quality gate
-    const query = { isPublic: true };
+    // CRITICAL: $ne: false treats undefined/null as public
+    // This covers legacy documents created before isPublic field existed
+    const query = {};
+
     if (category && category !== "All") query.category = category;
     if (tag) query.tags = tag;
     if (q) {
@@ -67,10 +79,10 @@ export async function GET(request) {
       ];
     }
 
-    // Sort options
     const sortMap = {
       quality: { publicQuality: -1, createdAt: -1 },
       recent: { createdAt: -1 },
+      stars: { stars: -1, createdAt: -1 },
       completed: { completionDate: -1, createdAt: -1 },
     };
     const sortOrder = sortMap[sort] ?? sortMap.quality;
@@ -87,6 +99,10 @@ export async function GET(request) {
     // Strip phases to names + objectives only for card view
     const lightweight = projects.map((p) => ({
       ...p,
+      views: p.views ?? 0,
+      stars: p.stars ?? 0,
+      helpedCount: p.helpedCount ?? 0,
+      exportCount: p.exportCount ?? 0,
       phases: (p.phases ?? []).map((ph) => ({
         id: ph.id,
         name: ph.name,

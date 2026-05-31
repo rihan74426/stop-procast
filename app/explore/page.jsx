@@ -9,12 +9,15 @@ import { Badge } from "@/components/ui/Badge";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { CATEGORIES } from "@/lib/ai/publicize";
 import { useI18n } from "@/lib/i18n";
+import { getSessionId } from "@/lib/sessionId";
 import {
   FiSearch,
-  FiFilter,
-  FiTrendingUp,
-  FiClock,
   FiStar,
+  FiClock,
+  FiEye,
+  FiHeart,
+  FiDownload,
+  FiGitBranch,
 } from "react-icons/fi";
 
 const SCOPE_COLOR = {
@@ -23,8 +26,87 @@ const SCOPE_COLOR = {
   ambitious: "amber",
 };
 
-function ProjectPublicCard({ project, onFork }) {
-  const { t } = useI18n();
+// ─── Engagement bar ───────────────────────────────────────────────────
+
+function EngagementBar({
+  project,
+  sessionId,
+  onStar,
+  onHelped,
+  starring,
+  helping,
+}) {
+  const hasStarred =
+    typeof window !== "undefined" &&
+    sessionStorage.getItem(`starred_${project.id}`) === "1";
+  const hasHelped =
+    typeof window !== "undefined" &&
+    sessionStorage.getItem(`helped_${project.id}`) === "1";
+
+  return (
+    <div className="flex items-center gap-3 text-[10px] text-[var(--text-tertiary)]">
+      {/* Views */}
+      {(project.views ?? 0) > 0 && (
+        <span className="flex items-center gap-1">
+          <FiEye size={10} />
+          {project.views}
+        </span>
+      )}
+
+      {/* Stars */}
+      <button
+        onClick={() => onStar(project)}
+        disabled={starring}
+        title="Star this project"
+        className={[
+          "flex items-center gap-1 transition-colors",
+          hasStarred
+            ? "text-[var(--amber)] font-semibold"
+            : "hover:text-[var(--amber)]",
+        ].join(" ")}
+      >
+        <FiStar size={10} className={hasStarred ? "fill-current" : ""} />
+        {(project.stars ?? 0) > 0 ? project.stars : "Star"}
+      </button>
+
+      {/* Helped */}
+      <button
+        onClick={() => onHelped(project)}
+        disabled={helping}
+        title="Mark as helpful"
+        className={[
+          "flex items-center gap-1 transition-colors",
+          hasHelped
+            ? "text-[var(--coral)] font-semibold"
+            : "hover:text-[var(--coral)]",
+        ].join(" ")}
+      >
+        <FiHeart size={10} className={hasHelped ? "fill-current" : ""} />
+        {(project.helpedCount ?? 0) > 0 ? project.helpedCount : "Helpful"}
+      </button>
+
+      {/* Exports */}
+      {(project.exportCount ?? 0) > 0 && (
+        <span className="flex items-center gap-1">
+          <FiDownload size={10} />
+          {project.exportCount}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ─── Project card ─────────────────────────────────────────────────────
+
+function ProjectPublicCard({
+  project,
+  sessionId,
+  onFork,
+  onStar,
+  onHelped,
+  starringId,
+  helpingId,
+}) {
   return (
     <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-5 flex flex-col gap-3 hover:border-[var(--violet)] hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 transition-all duration-200 group">
       {/* Header */}
@@ -37,26 +119,27 @@ function ProjectPublicCard({ project, onFork }) {
             {project.oneLineGoal}
           </p>
         </div>
-        {/* Quality score badge */}
-        <div
-          className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold border-2"
-          style={{
-            borderColor:
-              project.publicQuality >= 90
-                ? "var(--emerald)"
-                : project.publicQuality >= 80
-                ? "var(--violet)"
-                : "var(--amber)",
-            color:
-              project.publicQuality >= 90
-                ? "var(--emerald)"
-                : project.publicQuality >= 80
-                ? "var(--violet)"
-                : "var(--amber)",
-          }}
-        >
-          {project.publicQuality}
-        </div>
+        {project.publicQuality != null && (
+          <div
+            className="shrink-0 w-10 h-10 rounded-full flex items-center justify-center text-xs font-bold border-2"
+            style={{
+              borderColor:
+                project.publicQuality >= 90
+                  ? "var(--emerald)"
+                  : project.publicQuality >= 80
+                  ? "var(--violet)"
+                  : "var(--amber)",
+              color:
+                project.publicQuality >= 90
+                  ? "var(--emerald)"
+                  : project.publicQuality >= 80
+                  ? "var(--violet)"
+                  : "var(--amber)",
+            }}
+          >
+            {project.publicQuality}
+          </div>
+        )}
       </div>
 
       {/* Phases preview */}
@@ -93,24 +176,35 @@ function ProjectPublicCard({ project, onFork }) {
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between pt-1 border-t border-[var(--border)] mt-auto">
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between pt-1 border-t border-[var(--border)] mt-auto gap-2">
+        <div className="flex items-center gap-2 min-w-0">
           <Badge variant={SCOPE_COLOR[project.scopeLevel] ?? "slate"}>
             {project.scopeLevel}
           </Badge>
           {project.timeline && (
-            <span className="text-[10px] text-[var(--text-tertiary)]">
+            <span className="text-[10px] text-[var(--text-tertiary)] truncate">
               {project.timeline}
             </span>
           )}
         </div>
         <button
           onClick={() => onFork(project)}
-          className="text-xs font-medium text-[var(--violet)] hover:underline transition-colors"
+          className="flex items-center gap-1 text-xs font-medium text-[var(--violet)] hover:underline transition-colors shrink-0"
         >
-          {t("explore_use_as_template")} →
+          <FiGitBranch size={11} />
+          Use template
         </button>
       </div>
+
+      {/* Engagement row */}
+      <EngagementBar
+        project={project}
+        sessionId={sessionId}
+        onStar={onStar}
+        onHelped={onHelped}
+        starring={starringId === project.id}
+        helping={helpingId === project.id}
+      />
     </div>
   );
 }
@@ -124,7 +218,6 @@ function SkeletonCard() {
           <div className="h-3 bg-[var(--bg-muted)] rounded w-full mb-1" />
           <div className="h-3 bg-[var(--bg-muted)] rounded w-2/3" />
         </div>
-        <div className="w-10 h-10 rounded-full bg-[var(--bg-muted)] shrink-0" />
       </div>
       <div className="flex gap-1 mb-3">
         {[1, 2, 3].map((i) => (
@@ -150,7 +243,14 @@ function ExploreContent() {
   const [sort, setSort] = useState("quality");
   const [query, setQuery] = useState("");
   const [searchInput, setSearchInput] = useState("");
+  const [sessionId, setSessionId] = useState(null);
+  const [starringId, setStarringId] = useState(null);
+  const [helpingId, setHelpingId] = useState(null);
   const searchTimer = useRef(null);
+
+  useEffect(() => {
+    setSessionId(getSessionId());
+  }, []);
 
   const fetchProjects = useCallback(
     async (opts = {}) => {
@@ -213,7 +313,6 @@ function ExploreContent() {
   };
 
   const handleFork = (project) => {
-    // Store template idea in sessionStorage, redirect to /new
     try {
       sessionStorage.setItem(
         "momentum_fork_template",
@@ -228,6 +327,70 @@ function ExploreContent() {
     window.location.href = "/new";
   };
 
+  const handleStar = async (project) => {
+    const actor = sessionId;
+    if (!actor) return;
+    const key = `starred_${project.id}`;
+    const alreadyStarred = sessionStorage.getItem(key) === "1";
+    const action = alreadyStarred ? "unstar" : "star";
+
+    setStarringId(project.id);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/engage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, actorId: actor }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        if (alreadyStarred) {
+          sessionStorage.removeItem(key);
+        } else {
+          sessionStorage.setItem(key, "1");
+        }
+        // Update local state
+        setProjects((prev) =>
+          prev.map((p) =>
+            p.id === project.id ? { ...p, stars: data.stars } : p
+          )
+        );
+      }
+    } catch {
+      /* silent */
+    } finally {
+      setStarringId(null);
+    }
+  };
+
+  const handleHelped = async (project) => {
+    const actor = sessionId;
+    if (!actor) return;
+    const key = `helped_${project.id}`;
+    if (sessionStorage.getItem(key) === "1") return;
+
+    setHelpingId(project.id);
+    try {
+      const res = await fetch(`/api/projects/${project.id}/engage`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "helped", actorId: actor }),
+      });
+      const data = await res.json();
+      if (data.ok && !data.alreadyMarked) {
+        sessionStorage.setItem(key, "1");
+        setProjects((prev) =>
+          prev.map((p) =>
+            p.id === project.id ? { ...p, helpedCount: data.helpedCount } : p
+          )
+        );
+      }
+    } catch {
+      /* silent */
+    } finally {
+      setHelpingId(null);
+    }
+  };
+
   const hasMore = projects.length < total;
 
   return (
@@ -237,14 +400,11 @@ function ExploreContent() {
         <TopBar />
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-            {/* Hero header */}
+            {/* Header */}
             <div className="mb-6 sm:mb-8">
-              <div className="flex items-center gap-2 mb-2">
-                <span className="text-2xl">🌍</span>
-                <h1 className="font-display font-bold text-2xl sm:text-3xl text-[var(--text-primary)]">
-                  {t("explore_title")}
-                </h1>
-              </div>
+              <h1 className="font-display font-bold text-2xl sm:text-3xl text-[var(--text-primary)] mb-1">
+                {t("explore_title")}
+              </h1>
               <p className="text-sm text-[var(--text-secondary)] max-w-xl">
                 {t("explore_subtitle")}
               </p>
@@ -268,16 +428,9 @@ function ExploreContent() {
               {/* Sort */}
               <div className="flex gap-1.5 bg-[var(--bg-subtle)] rounded-[var(--r-md)] p-1">
                 {[
-                  {
-                    id: "quality",
-                    icon: FiStar,
-                    label: t("explore_sort_quality"),
-                  },
-                  {
-                    id: "recent",
-                    icon: FiClock,
-                    label: t("explore_sort_recent"),
-                  },
+                  { id: "quality", icon: FiStar, label: "Top rated" },
+                  { id: "recent", icon: FiClock, label: "Recent" },
+                  { id: "stars", icon: FiStar, label: "Stars" },
                 ].map(({ id, icon: Icon, label }) => (
                   <button
                     key={id}
@@ -318,8 +471,8 @@ function ExploreContent() {
             {!loading && (
               <p className="text-xs text-[var(--text-tertiary)] mb-4">
                 {total === 0
-                  ? t("explore_no_results")
-                  : t("explore_count", { count: total })}
+                  ? "No projects found"
+                  : `${total} project${total !== 1 ? "s" : ""}`}
               </p>
             )}
 
@@ -333,7 +486,12 @@ function ExploreContent() {
                     <ProjectPublicCard
                       key={p.publicSlug ?? p.id}
                       project={p}
+                      sessionId={sessionId}
                       onFork={handleFork}
+                      onStar={handleStar}
+                      onHelped={handleHelped}
+                      starringId={starringId}
+                      helpingId={helpingId}
                     />
                   ))}
             </div>
@@ -345,7 +503,7 @@ function ExploreContent() {
                   onClick={handleLoadMore}
                   className="px-6 py-2.5 text-sm font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all"
                 >
-                  {t("explore_load_more")}
+                  Load more
                 </button>
               </div>
             )}
@@ -359,18 +517,20 @@ function ExploreContent() {
             {/* Empty state */}
             {!loading && projects.length === 0 && (
               <div className="flex flex-col items-center py-16 text-center">
-                <div className="text-5xl mb-4">🔭</div>
+                <div className="w-16 h-16 rounded-2xl bg-[var(--bg-subtle)] flex items-center justify-center mb-4">
+                  <FiSearch size={24} className="text-[var(--text-tertiary)]" />
+                </div>
                 <h2 className="font-display font-semibold text-xl text-[var(--text-primary)] mb-2">
-                  {t("explore_empty_title")}
+                  No projects yet
                 </h2>
                 <p className="text-sm text-[var(--text-secondary)] max-w-sm mb-6">
-                  {t("explore_empty_desc")}
+                  Be the first to share a completed project with the community.
                 </p>
                 <Link
                   href="/new"
                   className="px-5 py-2.5 rounded-[var(--r-md)] bg-[var(--violet)] text-white text-sm font-semibold hover:bg-[var(--violet-dim)] transition-colors"
                 >
-                  {t("explore_empty_cta")}
+                  Start a project
                 </Link>
               </div>
             )}

@@ -25,6 +25,7 @@ import {
   exportProjectMarkdown,
   exportProjectJSON,
 } from "@/lib/utils/exportMarkdown";
+import { useEngageView, trackExport } from "@/lib/utils/engage";
 import { useI18n } from "@/lib/i18n";
 import { toast } from "@/lib/toast";
 import {
@@ -36,6 +37,7 @@ import {
   FaLock,
   FaLockOpen,
 } from "react-icons/fa";
+import { FiStar, FiHeart, FiEye, FiDownload } from "react-icons/fi";
 import { MdDelete } from "react-icons/md";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
@@ -46,7 +48,6 @@ function PublicViewBanner({ projectTitle }) {
   const { t } = useI18n();
   return (
     <div className="rounded-[var(--r-lg)] border border-[var(--violet)] bg-[var(--violet-bg)] px-4 py-3 flex items-center gap-3 mb-4">
-      <span className="text-lg shrink-0">🌍</span>
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-[var(--violet-dim)]">
           {t("project_public_view_title")}
@@ -60,6 +61,43 @@ function PublicViewBanner({ projectTitle }) {
           {t("project_public_view_cta")}
         </Button>
       </Link>
+    </div>
+  );
+}
+
+// ─── Engagement bar for public view ───────────────────────────────────
+
+function PublicEngagementBar({ project }) {
+  const stars = project.stars ?? 0;
+  const helpedCount = project.helpedCount ?? 0;
+  const views = project.views ?? 0;
+  const exportCount = project.exportCount ?? 0;
+
+  if (stars + helpedCount + views + exportCount === 0) return null;
+
+  return (
+    <div className="flex items-center gap-4 text-xs text-[var(--text-tertiary)] mb-4">
+      {views > 0 && (
+        <span className="flex items-center gap-1.5">
+          <FiEye size={12} /> {views} {views === 1 ? "view" : "views"}
+        </span>
+      )}
+      {stars > 0 && (
+        <span className="flex items-center gap-1.5">
+          <FiStar size={12} /> {stars} {stars === 1 ? "star" : "stars"}
+        </span>
+      )}
+      {helpedCount > 0 && (
+        <span className="flex items-center gap-1.5">
+          <FiHeart size={12} /> helped {helpedCount}
+        </span>
+      )}
+      {exportCount > 0 && (
+        <span className="flex items-center gap-1.5">
+          <FiDownload size={12} /> {exportCount}{" "}
+          {exportCount === 1 ? "export" : "exports"}
+        </span>
+      )}
     </div>
   );
 }
@@ -108,13 +146,11 @@ function ProjectPageClient({ id }) {
   const router = useRouter();
   const { t } = useI18n();
 
-  // Try local store first (owner with edit access)
   const storeProject = useProjectStore((s) => s.getProject(id));
   const deleteProject = useProjectStore((s) => s.deleteProject);
   const completeProject = useProjectStore((s) => s.completeProject);
   const updateProject = useProjectStore((s) => s.updateProject);
 
-  // Public fallback state
   const [publicProject, setPublicProject] = useState(null);
   const [isPublicView, setIsPublicView] = useState(false);
   const [publicLoading, setPublicLoading] = useState(false);
@@ -127,9 +163,15 @@ function ProjectPageClient({ id }) {
     loading: false,
   });
 
-  // If not in store, fetch from public API
+  const project = storeProject ?? publicProject;
+  const isOwner = !!storeProject;
+
+  // Track view for non-owners
+  useEngageView(id, isOwner);
+
+  // Fetch from public API if not in store
   useEffect(() => {
-    if (storeProject) return; // owner has it — no need
+    if (storeProject) return;
     setPublicLoading(true);
     fetch(`/api/projects/${id}`)
       .then((r) => {
@@ -147,10 +189,6 @@ function ProjectPageClient({ id }) {
       });
   }, [id, storeProject]);
 
-  const project = storeProject ?? publicProject;
-  const isOwner = !!storeProject;
-
-  // ── Toggle visibility ───────────────────────────────────────────────
   const handleToggleVisibility = useCallback(async () => {
     if (!isOwner || !project) return;
     const next = !project.isPublic;
@@ -189,20 +227,17 @@ function ProjectPageClient({ id }) {
     }
   }, [confirmModal.type, deleteProject, completeProject, id, router, t]);
 
-  // ── Loading / error states ──────────────────────────────────────────
-
   if (publicLoading) return <ProjectSkeleton />;
 
   if (publicError || (!project && !publicLoading)) {
     return (
       <div className="flex h-screen items-center justify-center px-4">
         <div className="text-center">
-          <p className="text-4xl mb-4">🔒</p>
           <p className="text-[var(--text-secondary)] mb-4">
             {t("project_not_found")}
           </p>
           <Link href="/">
-            <Button variant="ghost">← {t("nav_dashboard")}</Button>
+            <Button variant="ghost">Back to dashboard</Button>
           </Link>
         </div>
       </div>
@@ -215,6 +250,7 @@ function ProjectPageClient({ id }) {
   const handleExportMarkdown = () => {
     try {
       exportProjectMarkdown(project);
+      trackExport(project.id);
     } catch {
       toast.error(t("toast_export_md_error"));
     }
@@ -223,6 +259,7 @@ function ProjectPageClient({ id }) {
   const handleExportJSON = () => {
     try {
       exportProjectJSON(project);
+      trackExport(project.id);
     } catch {
       toast.error(t("toast_export_json_error"));
     }
@@ -233,6 +270,7 @@ function ProjectPageClient({ id }) {
     try {
       const { exportProjectPDF } = await import("@/lib/utils/exportPDF");
       await exportProjectPDF(project);
+      trackExport(project.id);
       toast.dismiss(toastId);
     } catch {
       toast.dismiss(toastId);
@@ -265,10 +303,12 @@ function ProjectPageClient({ id }) {
         <TopBar />
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
-            {/* Public view banner for non-owners */}
             {isPublicView && !isOwner && (
               <PublicViewBanner projectTitle={project.projectTitle} />
             )}
+
+            {/* Engagement stats for public view */}
+            {!isOwner && <PublicEngagementBar project={project} />}
 
             {/* Breadcrumb */}
             <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)] mb-4 sm:mb-6 min-w-0">
@@ -284,9 +324,9 @@ function ProjectPageClient({ id }) {
               </span>
             </div>
 
-            {/* Responsive two-column layout */}
+            {/* Two-column layout */}
             <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-[1fr_260px] xl:grid-cols-[1fr_280px]">
-              {/* ── Left column ── */}
+              {/* Left column */}
               <div className="flex flex-col gap-4 sm:gap-5 min-w-0">
                 {/* Project header */}
                 <div>
@@ -320,16 +360,14 @@ function ProjectPageClient({ id }) {
                       </Badge>
                     )}
                     {isCompleted && (
-                      <Badge status="completed">✓ {t("project_done")}</Badge>
+                      <Badge status="completed">{t("project_done")}</Badge>
                     )}
-                    {/* Public / private indicator */}
                     <Badge variant={project.isPublic ? "emerald" : "slate"}>
-                      {project.isPublic ? "🌍 Public" : "🔒 Private"}
+                      {project.isPublic ? "Public" : "Private"}
                     </Badge>
                   </div>
                 </div>
 
-                {/* Only show pressure/streak for owners */}
                 {isOwner && <ProjectPressure project={project} />}
                 {isOwner && <StreakBanner project={project} />}
 
@@ -346,7 +384,6 @@ function ProjectPageClient({ id }) {
                   {isOwner ? (
                     <TaskList project={project} />
                   ) : (
-                    // Read-only task list for public view
                     <div className="flex flex-col gap-1">
                       {project.tasks?.slice(0, 20).map((task) => (
                         <div
@@ -391,7 +428,7 @@ function ProjectPageClient({ id }) {
                 </div>
               </div>
 
-              {/* ── Right column ── */}
+              {/* Right column */}
               <div className="flex flex-col gap-3 sm:gap-4 pb-20 lg:pb-0">
                 {/* Stats */}
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
@@ -458,7 +495,7 @@ function ProjectPageClient({ id }) {
                           className="flex items-start gap-2 text-xs sm:text-sm text-[var(--text-secondary)]"
                         >
                           <span className="text-[var(--emerald)] mt-0.5 shrink-0">
-                            ✓
+                            +
                           </span>
                           <span>{c}</span>
                         </li>
@@ -510,7 +547,6 @@ function ProjectPageClient({ id }) {
                       </Button>
                     )}
 
-                    {/* Visibility toggle */}
                     <Button
                       variant="ghost"
                       onClick={handleToggleVisibility}
@@ -595,7 +631,7 @@ function ProjectPageClient({ id }) {
                       href={`/new?fork=${id}`}
                       className="inline-flex items-center gap-2 px-4 py-2 rounded-[var(--r-md)] bg-[var(--violet)] text-white text-xs font-semibold hover:bg-[var(--violet-dim)] transition-colors"
                     >
-                      🍴 {t("project_fork_btn")}
+                      {t("project_fork_btn")}
                     </Link>
                   </div>
                 )}
