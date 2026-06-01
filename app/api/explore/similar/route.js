@@ -1,14 +1,15 @@
 /**
  * GET /api/explore/similar?q=<idea text>
  * Returns up to 3 similar public projects based on title/goal fuzzy match.
- * No quality gate — all isPublic projects are candidates.
- * Quality used only for ranking (best results first).
+ *
+ * Projection fix: pure inclusion only — no field:0 except _id.
  */
 
 import { tryConnectDB } from "@/lib/db/mongoose";
 import Project from "@/lib/models/Project";
 
 const SIMILAR_PROJECTION = {
+  _id: 0,
   id: 1,
   publicSlug: 1,
   projectTitle: 1,
@@ -19,12 +20,6 @@ const SIMILAR_PROJECTION = {
   publicQuality: 1,
   phases: 1,
   completionDate: 1,
-  _id: 0,
-  userId: 0,
-  sessionId: 0,
-  tasks: 0,
-  blockers: 0,
-  postmortem: 0,
 };
 
 export async function GET(request) {
@@ -32,16 +27,11 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const q = searchParams.get("q")?.trim();
 
-    if (!q || q.length < 8) {
-      return Response.json({ projects: [] });
-    }
+    if (!q || q.length < 8) return Response.json({ projects: [] });
 
     const db = await tryConnectDB();
-    if (!db) {
-      return Response.json({ projects: [] });
-    }
+    if (!db) return Response.json({ projects: [] });
 
-    // Strip stop words to get meaningful keywords
     const stopWords = new Set([
       "a",
       "an",
@@ -88,11 +78,8 @@ export async function GET(request) {
       .filter((w) => w.length > 3 && !stopWords.has(w))
       .slice(0, 6);
 
-    if (keywords.length === 0) {
-      return Response.json({ projects: [] });
-    }
+    if (keywords.length === 0) return Response.json({ projects: [] });
 
-    // OR across all keyword+field combinations — no quality gate
     const orClauses = keywords.flatMap((kw) => [
       { projectTitle: { $regex: kw, $options: "i" } },
       { oneLineGoal: { $regex: kw, $options: "i" } },
@@ -101,24 +88,23 @@ export async function GET(request) {
     ]);
 
     const projects = await Project.find(
-      { isPublic: true, $or: orClauses },
+      { isPublic: { $ne: false }, $or: orClauses },
       SIMILAR_PROJECTION
     )
-      // AI-scored projects ranked first; unscored (null) last
       .sort({ publicQuality: -1, createdAt: -1 })
       .limit(3)
       .lean();
 
-    const lightweight = projects.map((p) => ({
-      ...p,
-      phases: (p.phases ?? []).map((ph) => ({
-        name: ph.name,
-        objective: ph.objective,
-      })),
-    }));
-
     return Response.json(
-      { projects: lightweight },
+      {
+        projects: projects.map((p) => ({
+          ...p,
+          phases: (p.phases ?? []).map((ph) => ({
+            name: ph.name,
+            objective: ph.objective,
+          })),
+        })),
+      },
       {
         headers: {
           "Cache-Control": "public, s-maxage=120, stale-while-revalidate=600",

@@ -1,96 +1,84 @@
 "use client";
 
-import { Button } from "@/components/ui/Button";
+import React from "react";
+import PropTypes from "prop-types";
+import { t } from "../../lib/i18n/translations";
 
-const SCOPES = [
-  {
-    id: "lean",
-    label: "Lean",
-    subtitle: "Start fast, learn fast",
-    description:
-      "Bare essentials only. 2 phases, core steps. Perfect for testing an idea or starting a new habit.",
-    timeHint: "2–3 weeks",
-    color: "var(--emerald)",
-    bg: "var(--emerald-bg)",
-  },
+const options = [
+  { id: "lean", labelKey: "scope_lean_label", hintKey: "scope_lean_hint" },
   {
     id: "standard",
-    label: "Standard",
-    subtitle: "Balanced & realistic",
-    description:
-      "Solid plan with 3 phases. All the important steps, no overwhelm.",
-    timeHint: "4–8 weeks",
-    color: "var(--violet)",
-    bg: "var(--violet-bg)",
-    recommended: true,
+    labelKey: "scope_standard_label",
+    hintKey: "scope_standard_hint",
   },
   {
     id: "ambitious",
-    label: "Ambitious",
-    subtitle: "Full vision",
-    description:
-      "4–5 phases covering every angle. For goals you're fully committed to seeing through.",
-    timeHint: "8–16 weeks",
-    color: "var(--amber)",
-    bg: "var(--amber-bg)",
+    labelKey: "scope_ambitious_label",
+    hintKey: "scope_ambitious_hint",
   },
 ];
 
-export function StepScope({ value, onChange, onBack, onNext }) {
+export function StepScope({
+  lang = "en",
+  scope = "standard",
+  onChange = () => {},
+  onBack,
+  onNext,
+}) {
   return (
     <div className="flex flex-col gap-6 sm:gap-8">
       <div>
         <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)] mb-2">
-          How ambitious is this?
+          {t(lang, "intake_scope")}
         </h1>
         <p className="text-sm sm:text-base text-[var(--text-secondary)]">
-          This shapes the depth of your plan. You can always adjust as you go.
+          {t(lang, "intake_scope_desc")}
         </p>
       </div>
 
       <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-3">
-        {SCOPES.map((scope) => {
-          const selected = value === scope.id;
+        {options.map((opt) => {
+          const selected = scope === opt.id;
           return (
-            <button
-              key={scope.id}
-              onClick={() => onChange(scope.id)}
-              className={[
-                "relative text-left rounded-[var(--r-lg)] border-2 p-4 sm:p-5 transition-all duration-200",
+            <label
+              key={opt.id}
+              className={`scope-option relative text-left rounded-[var(--r-lg)] border-2 p-4 sm:p-5 transition-all duration-200 ${
                 selected
                   ? "border-[var(--violet)] shadow-[var(--shadow-md)]"
-                  : "border-[var(--border)] hover:border-[var(--slate-4)]",
-              ].join(" ")}
+                  : "border-[var(--border)] hover:border-[var(--slate-4)]"
+              }`}
+              style={{
+                display: "block",
+                border: selected ? "1px solid #007acc" : "1px solid #ddd",
+                padding: "12px",
+                marginBottom: "8px",
+                borderRadius: 6,
+                cursor: "pointer",
+              }}
+              role="radiogroup"
+              aria-label={t(lang, "intake_scope")}
             >
-              {scope.recommended && (
-                <span
-                  className="absolute -top-3 left-1/2 -translate-x-1/2 px-3 py-0.5 text-xs font-medium rounded-full text-white"
-                  style={{ background: "var(--violet)" }}
-                >
-                  Recommended
-                </span>
-              )}
+              <input
+                type="radio"
+                name="scope"
+                value={opt.id}
+                checked={selected}
+                onChange={() => onChange(opt.id)}
+                style={{ marginRight: 8 }}
+              />
+              <strong className="font-display font-semibold text-base sm:text-lg text-[var(--text-primary)] mb-0.5">
+                {t(lang, opt.labelKey)}
+              </strong>
               <div
-                className="w-7 h-7 sm:w-8 sm:h-8 rounded-[var(--r-md)] flex items-center justify-center mb-3 sm:mb-4"
-                style={{ background: scope.bg }}
+                className="hint"
+                style={{
+                  fontSize: 13,
+                  color: "#666",
+                  marginTop: 6,
+                }}
               >
-                <div
-                  className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full"
-                  style={{ background: scope.color }}
-                />
+                {t(lang, opt.hintKey)}
               </div>
-              <p className="font-display font-semibold text-base sm:text-lg text-[var(--text-primary)] mb-0.5">
-                {scope.label}
-              </p>
-              <p className="text-xs text-[var(--text-secondary)] mb-2 sm:mb-3">
-                {scope.subtitle}
-              </p>
-              <p className="text-xs sm:text-sm text-[var(--text-secondary)] leading-relaxed mb-3 sm:mb-4">
-                {scope.description}
-              </p>
-              <p className="text-xs font-medium" style={{ color: scope.color }}>
-                ≈ {scope.timeHint}
-              </p>
               {selected && (
                 <div
                   className="absolute top-3 sm:top-4 right-3 sm:right-4 w-5 h-5 rounded-full flex items-center justify-center"
@@ -107,24 +95,38 @@ export function StepScope({ value, onChange, onBack, onNext }) {
                   </svg>
                 </div>
               )}
-            </button>
+            </label>
           );
         })}
       </div>
 
       <div className="flex items-center justify-between gap-3">
-        <Button variant="ghost" onClick={onBack}>
+        <button type="button" onClick={onBack} className="btn-ghost">
           ← Back
-        </Button>
-        <Button
+        </button>
+        <button
+          type="button"
           onClick={onNext}
-          disabled={!value}
-          size="lg"
-          className="flex-1 sm:flex-none justify-center"
+          disabled={!scope}
+          className="btn-primary flex-1 sm:flex-none justify-center"
+          style={{
+            background: "#007acc",
+            color: "#fff",
+            border: "none",
+            padding: "10px 14px",
+            borderRadius: 6,
+            cursor: "pointer",
+          }}
         >
-          Generate plan →
-        </Button>
+          {t(lang, "intake_generate")}
+        </button>
       </div>
     </div>
   );
 }
+
+StepScope.propTypes = {
+  lang: PropTypes.string,
+  scope: PropTypes.oneOf(["lean", "standard", "ambitious"]),
+  onChange: PropTypes.func,
+};

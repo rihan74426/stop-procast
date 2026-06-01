@@ -1,16 +1,24 @@
 /**
  * GET /api/explore
- * Public endpoint — returns paginated, anonymized public projects.
  *
- * CRITICAL FIX: query uses { isPublic: { $ne: false } } instead of
- * { isPublic: true } so legacy documents without the field set are
- * treated as public (the intended default).
+ * CRITICAL FIX: projection was mixing field:1 (include) and field:0 (exclude).
+ * MongoDB forbids this — only _id:0 is allowed alongside includes.
+ * That caused a MongoServerError that was silently caught, returning [].
+ *
+ * Fix: use ONLY inclusion projection (field:1). Sensitive fields are simply
+ * omitted from the include list rather than explicitly excluded.
+ *
+ * Query uses { isPublic: { $ne: false } } so legacy docs without the field
+ * are treated as public (the intended default).
  */
 
 import { tryConnectDB } from "@/lib/db/mongoose";
 import Project from "@/lib/models/Project";
 
+// ONLY inclusion fields + _id:0 (the one allowed exception).
+// Do NOT add any field:0 lines here — that breaks MongoDB.
 const PUBLIC_PROJECTION = {
+  _id: 0,
   id: 1,
   publicSlug: 1,
   projectTitle: 1,
@@ -25,24 +33,12 @@ const PUBLIC_PROJECTION = {
   phases: 1,
   completionDate: 1,
   createdAt: 1,
-  // Engagement
+  isPublic: 1,
+  // Engagement counters
   views: 1,
   stars: 1,
   helpedCount: 1,
   exportCount: 1,
-  _id: 0,
-  __v: 0,
-  userId: 0,
-  sessionId: 0,
-  isAnonymous: 0,
-  tasks: 0,
-  blockers: 0,
-  postmortem: 0,
-  streakDays: 0,
-  lastActivityAt: 0,
-  dailyNextAction: 0,
-  starredBy: 0,
-  helpedBy: 0,
 };
 
 export async function GET(request) {
@@ -64,9 +60,8 @@ export async function GET(request) {
       );
     }
 
-    // CRITICAL: $ne: false treats undefined/null as public
-    // This covers legacy documents created before isPublic field existed
-    const query = {};
+    // $ne: false treats undefined/null as public — covers all legacy documents
+    const query = { isPublic: { $ne: false } };
 
     if (category && category !== "All") query.category = category;
     if (tag) query.tags = tag;
@@ -96,7 +91,7 @@ export async function GET(request) {
       Project.countDocuments(query),
     ]);
 
-    // Strip phases to names + objectives only for card view
+    // Slim down phases for card view; fill in missing engagement defaults
     const lightweight = projects.map((p) => ({
       ...p,
       views: p.views ?? 0,

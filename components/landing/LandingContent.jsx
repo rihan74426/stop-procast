@@ -637,11 +637,7 @@ export default function LandingContent() {
               borderColor: "var(--violet)",
             }}
           >
-            <Link
-              href="/dashboard"
-              style={{ color: "var(--violet-dim)" }}
-              className="hover:underline"
-            >
+            <Link href="/dashboard" style={{ color: "var(--violet-dim)" }}>
               {t("guest_dashboard_go")} →
             </Link>
           </div>

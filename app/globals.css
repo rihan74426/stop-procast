@@ -179,6 +179,7 @@ html {
 button {
   padding: calc(var(--spacing) * 1);
   border-radius: var(--radius-2xl);
+  cursor: pointer;
 }
 
 body,

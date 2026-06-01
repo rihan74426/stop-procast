@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
-import { acceptTos } from "@/lib/tos";
 import { useI18n } from "@/lib/i18n";
+import { acceptTos } from "@/lib/tos";
 
 /**
  * TosModal — shown once per session before the first AI generation.

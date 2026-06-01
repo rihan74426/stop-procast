@@ -14,7 +14,7 @@ import { generateClarifyQuestions } from "@/lib/ai/clientGenerate";
 import { parseClarifyQuestions } from "@/lib/ai/parser";
 import { createToastSequence } from "@/lib/toastSequence";
 import { useI18n } from "@/lib/i18n";
-import { SimilarProjectsBanner } from "@/components/intake/SimilarProjectsBanner";
+import { SimilarProjectsBanner } from "./SimilarProjectBanner";
 
 // ─── GhostInput ───────────────────────────────────────────────────────
 
@@ -466,7 +466,13 @@ export function StepClarify({
           >
             {t("intake_skip")}
           </Button>
-          <Button onClick={onNext} size="lg" type="button" disabled={loading}>
+          <Button
+            onClick={onNext}
+            style={{ background: "var(--violet)", color: "white" }}
+            size="lg"
+            type="button"
+            disabled={loading}
+          >
             {canProceed
               ? t("intake_clarify_build")
               : t("intake_clarify_answer_count", {

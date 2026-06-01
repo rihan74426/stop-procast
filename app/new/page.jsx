@@ -21,7 +21,6 @@ import { parseBlueprint } from "@/lib/ai/parser";
 import { loadUserProfile, buildProfileContext } from "@/lib/userProfile";
 import { useI18n } from "@/lib/i18n";
 import { BiSolidPencil } from "react-icons/bi";
-import { isTosAccepted } from "@/lib/tos";
 import { TosModal } from "@/components/ui/TosModal";
 
 const STEP_LABELS_KEYS = ["Capture", "Clarify", "Scope", "Review", "Commit"];

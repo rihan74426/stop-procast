@@ -156,5 +156,6 @@ Non-owner public view shows "Use as template" CTA → links to `/new?fork=${id}`
 - Do NOT show the ToS modal more than once per session for the same user
 - Do NOT add `isPublic`, `publicQuality`, etc. to `TaskSchema` — they belong on root `ProjectSchema` only
 
-never use emojis here.
-the project data needs views, star, and helped mark, also we'll let users to count the download numbers of the project like exports. and we'll inspire the builders with those data in their dashboard. their progress and how many they helped. and how many stars they've got by their built projects.
+the clicks on projects in the explore will open the project page, where users can export them after they sign in instantly. or they can accuire them as their project. and start a journey for themselves.
+
+the explore page will not have a sidebar. it needs to be open and more elitely designed that attracts visitors and produces curisity. Improve and make it a masterpiece.
