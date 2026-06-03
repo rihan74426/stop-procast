@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useUser, SignInButton, SignUpButton } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { SavePromptModal } from "@/components/ui/SavePromptModal";
 import { TopBar } from "@/components/layout/Topbar";
@@ -18,7 +19,6 @@ import { EmailExportModal } from "@/components/project/EmailExportModal";
 import { ProgressRing } from "@/components/ui/Progress";
 import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
-import { Modal } from "@/components/ui/Modal";
 import { overallProgress } from "@/lib/utils/progress";
 import { formatDate, projectAgeLabel } from "@/lib/utils/date";
 import {
@@ -37,22 +37,658 @@ import {
   FaLock,
   FaLockOpen,
 } from "react-icons/fa";
-import { FiStar, FiHeart, FiEye, FiDownload } from "react-icons/fi";
+import {
+  FiStar,
+  FiHeart,
+  FiEye,
+  FiDownload,
+  FiGitBranch,
+  FiArrowRight,
+  FiAlertCircle,
+  FiCheckCircle,
+  FiLock,
+} from "react-icons/fi";
 import { MdDelete } from "react-icons/md";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 
-// ─── Public-view read-only banner ─────────────────────────────────────
+// ─── Access levels ────────────────────────────────────────────────────
+// OWNER       → project is in their account (storeProject !== null)
+// AUTHED      → signed in but does not own this project
+// ANONYMOUS   → not signed in
+//
+// Capabilities by level:
+//   OWNER    : edit tasks, blockers, complete, delete, visibility, all exports
+//   AUTHED   : export only + acquire (everything else locked until acquired)
+//   ANONYMOUS: read-only view; sign-in gate on export + acquire
 
-function PublicViewBanner({ projectTitle }) {
+// ─── Sign-in / sign-up gate ───────────────────────────────────────────
+function SignInGate({ open, onClose, context = "export", projectTitle }) {
+  if (!open) return null;
+  const isExport = context === "export";
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{ background: "rgba(12,12,15,0.78)", backdropFilter: "blur(8px)" }}
+    >
+      <div
+        className="w-full sm:max-w-md rounded-t-[var(--r-xl)] sm:rounded-[var(--r-xl)] border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)] overflow-hidden"
+        style={{
+          animation: "gateIn 260ms cubic-bezier(0.175,0.885,0.32,1.275) both",
+        }}
+      >
+        {/* Header */}
+        <div
+          className="px-6 py-5"
+          style={{
+            background:
+              "linear-gradient(135deg, var(--violet) 0%, #534ab7 100%)",
+          }}
+        >
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <div className="text-2xl mb-2">{isExport ? "📦" : "🚀"}</div>
+              <p className="font-display font-bold text-white text-lg leading-tight">
+                {isExport
+                  ? "Sign in to export"
+                  : "Sign in to acquire this plan"}
+              </p>
+              <p className="text-white/75 text-sm mt-1 leading-relaxed">
+                {isExport
+                  ? `Download the full blueprint for "${projectTitle}" as PDF, Markdown, or JSON.`
+                  : `Fork "${projectTitle}" to your dashboard and start tracking your own execution.`}
+              </p>
+            </div>
+            <button
+              onClick={onClose}
+              className="text-white/60 hover:text-white transition-colors text-xl leading-none mt-0.5"
+              aria-label="Close"
+            >
+              ×
+            </button>
+          </div>
+        </div>
+
+        {/* Body */}
+        <div className="px-6 py-5">
+          <ul className="flex flex-col gap-2 mb-5">
+            {(isExport
+              ? [
+                  { icon: "📄", text: "Export as PDF, Markdown, or JSON" },
+                  { icon: "📧", text: "Send the blueprint to your email" },
+                  { icon: "💾", text: "Your projects sync across all devices" },
+                ]
+              : [
+                  {
+                    icon: "🎯",
+                    text: "Get your own editable copy of this plan",
+                  },
+                  { icon: "✅", text: "Check off tasks and mark milestones" },
+                  { icon: "🔥", text: "Build streaks — finish what you start" },
+                ]
+            ).map(({ icon, text }) => (
+              <li
+                key={text}
+                className="flex items-center gap-3 text-sm"
+                style={{ color: "var(--text-primary)" }}
+              >
+                <span
+                  className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-base"
+                  style={{ background: "var(--emerald-bg)" }}
+                >
+                  {icon}
+                </span>
+                {text}
+              </li>
+            ))}
+          </ul>
+
+          <div className="flex flex-col gap-2.5">
+            <SignUpButton mode="modal">
+              <button
+                onClick={onClose}
+                className="w-full h-11 rounded-[var(--r-md)] font-semibold text-sm text-white transition-all active:scale-[0.98]"
+                style={{ background: "var(--violet)" }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.background = "var(--violet-dim)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.background = "var(--violet)")
+                }
+              >
+                Create free account — it takes 30 seconds
+              </button>
+            </SignUpButton>
+            <SignInButton mode="modal">
+              <button
+                onClick={onClose}
+                className="w-full h-10 rounded-[var(--r-md)] border text-sm transition-all"
+                style={{
+                  borderColor: "var(--border)",
+                  color: "var(--text-secondary)",
+                  background: "transparent",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--bg-subtle)";
+                  e.currentTarget.style.color = "var(--text-primary)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = "var(--text-secondary)";
+                }}
+              >
+                Sign in to existing account
+              </button>
+            </SignInButton>
+            <button
+              onClick={onClose}
+              className="w-full py-1.5 text-xs transition-colors"
+              style={{ color: "var(--text-tertiary)" }}
+            >
+              Continue browsing
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes gateIn {
+          from { opacity: 0; transform: translateY(24px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @media (max-width: 640px) {
+          @keyframes gateIn {
+            from { opacity: 0; transform: translateY(100%); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ─── Acquire panel (shown to signed-in non-owners) ────────────────────
+// Checks the 4-project limit before forking.
+function AcquirePanel({ project }) {
+  const router = useRouter();
+  const addProject = useProjectStore((s) => s.addProject);
+  const projects = useProjectStore((s) => s.projects);
+
+  const [status, setStatus] = useState("idle"); // idle | checking | acquiring | limited | done | error
+  const [limitInfo, setLimitInfo] = useState(null); // { count, limit }
+  const AUTH_LIMIT = 4;
+
+  // Quick local count so we can show the state without a round-trip first
+  const activeLocalCount = projects.filter((p) => !p.completionDate).length;
+  const alreadyAtLimit = activeLocalCount >= AUTH_LIMIT;
+
+  // Has the user already acquired this exact project?
+  const alreadyOwned = projects.some(
+    (p) => p.id === project.id || p.forkedFrom === project.id
+  );
+
+  const handleAcquire = async () => {
+    if (alreadyOwned) {
+      const existing = projects.find(
+        (p) => p.id === project.id || p.forkedFrom === project.id
+      );
+      if (existing) {
+        router.push(`/project/${existing.id}`);
+        return;
+      }
+    }
+
+    setStatus("checking");
+
+    // Server-side limit check
+    try {
+      const res = await fetch("/api/projects/check-limit");
+      const data = await res.json();
+      if (!data.allowed) {
+        setLimitInfo({ count: data.count, limit: data.limit });
+        setStatus("limited");
+        return;
+      }
+    } catch {
+      // If check fails, try anyway — server will enforce
+    }
+
+    setStatus("acquiring");
+    try {
+      const id = await addProject({
+        projectTitle: project.projectTitle,
+        oneLineGoal: project.oneLineGoal,
+        problemStatement: project.problemStatement ?? "",
+        targetUser: project.targetUser ?? "",
+        successCriteria: project.successCriteria ?? [],
+        scope: project.scope ?? {
+          mustHave: [],
+          niceToHave: [],
+          outOfScope: [],
+        },
+        scopeLevel: project.scopeLevel ?? "standard",
+        phases: project.phases ?? [],
+        // Reset all task statuses — the user starts fresh
+        tasks: (project.tasks ?? []).map((t) => ({
+          ...t,
+          status: "todo",
+          completedAt: null,
+        })),
+        dailyNextAction: "",
+        blockers: [],
+        toolsSuggested: project.toolsSuggested ?? [],
+        estimatedEffort: project.estimatedEffort ?? "",
+        timeline: project.timeline ?? "",
+        reviewQuestions: project.reviewQuestions ?? [],
+        forkedFrom: project.id,
+      });
+      setStatus("done");
+      toast.success("Project added! Redirecting to your copy…", {
+        duration: 2500,
+      });
+      setTimeout(() => router.push(`/project/${id}`), 800);
+    } catch (err) {
+      // Handle server-side limit rejection
+      if (err?.code === "LIMIT_REACHED" || err?.message?.includes("limit")) {
+        setLimitInfo({ count: AUTH_LIMIT, limit: AUTH_LIMIT });
+        setStatus("limited");
+      } else {
+        toast.error(err?.message ?? "Failed to acquire project. Try again.");
+        setStatus("idle");
+      }
+    }
+  };
+
+  // ── Already owned ─────────────────────────────────────────────────
+  if (alreadyOwned) {
+    return (
+      <div
+        className="rounded-[var(--r-xl)] border-2 p-4 flex items-center gap-3"
+        style={{
+          borderColor: "var(--emerald)",
+          background: "var(--emerald-bg)",
+        }}
+      >
+        <FiCheckCircle
+          size={20}
+          style={{ color: "var(--emerald)", flexShrink: 0 }}
+        />
+        <div className="flex-1 min-w-0">
+          <p
+            className="text-sm font-semibold"
+            style={{ color: "var(--emerald-dim)" }}
+          >
+            Already in your projects
+          </p>
+          <p
+            className="text-xs mt-0.5"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            You've already forked this plan.
+          </p>
+        </div>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => {
+            const existing = projects.find(
+              (p) => p.id === project.id || p.forkedFrom === project.id
+            );
+            if (existing) router.push(`/project/${existing.id}`);
+          }}
+        >
+          Open →
+        </Button>
+      </div>
+    );
+  }
+
+  // ── At limit ──────────────────────────────────────────────────────
+  if (status === "limited" || alreadyAtLimit) {
+    const count = limitInfo?.count ?? activeLocalCount;
+    const limit = limitInfo?.limit ?? AUTH_LIMIT;
+    return (
+      <div
+        className="rounded-[var(--r-xl)] border-2 p-5 flex flex-col gap-4"
+        style={{ borderColor: "var(--amber)", background: "var(--amber-bg)" }}
+      >
+        <div className="flex items-start gap-3">
+          <FiAlertCircle
+            size={20}
+            style={{ color: "var(--amber)", flexShrink: 0, marginTop: 2 }}
+          />
+          <div>
+            <p
+              className="font-display font-semibold text-sm"
+              style={{ color: "var(--text-primary)" }}
+            >
+              Project limit reached ({count}/{limit})
+            </p>
+            <p
+              className="text-xs mt-1 leading-relaxed"
+              style={{ color: "var(--text-secondary)" }}
+            >
+              You have {count} active project{count !== 1 ? "s" : ""}. Complete
+              or delete one to make room for this plan.
+            </p>
+          </div>
+        </div>
+        <div className="flex flex-col gap-2">
+          <Link href="/dashboard">
+            <Button size="sm" className="w-full justify-center" variant="ghost">
+              Go to dashboard → manage projects
+            </Button>
+          </Link>
+          <button
+            onClick={() => setStatus("idle")}
+            className="text-xs text-center transition-colors"
+            style={{ color: "var(--text-tertiary)" }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.color = "var(--text-secondary)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.color = "var(--text-tertiary)")
+            }
+          >
+            Dismiss
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Done (brief success before redirect) ──────────────────────────
+  if (status === "done") {
+    return (
+      <div
+        className="rounded-[var(--r-xl)] border-2 p-4 flex items-center gap-3"
+        style={{
+          borderColor: "var(--emerald)",
+          background: "var(--emerald-bg)",
+        }}
+      >
+        <FiCheckCircle
+          size={20}
+          style={{ color: "var(--emerald)", flexShrink: 0 }}
+        />
+        <p
+          className="text-sm font-semibold"
+          style={{ color: "var(--emerald-dim)" }}
+        >
+          Added! Taking you there…
+        </p>
+        <div
+          className="ml-auto w-4 h-4 rounded-full border-2 border-t-transparent animate-spin"
+          style={{
+            borderColor: "var(--emerald)",
+            borderTopColor: "transparent",
+          }}
+        />
+      </div>
+    );
+  }
+
+  // ── Default CTA ───────────────────────────────────────────────────
+  const isLoading = status === "checking" || status === "acquiring";
+  const loadingLabel =
+    status === "checking" ? "Checking limit…" : "Forking plan…";
+
+  return (
+    <div
+      className="rounded-[var(--r-xl)] border-2 p-5 flex flex-col gap-4"
+      style={{
+        borderColor: "var(--violet)",
+        background:
+          "linear-gradient(135deg, var(--violet-bg) 0%, color-mix(in srgb, var(--emerald-bg) 40%, transparent) 100%)",
+      }}
+    >
+      <div className="flex items-start gap-3">
+        <div
+          className="w-9 h-9 rounded-[var(--r-md)] flex items-center justify-center text-lg shrink-0"
+          style={{ background: "var(--violet)", color: "white" }}
+        >
+          🚀
+        </div>
+        <div className="min-w-0">
+          <p
+            className="font-display font-semibold text-sm mb-0.5"
+            style={{ color: "var(--text-primary)" }}
+          >
+            Make this your project
+          </p>
+          <p
+            className="text-xs leading-relaxed"
+            style={{ color: "var(--text-secondary)" }}
+          >
+            Fork this blueprint to your dashboard. All tasks reset to "todo" —
+            you start your own journey.
+          </p>
+        </div>
+      </div>
+
+      {/* Slot info */}
+      <div
+        className="flex items-center gap-2 px-3 py-2 rounded-[var(--r-md)] text-xs"
+        style={{
+          background: "var(--bg-elevated)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <div className="flex gap-1">
+          {Array.from({ length: AUTH_LIMIT }).map((_, i) => (
+            <div
+              key={i}
+              className="w-3 h-3 rounded-sm transition-colors"
+              style={{
+                background:
+                  i < activeLocalCount ? "var(--violet)" : "var(--bg-muted)",
+                border: "1px solid var(--border)",
+              }}
+            />
+          ))}
+        </div>
+        <span style={{ color: "var(--text-tertiary)" }}>
+          {activeLocalCount}/{AUTH_LIMIT} project slots used
+        </span>
+      </div>
+
+      <Button
+        variant="emerald"
+        onClick={handleAcquire}
+        loading={isLoading}
+        className="w-full justify-center gap-2"
+      >
+        {isLoading ? (
+          loadingLabel
+        ) : (
+          <>
+            <FiGitBranch size={14} />
+            Add to my {activeLocalCount}/{AUTH_LIMIT} projects
+          </>
+        )}
+      </Button>
+    </div>
+  );
+}
+
+// ─── Export panel ─────────────────────────────────────────────────────
+// canExport: isOwner || isSignedIn
+// If !canExport, clicking any export button triggers the sign-in gate.
+function ExportPanel({ project, canExport, onNeedAuth, isOwner }) {
+  const { t } = useI18n();
+  const [showEmail, setShowEmail] = useState(false);
+
+  const handlePDF = async () => {
+    if (!canExport) return onNeedAuth();
+    const id = toast.loading(t("toast_export_pdf_generating"));
+    try {
+      const { exportProjectPDF } = await import("@/lib/utils/exportPDF");
+      await exportProjectPDF(project);
+      trackExport(project.id);
+      toast.dismiss(id);
+    } catch {
+      toast.dismiss(id);
+      toast.error(t("toast_export_pdf_error"));
+    }
+  };
+
+  const handleMarkdown = () => {
+    if (!canExport) return onNeedAuth();
+    try {
+      exportProjectMarkdown(project);
+      trackExport(project.id);
+    } catch {
+      toast.error(t("toast_export_md_error"));
+    }
+  };
+
+  const handleJSON = () => {
+    if (!canExport) return onNeedAuth();
+    try {
+      exportProjectJSON(project);
+      trackExport(project.id);
+    } catch {
+      toast.error(t("toast_export_json_error"));
+    }
+  };
+
+  const handleEmail = () => {
+    if (!canExport) return onNeedAuth();
+    setShowEmail(true);
+  };
+
+  const items = [
+    {
+      label: "PDF",
+      icon: FaFilePdf,
+      accentColor: "var(--coral)",
+      handler: handlePDF,
+    },
+    {
+      label: "Markdown",
+      icon: FaMarkdown,
+      accentColor: "var(--violet)",
+      handler: handleMarkdown,
+    },
+    {
+      label: "JSON",
+      icon: FaJs,
+      accentColor: "var(--emerald)",
+      handler: handleJSON,
+    },
+    {
+      label: "Email to me",
+      icon: FaMailBulk,
+      accentColor: "var(--amber)",
+      handler: handleEmail,
+    },
+  ];
+
+  return (
+    <>
+      <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
+        <div className="flex items-center justify-between mb-3">
+          <p
+            className="text-xs font-semibold uppercase tracking-widest"
+            style={{ color: "var(--text-tertiary)" }}
+          >
+            Export blueprint
+          </p>
+          {!canExport && (
+            <span
+              className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium"
+              style={{ background: "var(--amber-bg)", color: "var(--amber)" }}
+            >
+              <FiLock size={9} /> Sign in required
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          {items.map(({ label, icon: Icon, accentColor, handler }) => (
+            <button
+              key={label}
+              onClick={handler}
+              className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-[var(--r-md)] border text-sm text-left transition-all duration-150"
+              style={{
+                borderColor: "var(--border)",
+                background: "transparent",
+                color: "var(--text-secondary)",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--bg-subtle)";
+                e.currentTarget.style.color = "var(--text-primary)";
+                if (canExport) e.currentTarget.style.borderColor = accentColor;
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = "var(--text-secondary)";
+                e.currentTarget.style.borderColor = "var(--border)";
+              }}
+            >
+              <Icon size={14} style={{ color: accentColor, flexShrink: 0 }} />
+              <span className="flex-1">{label}</span>
+              {canExport ? (
+                <FiArrowRight
+                  size={12}
+                  className="opacity-0 group-hover:opacity-100 transition-opacity"
+                />
+              ) : (
+                <FiLock size={10} style={{ color: "var(--text-tertiary)" }} />
+              )}
+            </button>
+          ))}
+        </div>
+
+        {!canExport && (
+          <p
+            className="mt-3 text-[11px] text-center"
+            style={{ color: "var(--text-tertiary)" }}
+          >
+            <SignInButton mode="modal">
+              <button className="underline hover:text-[var(--violet)] transition-colors">
+                Sign in
+              </button>
+            </SignInButton>{" "}
+            or{" "}
+            <SignUpButton mode="modal">
+              <button className="underline hover:text-[var(--violet)] transition-colors">
+                create a free account
+              </button>
+            </SignUpButton>{" "}
+            to export
+          </p>
+        )}
+      </div>
+
+      {canExport && (
+        <EmailExportModal
+          open={showEmail}
+          onClose={() => setShowEmail(false)}
+          project={project}
+        />
+      )}
+    </>
+  );
+}
+
+// ─── Public view banner ───────────────────────────────────────────────
+function PublicViewBanner() {
   const { t } = useI18n();
   return (
     <div className="rounded-[var(--r-lg)] border border-[var(--violet)] bg-[var(--violet-bg)] px-4 py-3 flex items-center gap-3 mb-4">
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-medium text-[var(--violet-dim)]">
+        <p
+          className="text-sm font-medium"
+          style={{ color: "var(--violet-dim)" }}
+        >
           {t("project_public_view_title")}
         </p>
-        <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+        <p
+          className="text-xs mt-0.5"
+          style={{ color: "var(--text-secondary)" }}
+        >
           {t("project_public_view_desc")}
         </p>
       </div>
@@ -65,37 +701,124 @@ function PublicViewBanner({ projectTitle }) {
   );
 }
 
-// ─── Engagement bar for public view ───────────────────────────────────
-
-function PublicEngagementBar({ project }) {
-  const stars = project.stars ?? 0;
-  const helpedCount = project.helpedCount ?? 0;
-  const views = project.views ?? 0;
-  const exportCount = project.exportCount ?? 0;
-
-  if (stars + helpedCount + views + exportCount === 0) return null;
+// ─── Read-only task list (non-owners) ─────────────────────────────────
+function ReadOnlyTaskList({ project }) {
+  const doneTasks =
+    project.tasks?.filter((t) => t.status === "done").length ?? 0;
+  const total = project.tasks?.length ?? 0;
 
   return (
-    <div className="flex items-center gap-4 text-xs text-[var(--text-tertiary)] mb-4">
-      {views > 0 && (
-        <span className="flex items-center gap-1.5">
-          <FiEye size={12} /> {views} {views === 1 ? "view" : "views"}
+    <div>
+      {/* Locked notice */}
+      <div
+        className="flex items-center gap-2 px-3 py-2 rounded-[var(--r-md)] mb-3 text-xs"
+        style={{
+          background: "var(--bg-subtle)",
+          border: "1px solid var(--border)",
+          color: "var(--text-tertiary)",
+        }}
+      >
+        <FiLock size={11} style={{ flexShrink: 0 }} />
+        <span>
+          Task editing is locked.{" "}
+          <strong style={{ color: "var(--text-secondary)" }}>
+            Acquire this project
+          </strong>{" "}
+          to track your own progress.
+        </span>
+      </div>
+
+      <div className="flex flex-col gap-1">
+        {project.tasks?.slice(0, 25).map((task) => (
+          <div
+            key={task.id}
+            className="flex items-center gap-3 px-3 py-2 rounded-[var(--r-md)]"
+            style={{ opacity: task.status === "done" ? 0.5 : 1 }}
+          >
+            <span
+              className="text-sm leading-none shrink-0"
+              style={{
+                color:
+                  task.status === "done"
+                    ? "var(--emerald)"
+                    : task.status === "doing"
+                    ? "var(--violet)"
+                    : "var(--text-tertiary)",
+              }}
+            >
+              {task.status === "done"
+                ? "●"
+                : task.status === "doing"
+                ? "◑"
+                : "○"}
+            </span>
+            <p
+              className="text-sm flex-1 min-w-0 truncate"
+              style={{
+                color:
+                  task.status === "done"
+                    ? "var(--text-tertiary)"
+                    : "var(--text-primary)",
+                textDecoration:
+                  task.status === "done" ? "line-through" : "none",
+              }}
+            >
+              {task.title}
+            </p>
+          </div>
+        ))}
+        {total > 25 && (
+          <p
+            className="text-xs px-3 pt-1"
+            style={{ color: "var(--text-tertiary)" }}
+          >
+            +{total - 25} more tasks
+          </p>
+        )}
+      </div>
+
+      {total > 0 && (
+        <p
+          className="text-xs mt-3 px-1"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          {doneTasks}/{total} tasks completed in the original plan
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ─── Engagement bar ───────────────────────────────────────────────────
+function PublicEngagementBar({ project }) {
+  const v = project.views ?? 0,
+    s = project.stars ?? 0,
+    h = project.helpedCount ?? 0,
+    e = project.exportCount ?? 0;
+  if (v + s + h + e === 0) return null;
+  return (
+    <div
+      className="flex items-center gap-4 text-xs mb-4"
+      style={{ color: "var(--text-tertiary)" }}
+    >
+      {v > 0 && (
+        <span className="flex items-center gap-1">
+          <FiEye size={11} /> {v}
         </span>
       )}
-      {stars > 0 && (
-        <span className="flex items-center gap-1.5">
-          <FiStar size={12} /> {stars} {stars === 1 ? "star" : "stars"}
+      {s > 0 && (
+        <span className="flex items-center gap-1">
+          <FiStar size={11} /> {s}
         </span>
       )}
-      {helpedCount > 0 && (
-        <span className="flex items-center gap-1.5">
-          <FiHeart size={12} /> helped {helpedCount}
+      {h > 0 && (
+        <span className="flex items-center gap-1">
+          <FiHeart size={11} /> {h}
         </span>
       )}
-      {exportCount > 0 && (
-        <span className="flex items-center gap-1.5">
-          <FiDownload size={12} /> {exportCount}{" "}
-          {exportCount === 1 ? "export" : "exports"}
+      {e > 0 && (
+        <span className="flex items-center gap-1">
+          <FiDownload size={11} /> {e}
         </span>
       )}
     </div>
@@ -103,7 +826,6 @@ function PublicEngagementBar({ project }) {
 }
 
 // ─── Loading skeleton ─────────────────────────────────────────────────
-
 function ProjectSkeleton() {
   return (
     <div className="flex h-screen overflow-hidden">
@@ -141,10 +863,10 @@ function ProjectSkeleton() {
 }
 
 // ─── Main component ───────────────────────────────────────────────────
-
 function ProjectPageClient({ id }) {
   const router = useRouter();
   const { t } = useI18n();
+  const { isSignedIn } = useUser();
 
   const storeProject = useProjectStore((s) => s.getProject(id));
   const deleteProject = useProjectStore((s) => s.deleteProject);
@@ -156,7 +878,9 @@ function ProjectPageClient({ id }) {
   const [publicLoading, setPublicLoading] = useState(false);
   const [publicError, setPublicError] = useState(false);
 
-  const [showEmailExport, setShowEmailExport] = useState(false);
+  const [showSignInGate, setShowSignInGate] = useState(false);
+  const [gateContext, setGateContext] = useState("export");
+  const [showOwnerEmail, setShowOwnerEmail] = useState(false);
   const [confirmModal, setConfirmModal] = useState({
     open: false,
     type: null,
@@ -164,12 +888,16 @@ function ProjectPageClient({ id }) {
   });
 
   const project = storeProject ?? publicProject;
+
+  // isOwner: true only when the project lives in this user's own store/account
   const isOwner = !!storeProject;
 
-  // Track view for non-owners
+  // canExport: owner OR any signed-in user (public data is free to export once authed)
+  const canExport = isOwner || isSignedIn;
+
   useEngageView(id, isOwner);
 
-  // Fetch from public API if not in store
+  // Fetch from public API when not the owner
   useEffect(() => {
     if (storeProject) return;
     setPublicLoading(true);
@@ -178,9 +906,9 @@ function ProjectPageClient({ id }) {
         if (!r.ok) throw new Error("not found");
         return r.json();
       })
-      .then((data) => {
-        setPublicProject(data.project ?? null);
-        setIsPublicView(data.isPublicView ?? false);
+      .then((d) => {
+        setPublicProject(d.project ?? null);
+        setIsPublicView(d.isPublicView ?? false);
         setPublicLoading(false);
       })
       .catch(() => {
@@ -189,23 +917,18 @@ function ProjectPageClient({ id }) {
       });
   }, [id, storeProject]);
 
-  const handleToggleVisibility = useCallback(async () => {
-    if (!isOwner || !project) return;
-    const next = !project.isPublic;
-    await updateProject(project.id, { isPublic: next });
-    toast.success(
-      next ? t("toast_project_made_public") : t("toast_project_made_private"),
-      { duration: 3000 }
-    );
-  }, [isOwner, project, updateProject, t]);
-
-  const openConfirm = useCallback((type) => {
-    setConfirmModal({ open: true, type, loading: false });
+  const openGate = useCallback((ctx) => {
+    setGateContext(ctx);
+    setShowSignInGate(true);
   }, []);
-
-  const closeConfirm = useCallback(() => {
-    setConfirmModal((s) => ({ ...s, open: false, loading: false }));
-  }, []);
+  const openConfirm = useCallback(
+    (type) => setConfirmModal({ open: true, type, loading: false }),
+    []
+  );
+  const closeConfirm = useCallback(
+    () => setConfirmModal((s) => ({ ...s, open: false, loading: false })),
+    []
+  );
 
   const handleConfirmAction = useCallback(async () => {
     setConfirmModal((s) => ({ ...s, loading: true }));
@@ -227,13 +950,23 @@ function ProjectPageClient({ id }) {
     }
   }, [confirmModal.type, deleteProject, completeProject, id, router, t]);
 
+  const handleToggleVisibility = useCallback(async () => {
+    if (!isOwner || !project) return;
+    const next = !project.isPublic;
+    await updateProject(project.id, { isPublic: next });
+    toast.success(
+      next ? t("toast_project_made_public") : t("toast_project_made_private"),
+      { duration: 3000 }
+    );
+  }, [isOwner, project, updateProject, t]);
+
   if (publicLoading) return <ProjectSkeleton />;
 
   if (publicError || (!project && !publicLoading)) {
     return (
       <div className="flex h-screen items-center justify-center px-4">
         <div className="text-center">
-          <p className="text-[var(--text-secondary)] mb-4">
+          <p className="mb-4" style={{ color: "var(--text-secondary)" }}>
             {t("project_not_found")}
           </p>
           <Link href="/">
@@ -246,37 +979,6 @@ function ProjectPageClient({ id }) {
 
   const progress = overallProgress(project);
   const isCompleted = !!project.completionDate;
-
-  const handleExportMarkdown = () => {
-    try {
-      exportProjectMarkdown(project);
-      trackExport(project.id);
-    } catch {
-      toast.error(t("toast_export_md_error"));
-    }
-  };
-
-  const handleExportJSON = () => {
-    try {
-      exportProjectJSON(project);
-      trackExport(project.id);
-    } catch {
-      toast.error(t("toast_export_json_error"));
-    }
-  };
-
-  const handleExportPDF = async () => {
-    const toastId = toast.loading(t("toast_export_pdf_generating"));
-    try {
-      const { exportProjectPDF } = await import("@/lib/utils/exportPDF");
-      await exportProjectPDF(project);
-      trackExport(project.id);
-      toast.dismiss(toastId);
-    } catch {
-      toast.dismiss(toastId);
-      toast.error(t("toast_export_pdf_error"));
-    }
-  };
 
   const confirmConfig = {
     delete: {
@@ -303,15 +1005,15 @@ function ProjectPageClient({ id }) {
         <TopBar />
         <main className="flex-1 overflow-y-auto">
           <div className="max-w-5xl mx-auto px-4 sm:px-6 py-5 sm:py-8">
-            {isPublicView && !isOwner && (
-              <PublicViewBanner projectTitle={project.projectTitle} />
-            )}
-
-            {/* Engagement stats for public view */}
+            {/* Public view banner */}
+            {isPublicView && !isOwner && <PublicViewBanner />}
             {!isOwner && <PublicEngagementBar project={project} />}
 
             {/* Breadcrumb */}
-            <div className="flex items-center gap-2 text-xs text-[var(--text-tertiary)] mb-4 sm:mb-6 min-w-0">
+            <div
+              className="flex items-center gap-2 text-xs mb-4 sm:mb-6 min-w-0"
+              style={{ color: "var(--text-tertiary)" }}
+            >
               <Link
                 href="/"
                 className="hover:text-[var(--text-primary)] transition-colors shrink-0"
@@ -319,19 +1021,25 @@ function ProjectPageClient({ id }) {
                 {t("nav_dashboard")}
               </Link>
               <span className="shrink-0">/</span>
-              <span className="text-[var(--text-primary)] truncate min-w-0">
+              <span
+                className="truncate min-w-0"
+                style={{ color: "var(--text-primary)" }}
+              >
                 {project.projectTitle}
               </span>
             </div>
 
             {/* Two-column layout */}
             <div className="grid grid-cols-1 gap-5 sm:gap-6 lg:grid-cols-[1fr_260px] xl:grid-cols-[1fr_280px]">
-              {/* Left column */}
+              {/* ── Left column ─────────────────────────────────────── */}
               <div className="flex flex-col gap-4 sm:gap-5 min-w-0">
                 {/* Project header */}
                 <div>
                   <div className="flex items-start justify-between gap-3 mb-2">
-                    <h1 className="font-display font-semibold text-xl sm:text-3xl text-[var(--text-primary)] leading-tight flex-1 min-w-0">
+                    <h1
+                      className="font-display font-semibold text-xl sm:text-3xl leading-tight flex-1 min-w-0"
+                      style={{ color: "var(--text-primary)" }}
+                    >
                       {project.projectTitle}
                     </h1>
                     <ProgressRing
@@ -343,7 +1051,10 @@ function ProjectPageClient({ id }) {
                     />
                   </div>
                   {project.oneLineGoal && (
-                    <p className="text-sm sm:text-base text-[var(--text-secondary)] leading-relaxed">
+                    <p
+                      className="text-sm sm:text-base leading-relaxed"
+                      style={{ color: "var(--text-secondary)" }}
+                    >
                       {project.oneLineGoal}
                     </p>
                   )}
@@ -365,74 +1076,52 @@ function ProjectPageClient({ id }) {
                     <Badge variant={project.isPublic ? "emerald" : "slate"}>
                       {project.isPublic ? "Public" : "Private"}
                     </Badge>
+                    {/* Non-owner read-only indicator */}
+                    {!isOwner && (
+                      <Badge variant="amber">
+                        <FiLock size={9} className="inline mr-1" />
+                        Viewing only
+                      </Badge>
+                    )}
                   </div>
                 </div>
 
+                {/* Owner-only: pressure + streak */}
                 {isOwner && <ProjectPressure project={project} />}
                 {isOwner && <StreakBanner project={project} />}
 
+                {/* Phase timeline — visible to all */}
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
                   <PhaseTimeline project={project} />
                 </div>
 
+                {/* Next action — owner only */}
                 {isOwner && !isCompleted && <NextAction project={project} />}
 
+                {/* Task list */}
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 sm:p-5">
-                  <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3 sm:mb-4">
+                  <p
+                    className="text-xs font-semibold uppercase tracking-widest mb-3 sm:mb-4"
+                    style={{ color: "var(--text-tertiary)" }}
+                  >
                     {t("project_all_tasks")}
                   </p>
                   {isOwner ? (
                     <TaskList project={project} />
                   ) : (
-                    <div className="flex flex-col gap-1">
-                      {project.tasks?.slice(0, 20).map((task) => (
-                        <div
-                          key={task.id}
-                          className="flex items-center gap-3 px-3 py-2 rounded-[var(--r-md)]"
-                        >
-                          <span
-                            className="text-base leading-none"
-                            style={{
-                              color:
-                                task.status === "done"
-                                  ? "var(--emerald)"
-                                  : task.status === "doing"
-                                  ? "var(--violet)"
-                                  : "var(--text-tertiary)",
-                            }}
-                          >
-                            {task.status === "done"
-                              ? "●"
-                              : task.status === "doing"
-                              ? "◑"
-                              : "○"}
-                          </span>
-                          <p
-                            className={`text-sm ${
-                              task.status === "done"
-                                ? "line-through text-[var(--text-tertiary)]"
-                                : "text-[var(--text-primary)]"
-                            }`}
-                          >
-                            {task.title}
-                          </p>
-                        </div>
-                      ))}
-                      {(project.tasks?.length ?? 0) > 20 && (
-                        <p className="text-xs text-[var(--text-tertiary)] px-3 pt-1">
-                          +{project.tasks.length - 20} more tasks
-                        </p>
-                      )}
-                    </div>
+                    <ReadOnlyTaskList project={project} />
                   )}
                 </div>
               </div>
 
-              {/* Right column */}
+              {/* ── Right column ────────────────────────────────────── */}
               <div className="flex flex-col gap-3 sm:gap-4 pb-20 lg:pb-0">
-                {/* Stats */}
+                {/* Stats — visible to all */}
                 <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
-                  <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3">
+                  <p
+                    className="text-xs font-semibold uppercase tracking-widest mb-3"
+                    style={{ color: "var(--text-tertiary)" }}
+                  >
                     {t("project_stats")}
                   </p>
                   <div className="grid grid-cols-4 gap-2 lg:grid-cols-2">
@@ -468,7 +1157,10 @@ function ProjectPageClient({ id }) {
                         key={label}
                         className="rounded-[var(--r-md)] bg-[var(--bg-surface)] p-2.5 text-center lg:text-left"
                       >
-                        <p className="text-[10px] sm:text-xs text-[var(--text-tertiary)] mb-1 leading-tight">
+                        <p
+                          className="text-[10px] sm:text-xs mb-1 leading-tight"
+                          style={{ color: "var(--text-tertiary)" }}
+                        >
                           {label}
                         </p>
                         <p
@@ -482,19 +1174,26 @@ function ProjectPageClient({ id }) {
                   </div>
                 </div>
 
-                {/* Success criteria */}
+                {/* Success criteria — visible to all */}
                 {project.successCriteria?.length > 0 && (
                   <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
-                    <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3">
+                    <p
+                      className="text-xs font-semibold uppercase tracking-widest mb-3"
+                      style={{ color: "var(--text-tertiary)" }}
+                    >
                       {t("project_success_criteria")}
                     </p>
                     <ul className="flex flex-col gap-1.5">
                       {project.successCriteria.map((c, i) => (
                         <li
                           key={i}
-                          className="flex items-start gap-2 text-xs sm:text-sm text-[var(--text-secondary)]"
+                          className="flex items-start gap-2 text-xs sm:text-sm"
+                          style={{ color: "var(--text-secondary)" }}
                         >
-                          <span className="text-[var(--emerald)] mt-0.5 shrink-0">
+                          <span
+                            className="mt-0.5 shrink-0"
+                            style={{ color: "var(--emerald)" }}
+                          >
                             +
                           </span>
                           <span>{c}</span>
@@ -504,17 +1203,20 @@ function ProjectPageClient({ id }) {
                   </div>
                 )}
 
-                {/* Blockers — owners only */}
+                {/* Blockers — owner only */}
                 {isOwner && (
                   <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
                     <BlockerPanel project={project} />
                   </div>
                 )}
 
-                {/* Tools */}
+                {/* Tools — visible to all */}
                 {project.toolsSuggested?.length > 0 && (
                   <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4">
-                    <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3">
+                    <p
+                      className="text-xs font-semibold uppercase tracking-widest mb-3"
+                      style={{ color: "var(--text-tertiary)" }}
+                    >
                       {t("project_tools")}
                     </p>
                     <div className="flex flex-wrap gap-1.5">
@@ -527,13 +1229,15 @@ function ProjectPageClient({ id }) {
                   </div>
                 )}
 
-                {/* Actions — owners only */}
+                {/* ── OWNER ACTIONS ── */}
                 {isOwner && (
                   <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] p-4 flex flex-col gap-2">
-                    <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-1">
+                    <p
+                      className="text-xs font-semibold uppercase tracking-widest mb-1"
+                      style={{ color: "var(--text-tertiary)" }}
+                    >
                       {t("project_actions")}
                     </p>
-
                     {!isCompleted && (
                       <Button
                         variant="emerald"
@@ -546,7 +1250,6 @@ function ProjectPageClient({ id }) {
                         </span>
                       </Button>
                     )}
-
                     <Button
                       variant="ghost"
                       onClick={handleToggleVisibility}
@@ -568,10 +1271,9 @@ function ProjectPageClient({ id }) {
                         </>
                       )}
                     </Button>
-
                     <Button
                       variant="ghost"
-                      onClick={() => setShowEmailExport(true)}
+                      onClick={() => setShowOwnerEmail(true)}
                       className="w-full justify-center"
                     >
                       <FaMailBulk className="shrink-0" />
@@ -581,7 +1283,22 @@ function ProjectPageClient({ id }) {
                     </Button>
                     <Button
                       variant="ghost"
-                      onClick={handleExportPDF}
+                      onClick={async () => {
+                        const id2 = toast.loading(
+                          t("toast_export_pdf_generating")
+                        );
+                        try {
+                          const { exportProjectPDF } = await import(
+                            "@/lib/utils/exportPDF"
+                          );
+                          await exportProjectPDF(project);
+                          trackExport(project.id);
+                          toast.dismiss(id2);
+                        } catch {
+                          toast.dismiss(id2);
+                          toast.error(t("toast_export_pdf_error"));
+                        }
+                      }}
                       className="w-full justify-center"
                     >
                       <FaFilePdf className="shrink-0" />
@@ -591,7 +1308,14 @@ function ProjectPageClient({ id }) {
                     </Button>
                     <Button
                       variant="ghost"
-                      onClick={handleExportMarkdown}
+                      onClick={() => {
+                        try {
+                          exportProjectMarkdown(project);
+                          trackExport(project.id);
+                        } catch {
+                          toast.error(t("toast_export_md_error"));
+                        }
+                      }}
                       className="w-full justify-center"
                     >
                       <FaMarkdown className="shrink-0" />
@@ -599,7 +1323,14 @@ function ProjectPageClient({ id }) {
                     </Button>
                     <Button
                       variant="ghost"
-                      onClick={handleExportJSON}
+                      onClick={() => {
+                        try {
+                          exportProjectJSON(project);
+                          trackExport(project.id);
+                        } catch {
+                          toast.error(t("toast_export_json_error"));
+                        }
+                      }}
                       className="w-full justify-center"
                     >
                       <FaJs className="shrink-0" />
@@ -618,22 +1349,78 @@ function ProjectPageClient({ id }) {
                   </div>
                 )}
 
-                {/* Public view: fork CTA */}
+                {/* ── NON-OWNER ACTIONS ── */}
                 {!isOwner && (
-                  <div className="rounded-[var(--r-lg)] border-2 border-dashed border-[var(--violet)] bg-[var(--violet-bg)] p-4 text-center">
-                    <p className="text-sm font-semibold text-[var(--violet-dim)] mb-2">
-                      {t("project_fork_cta_title")}
-                    </p>
-                    <p className="text-xs text-[var(--text-secondary)] mb-3">
-                      {t("project_fork_cta_desc")}
-                    </p>
-                    <Link
-                      href={`/new?fork=${id}`}
-                      className="inline-flex items-center gap-2 px-4 py-2 rounded-[var(--r-md)] bg-[var(--violet)] text-white text-xs font-semibold hover:bg-[var(--violet-dim)] transition-colors"
-                    >
-                      {t("project_fork_btn")}
-                    </Link>
-                  </div>
+                  <>
+                    {/* Acquire panel — signed-in users see the fork CTA; anon see sign-in prompt */}
+                    {isSignedIn ? (
+                      <AcquirePanel project={project} />
+                    ) : (
+                      <div
+                        className="rounded-[var(--r-xl)] border-2 p-5 flex flex-col gap-3"
+                        style={{
+                          borderColor: "var(--violet)",
+                          background: "var(--violet-bg)",
+                        }}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className="text-2xl shrink-0">🚀</div>
+                          <div>
+                            <p
+                              className="font-display font-semibold text-sm"
+                              style={{ color: "var(--text-primary)" }}
+                            >
+                              Start your own version
+                            </p>
+                            <p
+                              className="text-xs mt-1 leading-relaxed"
+                              style={{ color: "var(--text-secondary)" }}
+                            >
+                              Sign in to fork this plan to your dashboard and
+                              track your own journey.
+                            </p>
+                          </div>
+                        </div>
+                        <SignUpButton mode="modal">
+                          <button
+                            className="w-full h-10 rounded-[var(--r-md)] text-sm font-semibold text-white transition-all flex items-center justify-center gap-2"
+                            style={{ background: "var(--violet)" }}
+                            onMouseEnter={(e) =>
+                              (e.currentTarget.style.background =
+                                "var(--violet-dim)")
+                            }
+                            onMouseLeave={(e) =>
+                              (e.currentTarget.style.background =
+                                "var(--violet)")
+                            }
+                          >
+                            <FiGitBranch size={13} />
+                            Sign up — it's free
+                          </button>
+                        </SignUpButton>
+                        <SignInButton mode="modal">
+                          <button
+                            className="w-full h-9 rounded-[var(--r-md)] text-xs font-medium border transition-all"
+                            style={{
+                              borderColor: "var(--violet)",
+                              color: "var(--violet-dim)",
+                              background: "transparent",
+                            }}
+                          >
+                            Already have an account? Sign in
+                          </button>
+                        </SignInButton>
+                      </div>
+                    )}
+
+                    {/* Export panel — works for signed-in non-owners; gated for anonymous */}
+                    <ExportPanel
+                      project={project}
+                      canExport={canExport}
+                      onNeedAuth={() => openGate("export")}
+                      isOwner={false}
+                    />
+                  </>
                 )}
               </div>
             </div>
@@ -642,13 +1429,20 @@ function ProjectPageClient({ id }) {
         </main>
       </div>
 
-      {isOwner && (
-        <EmailExportModal
-          open={showEmailExport}
-          onClose={() => setShowEmailExport(false)}
-          project={project}
-        />
-      )}
+      {/* Modals */}
+      <SignInGate
+        open={showSignInGate}
+        onClose={() => setShowSignInGate(false)}
+        context={gateContext}
+        projectTitle={project?.projectTitle}
+      />
+
+      {/* Owner email export */}
+      <EmailExportModal
+        open={showOwnerEmail}
+        onClose={() => setShowOwnerEmail(false)}
+        project={project}
+      />
 
       {activeConfig && (
         <ConfirmModal
