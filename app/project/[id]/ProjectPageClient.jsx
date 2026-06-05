@@ -51,6 +51,8 @@ import {
 import { MdDelete } from "react-icons/md";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
+import { FiGitBranch } from "react-icons/fi";
+import { SignInGate } from "@/components/project/SignInGate";
 
 // ─── Access levels ────────────────────────────────────────────────────
 // OWNER       → project is in their account (storeProject !== null)
@@ -61,152 +63,6 @@ import { ConfirmModal } from "@/components/ui/ConfirmModal";
 //   OWNER    : edit tasks, blockers, complete, delete, visibility, all exports
 //   AUTHED   : export only + acquire (everything else locked until acquired)
 //   ANONYMOUS: read-only view; sign-in gate on export + acquire
-
-// ─── Sign-in / sign-up gate ───────────────────────────────────────────
-function SignInGate({ open, onClose, context = "export", projectTitle }) {
-  if (!open) return null;
-  const isExport = context === "export";
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
-      style={{ background: "rgba(12,12,15,0.78)", backdropFilter: "blur(8px)" }}
-    >
-      <div
-        className="w-full sm:max-w-md rounded-t-[var(--r-xl)] sm:rounded-[var(--r-xl)] border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)] overflow-hidden"
-        style={{
-          animation: "gateIn 260ms cubic-bezier(0.175,0.885,0.32,1.275) both",
-        }}
-      >
-        {/* Header */}
-        <div
-          className="px-6 py-5"
-          style={{
-            background:
-              "linear-gradient(135deg, var(--violet) 0%, #534ab7 100%)",
-          }}
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="text-2xl mb-2">{isExport ? "📦" : "🚀"}</div>
-              <p className="font-display font-bold text-white text-lg leading-tight">
-                {isExport
-                  ? "Sign in to export"
-                  : "Sign in to acquire this plan"}
-              </p>
-              <p className="text-white/75 text-sm mt-1 leading-relaxed">
-                {isExport
-                  ? `Download the full blueprint for "${projectTitle}" as PDF, Markdown, or JSON.`
-                  : `Fork "${projectTitle}" to your dashboard and start tracking your own execution.`}
-              </p>
-            </div>
-            <button
-              onClick={onClose}
-              className="text-white/60 hover:text-white transition-colors text-xl leading-none mt-0.5"
-              aria-label="Close"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-
-        {/* Body */}
-        <div className="px-6 py-5">
-          <ul className="flex flex-col gap-2 mb-5">
-            {(isExport
-              ? [
-                  { icon: "📄", text: "Export as PDF, Markdown, or JSON" },
-                  { icon: "📧", text: "Send the blueprint to your email" },
-                  { icon: "💾", text: "Your projects sync across all devices" },
-                ]
-              : [
-                  {
-                    icon: "🎯",
-                    text: "Get your own editable copy of this plan",
-                  },
-                  { icon: "✅", text: "Check off tasks and mark milestones" },
-                  { icon: "🔥", text: "Build streaks — finish what you start" },
-                ]
-            ).map(({ icon, text }) => (
-              <li
-                key={text}
-                className="flex items-center gap-3 text-sm"
-                style={{ color: "var(--text-primary)" }}
-              >
-                <span
-                  className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-base"
-                  style={{ background: "var(--emerald-bg)" }}
-                >
-                  {icon}
-                </span>
-                {text}
-              </li>
-            ))}
-          </ul>
-
-          <div className="flex flex-col gap-2.5">
-            <SignUpButton mode="modal">
-              <button
-                onClick={onClose}
-                className="w-full h-11 rounded-[var(--r-md)] font-semibold text-sm text-white transition-all active:scale-[0.98]"
-                style={{ background: "var(--violet)" }}
-                onMouseEnter={(e) =>
-                  (e.currentTarget.style.background = "var(--violet-dim)")
-                }
-                onMouseLeave={(e) =>
-                  (e.currentTarget.style.background = "var(--violet)")
-                }
-              >
-                Create free account — it takes 30 seconds
-              </button>
-            </SignUpButton>
-            <SignInButton mode="modal">
-              <button
-                onClick={onClose}
-                className="w-full h-10 rounded-[var(--r-md)] border text-sm transition-all"
-                style={{
-                  borderColor: "var(--border)",
-                  color: "var(--text-secondary)",
-                  background: "transparent",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "var(--bg-subtle)";
-                  e.currentTarget.style.color = "var(--text-primary)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "transparent";
-                  e.currentTarget.style.color = "var(--text-secondary)";
-                }}
-              >
-                Sign in to existing account
-              </button>
-            </SignInButton>
-            <button
-              onClick={onClose}
-              className="w-full py-1.5 text-xs transition-colors"
-              style={{ color: "var(--text-tertiary)" }}
-            >
-              Continue browsing
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <style>{`
-        @keyframes gateIn {
-          from { opacity: 0; transform: translateY(24px) scale(0.97); }
-          to   { opacity: 1; transform: translateY(0) scale(1); }
-        }
-        @media (max-width: 640px) {
-          @keyframes gateIn {
-            from { opacity: 0; transform: translateY(100%); }
-            to   { opacity: 1; transform: translateY(0); }
-          }
-        }
-      `}</style>
-    </div>
-  );
-}
 
 // ─── Acquire panel (shown to signed-in non-owners) ────────────────────
 // Checks the 4-project limit before forking.
@@ -445,10 +301,10 @@ function AcquirePanel({ project }) {
     >
       <div className="flex items-start gap-3">
         <div
-          className="w-9 h-9 rounded-[var(--r-md)] flex items-center justify-center text-lg shrink-0"
+          className="w-9 h-9 rounded-[var(--r-md)] flex items-center justify-center shrink-0"
           style={{ background: "var(--violet)", color: "white" }}
         >
-          🚀
+          <FiGitBranch size={17} />
         </div>
         <div className="min-w-0">
           <p
@@ -1364,7 +1220,15 @@ function ProjectPageClient({ id }) {
                         }}
                       >
                         <div className="flex items-start gap-3">
-                          <div className="text-2xl shrink-0">🚀</div>
+                          <div
+                            className="flex items-center justify-center w-9 h-9 rounded-[var(--r-md)] shrink-0"
+                            style={{ background: "var(--violet-bg)" }}
+                          >
+                            <FiGitBranch
+                              size={17}
+                              style={{ color: "var(--violet)" }}
+                            />
+                          </div>{" "}
                           <div>
                             <p
                               className="font-display font-semibold text-sm"

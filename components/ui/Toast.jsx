@@ -1,110 +1,46 @@
 "use client";
 
 import { useToastStore } from "@/lib/toast";
+import {
+  FiCheckCircle,
+  FiXCircle,
+  FiAlertTriangle,
+  FiInfo,
+  FiLoader,
+  FiX,
+} from "react-icons/fi";
 
-const ICONS = {
-  success: (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-      <circle
-        cx="7.5"
-        cy="7.5"
-        r="6.5"
-        stroke="var(--emerald)"
-        strokeWidth="1.3"
-      />
-      <path
-        d="M4.5 7.5l2 2 4-4"
-        stroke="var(--emerald)"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  ),
-  error: (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-      <circle
-        cx="7.5"
-        cy="7.5"
-        r="6.5"
-        stroke="var(--coral)"
-        strokeWidth="1.3"
-      />
-      <path
-        d="M5 5l5 5M10 5l-5 5"
-        stroke="var(--coral)"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  warn: (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-      <path
-        d="M7.5 2L13.5 13H1.5L7.5 2z"
-        stroke="var(--amber)"
-        strokeWidth="1.3"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M7.5 6v3M7.5 10.5v.5"
-        stroke="var(--amber)"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  info: (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-      <circle
-        cx="7.5"
-        cy="7.5"
-        r="6.5"
-        stroke="var(--violet)"
-        strokeWidth="1.3"
-      />
-      <path
-        d="M7.5 7v4M7.5 4.5v.5"
-        stroke="var(--violet)"
-        strokeWidth="1.4"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
-  loading: (
-    <svg
-      width="15"
-      height="15"
-      viewBox="0 0 15 15"
-      fill="none"
-      className="animate-spin"
-    >
-      <circle
-        cx="7.5"
-        cy="7.5"
-        r="5.5"
-        stroke="var(--violet)"
-        strokeWidth="1.5"
-        strokeOpacity="0.25"
-      />
-      <path
-        d="M7.5 2A5.5 5.5 0 0 1 13 7.5"
-        stroke="var(--violet)"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  ),
+// ─── Icon + border per type ───────────────────────────────────────────
+const TYPE_CONFIG = {
+  success: {
+    Icon: FiCheckCircle,
+    color: "var(--emerald)",
+    border: "color-mix(in srgb, var(--emerald) 35%, transparent)",
+  },
+  error: {
+    Icon: FiXCircle,
+    color: "var(--coral)",
+    border: "color-mix(in srgb, var(--coral) 35%, transparent)",
+  },
+  warn: {
+    Icon: FiAlertTriangle,
+    color: "var(--amber)",
+    border: "color-mix(in srgb, var(--amber) 35%, transparent)",
+  },
+  info: {
+    Icon: FiInfo,
+    color: "var(--violet)",
+    border: "color-mix(in srgb, var(--violet) 35%, transparent)",
+  },
+  loading: {
+    Icon: FiLoader,
+    color: "var(--violet)",
+    border: "color-mix(in srgb, var(--violet) 35%, transparent)",
+    spin: true,
+  },
 };
 
-const BORDER = {
-  success: "border-[var(--emerald)]",
-  error: "border-[var(--coral)]",
-  warn: "border-[var(--amber)]",
-  info: "border-[var(--violet)]",
-  loading: "border-[var(--violet)]",
-};
-
+// ─── ToastContainer ───────────────────────────────────────────────────
 export function ToastContainer() {
   const toasts = useToastStore((s) => s.toasts);
   const dismiss = useToastStore((s) => s.dismiss);
@@ -117,78 +53,86 @@ export function ToastContainer() {
       aria-label="Notifications"
       className={[
         "fixed z-[100] flex flex-col gap-2 pointer-events-none",
-        // Mobile: sit above FAB button (bottom: ~80px), from right
-        // Desktop: standard bottom-right
-        "bottom-20 right-3 left-3 sm:left-auto sm:bottom-4 sm:right-4",
+        "bottom-20 right-3 left-3 sm:left-auto sm:bottom-5 sm:right-5",
       ].join(" ")}
       style={{ maxWidth: "min(380px, calc(100vw - 24px))" }}
     >
       {toasts.map((t) => {
-        const displayIcon = t.customIcon
-          ? (() => {
-              const IconComponent = t.customIcon;
-              return (
-                <IconComponent
-                  size={16}
-                  className="text-[var(--violet)]"
-                  aria-hidden
-                />
-              );
-            })()
-          : ICONS[t.type];
+        const cfg = TYPE_CONFIG[t.type] ?? TYPE_CONFIG.info;
+
+        // Allow custom icon component override
+        const IconComponent = t.customIcon ? t.customIcon : cfg.Icon;
 
         return (
           <div
             key={t.id}
-            className={[
-              "pointer-events-auto flex items-start gap-3 px-4 py-3",
-              "rounded-[var(--r-lg)] border bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)]",
-              "animate-[toastIn_200ms_var(--ease-spring)_both]",
-              BORDER[t.type] ?? BORDER.info,
-            ].join(" ")}
+            className="pointer-events-auto flex items-start gap-3 px-4 py-3 rounded-[var(--r-lg)] border"
+            style={{
+              background: "var(--bg-elevated)",
+              borderColor: cfg.border,
+              boxShadow:
+                "0 4px 16px rgba(0,0,0,0.10), 0 1px 4px rgba(0,0,0,0.06)",
+              animation: "toastIn 200ms var(--ease-spring) both",
+            }}
           >
-            <span className="shrink-0 mt-0.5">{displayIcon}</span>
+            {/* Icon */}
+            <span className="shrink-0 mt-0.5">
+              <IconComponent
+                size={15}
+                className={cfg.spin ? "animate-spin" : ""}
+                style={{ color: t.customIcon ? "var(--violet)" : cfg.color }}
+              />
+            </span>
 
+            {/* Message */}
             <div className="flex-1 min-w-0">
-              <p className="text-sm text-[var(--text-primary)] leading-snug break-words">
+              <p
+                className="text-sm leading-snug break-words"
+                style={{ color: "var(--text-primary)" }}
+              >
                 {t.message}
               </p>
 
+              {/* Feedback link for errors */}
               {t.type === "error" && !t.action && (
                 <a
                   href="/feedback"
-                  className="inline-flex items-center gap-1 mt-1 text-xs text-[var(--violet)] hover:underline"
+                  className="inline-flex items-center gap-1 mt-1 text-xs hover:underline"
+                  style={{ color: "var(--violet)" }}
                 >
                   Report this issue →
                 </a>
               )}
 
+              {/* Custom action */}
               {t.action && (
                 <button
                   onClick={() => {
                     t.action.onClick();
                     dismiss(t.id);
                   }}
-                  className="mt-1 text-xs font-medium text-[var(--violet)] hover:underline"
+                  className="mt-1 text-xs font-medium hover:underline"
+                  style={{ color: "var(--violet)" }}
                 >
                   {t.action.label} →
                 </button>
               )}
             </div>
 
+            {/* Dismiss */}
             <button
               onClick={() => dismiss(t.id)}
-              className="shrink-0 text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors mt-0.5 p-0.5"
+              className="shrink-0 flex items-center justify-center w-5 h-5 rounded mt-0.5 transition-colors"
+              style={{ color: "var(--text-tertiary)" }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.color = "var(--text-primary)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.color = "var(--text-tertiary)")
+              }
               aria-label="Dismiss notification"
             >
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-                <path
-                  d="M9 3L3 9M3 3l6 6"
-                  stroke="currentColor"
-                  strokeWidth="1.4"
-                  strokeLinecap="round"
-                />
-              </svg>
+              <FiX size={12} strokeWidth={2} />
             </button>
           </div>
         );

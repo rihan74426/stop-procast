@@ -3,9 +3,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/Button";
 import { useI18n } from "@/lib/i18n";
+import { FiChevronRight } from "react-icons/fi";
 
 // ─── Ghost suggestion engine ──────────────────────────────────────────
-
 const SUGGESTION_RULES = [
   {
     triggers: ["learn", "learning", "study", "studying", "master", "mastering"],
@@ -132,33 +132,7 @@ const SUGGESTION_RULES = [
     weight: 2,
   },
   {
-    triggers: [
-      "research",
-      "researching",
-      "investigate",
-      "investigating",
-      "analyse",
-      "analyze",
-      "validate",
-    ],
-    completions: [
-      "the market for my SaaS idea",
-      "machine learning techniques for my use case",
-      "customer pain points through 20 interviews",
-      "my competitor landscape thoroughly",
-      "what my target audience actually wants",
-    ],
-    weight: 2,
-  },
-  {
-    triggers: [
-      "start",
-      "starting",
-      "begin",
-      "beginning",
-      "kick off",
-      "kickoff",
-    ],
+    triggers: ["start", "starting", "begin", "beginning"],
     completions: [
       "a freelance design practice",
       "a YouTube channel focused on my expertise",
@@ -175,7 +149,6 @@ const SUGGESTION_RULES = [
       "my team's deployment frequency",
       "my design skills to portfolio-ready",
       "organic traffic to my site by 3x",
-      "my network through meaningful conversations",
       "my leadership skills and guide my team better",
     ],
     weight: 2,
@@ -187,19 +160,8 @@ const SUGGESTION_RULES = [
       "the online course I started months ago",
       "my open-source project with full docs",
       "that side project I've been procrastinating on",
-      "the backlog and have a clean slate",
     ],
     weight: 2,
-  },
-  {
-    triggers: ["i want", "i need", "i'd like", "i would like"],
-    completions: [
-      "to build something people actually use",
-      "to finish something I've started",
-      "to develop a skill that matters",
-      "to make an impact in my field",
-    ],
-    weight: 1,
   },
 ];
 
@@ -224,10 +186,7 @@ const DOMAIN_HINTS = [
     keywords: ["book", "novel", "nonfiction", "writing"],
     append: " — with weekly milestones and accountability",
   },
-  {
-    keywords: ["podcast"],
-    append: " — record 5 pilots, then launch publicly",
-  },
+  { keywords: ["podcast"], append: " — record 5 pilots, then launch publicly" },
   {
     keywords: ["youtube", "channel", "video", "content"],
     append: " — produce 10 videos before worrying about growth",
@@ -248,7 +207,6 @@ const DOMAIN_HINTS = [
 
 function getGhostCompletion(value) {
   if (!value || value.trim().length < 6) return "";
-
   const lower = value.toLowerCase().trim();
   const words = lower.split(/\s+/);
   const lastWord = words[words.length - 1];
@@ -262,15 +220,13 @@ function getGhostCompletion(value) {
         lastWord.length >= 3 &&
         lastWord.length < trigger.length
       ) {
-        const completion = rule.completions[0];
-        return trigger.slice(lastWord.length) + " " + completion;
+        return trigger.slice(lastWord.length) + " " + rule.completions[0];
       }
     }
   }
 
-  let bestRule = null;
-  let bestWeight = -1;
-
+  let bestRule = null,
+    bestWeight = -1;
   for (const rule of SUGGESTION_RULES) {
     for (const trigger of rule.triggers) {
       if (
@@ -287,7 +243,6 @@ function getGhostCompletion(value) {
       }
     }
   }
-
   if (bestRule) {
     const idx = value.length % bestRule.completions.length;
     return " " + bestRule.completions[idx];
@@ -296,17 +251,14 @@ function getGhostCompletion(value) {
   if (value.trim().length > 20 && !value.trim().endsWith(".")) {
     for (const hint of DOMAIN_HINTS) {
       if (hint.keywords.some((kw) => lower.includes(kw))) {
-        if (!lower.includes(hint.append.toLowerCase().slice(3))) {
+        if (!lower.includes(hint.append.toLowerCase().slice(3)))
           return hint.append;
-        }
       }
     }
   }
-
   return "";
 }
 
-// ─── Example keys (7 examples, translated via i18n) ───────────────────
 const EXAMPLE_KEYS = [
   "capture_example_0",
   "capture_example_1",
@@ -328,7 +280,6 @@ export function StepCapture({ value, onChange, onNext }) {
   const ghostDebounceRef = useRef(null);
   const canProceed = value.trim().length >= 20;
 
-  // Rotate placeholder examples
   useEffect(() => {
     const timer = setInterval(
       () => setExampleIdx((i) => (i + 1) % EXAMPLE_KEYS.length),
@@ -339,9 +290,10 @@ export function StepCapture({ value, onChange, onNext }) {
 
   const computeGhost = useCallback((text) => {
     if (ghostDebounceRef.current) clearTimeout(ghostDebounceRef.current);
-    ghostDebounceRef.current = setTimeout(() => {
-      setGhost(getGhostCompletion(text));
-    }, 120);
+    ghostDebounceRef.current = setTimeout(
+      () => setGhost(getGhostCompletion(text)),
+      120
+    );
   }, []);
 
   const handleChange = useCallback(
@@ -404,33 +356,34 @@ export function StepCapture({ value, onChange, onNext }) {
 
   return (
     <div className="flex flex-col gap-6 sm:gap-8">
+      {/* Header */}
       <div>
-        <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)] mb-2">
+        <h1
+          className="text-2xl sm:text-3xl font-display font-semibold mb-2"
+          style={{ color: "var(--text-primary)" }}
+        >
           {t("intake_what")}
         </h1>
-        <p className="text-sm sm:text-base text-[var(--text-secondary)]">
+        <p
+          className="text-sm sm:text-base"
+          style={{ color: "var(--text-secondary)" }}
+        >
           {t("intake_what_desc")}
         </p>
       </div>
 
-      {/* ── Textarea with ghost overlay ── */}
+      {/* Textarea with ghost overlay */}
       <div className="relative">
         <div
-          className={[
-            "rounded-[var(--r-lg)] border-2 transition-colors duration-200 overflow-hidden",
-            focused ? "border-[var(--violet)]" : "border-[var(--border)]",
-          ].join(" ")}
+          className="rounded-[var(--r-lg)] border-2 transition-colors duration-200 overflow-hidden"
+          style={{ borderColor: focused ? "var(--violet)" : "var(--border)" }}
         >
+          {/* Ghost text layer */}
           {showGhost && (
             <div
               aria-hidden="true"
               className="absolute top-0 left-0 w-full px-4 sm:px-5 py-3 sm:py-4 text-sm sm:text-base leading-relaxed pointer-events-none select-none whitespace-pre-wrap break-words z-0 overflow-hidden"
-              style={{
-                fontFamily: "inherit",
-                fontSize: "inherit",
-                lineHeight: "inherit",
-                paddingBottom: "52px",
-              }}
+              style={{ paddingBottom: "52px" }}
             >
               <span className="invisible whitespace-pre-wrap">{value}</span>
               <span
@@ -454,23 +407,32 @@ export function StepCapture({ value, onChange, onNext }) {
             onKeyDown={handleKeyDown}
             placeholder={currentPlaceholder}
             rows={5}
-            className="w-full bg-transparent px-4 sm:px-5 py-3 sm:py-4 text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] resize-none focus:outline-none text-sm sm:text-base leading-relaxed relative z-10"
+            className="w-full bg-transparent px-4 sm:px-5 py-3 sm:py-4 resize-none focus:outline-none text-sm sm:text-base leading-relaxed relative z-10"
+            style={{
+              color: "var(--text-primary)",
+            }}
             autoFocus
             spellCheck
           />
 
           {/* Footer bar */}
-          <div className="px-4 sm:px-5 py-2.5 sm:py-3 border-t border-[var(--border)] flex items-center justify-between relative z-10 bg-[var(--bg-elevated)]">
+          <div
+            className="px-4 sm:px-5 py-2.5 sm:py-3 border-t flex items-center justify-between relative z-10"
+            style={{
+              background: "var(--bg-elevated)",
+              borderColor: "var(--border)",
+            }}
+          >
             <span
-              className={`text-xs transition-colors ${
-                value.length < 20
-                  ? "text-[var(--text-tertiary)]"
-                  : "text-[var(--emerald)]"
-              }`}
+              className="text-xs transition-colors"
+              style={{
+                color:
+                  value.length < 20 ? "var(--text-tertiary)" : "var(--emerald)",
+              }}
             >
               {value.length < 20
                 ? `${20 - value.length} chars to go`
-                : "✓ Ready — more detail means a better plan"}
+                : "Ready — more detail means a better plan"}
             </span>
 
             <div className="flex items-center gap-2">
@@ -480,14 +442,28 @@ export function StepCapture({ value, onChange, onNext }) {
                     e.preventDefault();
                     acceptGhost();
                   }}
-                  className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-[var(--r-full)] bg-[var(--violet-bg)] text-[var(--violet-dim)] border border-[var(--violet)] hover:bg-[var(--violet)] hover:text-white transition-all font-medium"
+                  className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-[var(--r-full)] border font-medium transition-all"
+                  style={{
+                    background: "var(--violet-bg)",
+                    color: "var(--violet-dim)",
+                    borderColor: "var(--violet)",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "var(--violet)";
+                    e.currentTarget.style.color = "white";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "var(--violet-bg)";
+                    e.currentTarget.style.color = "var(--violet-dim)";
+                  }}
                 >
-                  <span className="hidden sm:inline">Tab</span>
-                  <span>↹ accept</span>
+                  Tab ↹ accept
                 </button>
               )}
-
-              <span className="text-xs text-[var(--text-tertiary)] tabular-nums min-w-[2rem] text-right">
+              <span
+                className="text-xs tabular-nums min-w-[2rem] text-right"
+                style={{ color: "var(--text-tertiary)" }}
+              >
                 {value.length}
               </span>
             </div>
@@ -495,49 +471,87 @@ export function StepCapture({ value, onChange, onNext }) {
         </div>
 
         {showGhost && (
-          <div className="absolute -bottom-7 right-0 text-[10px] text-[var(--text-tertiary)] pointer-events-none">
+          <p
+            className="absolute -bottom-7 right-0 text-[10px]"
+            style={{ color: "var(--text-tertiary)" }}
+          >
             Press{" "}
-            <kbd className="px-1 py-0.5 rounded bg-[var(--bg-muted)] font-mono text-[10px]">
+            <kbd
+              className="px-1 py-0.5 rounded font-mono text-[10px]"
+              style={{ background: "var(--bg-muted)" }}
+            >
               Tab
             </kbd>{" "}
             or{" "}
-            <kbd className="px-1 py-0.5 rounded bg-[var(--bg-muted)] font-mono text-[10px]">
+            <kbd
+              className="px-1 py-0.5 rounded font-mono text-[10px]"
+              style={{ background: "var(--bg-muted)" }}
+            >
               →
             </kbd>{" "}
             to accept
-          </div>
+          </p>
         )}
       </div>
 
-      {/* ── Examples section ── */}
+      {/* Examples section */}
       <div>
         <button
           onClick={() => setShowExamples((s) => !s)}
-          className="flex items-center gap-2 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors mb-3 group"
+          className="flex items-center gap-2 text-xs mb-3 group transition-colors"
+          style={{ color: "var(--text-tertiary)" }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.color = "var(--text-secondary)")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.color = "var(--text-tertiary)")
+          }
         >
-          <span
-            className={`transition-transform duration-200 ${
-              showExamples ? "rotate-90" : ""
-            }`}
-          >
-            ▶
-          </span>
+          {/* FiChevronRight rotates instead of Unicode ▶ */}
+          <FiChevronRight
+            size={12}
+            className="transition-transform duration-200 shrink-0"
+            style={{
+              transform: showExamples ? "rotate(90deg)" : "rotate(0deg)",
+            }}
+          />
           <span className="uppercase tracking-wider font-medium">
             {showExamples ? "Hide examples" : "Show examples for inspiration"}
           </span>
         </button>
 
         {showExamples && (
-          <div className="flex flex-col gap-2 animate-[fadeIn_150ms_ease_both]">
+          <div
+            className="flex flex-col gap-2"
+            style={{ animation: "fadeIn 150ms ease both" }}
+          >
             {EXAMPLE_KEYS.map((key, i) => {
               const ex = t(key);
               return (
                 <button
                   key={i}
                   onClick={() => handleExampleClick(ex)}
-                  className="text-left text-sm text-[var(--text-secondary)] px-3 sm:px-4 py-2.5 rounded-[var(--r-md)] border border-[var(--border)] hover:border-[var(--violet)] hover:text-[var(--text-primary)] hover:bg-[var(--violet-bg)] transition-all duration-150 group"
+                  className="text-left text-sm px-3 sm:px-4 py-2.5 rounded-[var(--r-md)] border transition-all duration-150"
+                  style={{
+                    borderColor: "var(--border)",
+                    color: "var(--text-secondary)",
+                    background: "transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "var(--violet)";
+                    e.currentTarget.style.color = "var(--text-primary)";
+                    e.currentTarget.style.background = "var(--violet-bg)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "var(--border)";
+                    e.currentTarget.style.color = "var(--text-secondary)";
+                    e.currentTarget.style.background = "transparent";
+                  }}
                 >
-                  <span className="text-[var(--text-tertiary)] group-hover:text-[var(--violet-dim)] mr-2 text-xs">
+                  <span
+                    className="text-xs mr-2"
+                    style={{ color: "var(--text-tertiary)" }}
+                  >
                     {i + 1}.
                   </span>
                   {ex}
@@ -548,24 +562,17 @@ export function StepCapture({ value, onChange, onNext }) {
         )}
       </div>
 
-      <div className="flex justify-end ">
+      {/* CTA */}
+      <div className="flex justify-end">
         <Button
           onClick={onNext}
-          style={{ background: "var(--violet)" }}
+          variant="primary"
           disabled={!canProceed}
           size="lg"
           className="gap-2 sm:gap-3 w-full sm:w-auto justify-center"
         >
           {t("intake_continue")}
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M3 8h10M9 4l4 4-4 4"
-              stroke="currentColor"
-              strokeWidth="1.6"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
+          <FiChevronRight size={16} strokeWidth={2} />
         </Button>
       </div>
 

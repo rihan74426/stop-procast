@@ -5,6 +5,7 @@ import { useUser, SignInButton, SignUpButton } from "@clerk/nextjs";
 import { useI18n } from "@/lib/i18n";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
+import { FiCheckCircle } from "react-icons/fi";
 
 function encodeProjectData(project) {
   try {
@@ -43,7 +44,6 @@ export function EmailExportModal({ open, onClose, project }) {
         setErrorMsg(t("common_error"));
         return;
       }
-
       const res = await fetch("/api/export-email", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -54,9 +54,7 @@ export function EmailExportModal({ open, onClose, project }) {
           projectData: encoded,
         }),
       });
-
       const data = await res.json().catch(() => ({}));
-
       if (res.ok) {
         setStatus("success");
       } else {
@@ -81,13 +79,7 @@ export function EmailExportModal({ open, onClose, project }) {
     onClose();
   };
 
-  const formats = [
-    { id: "markdown", label: "Markdown" },
-    { id: "json", label: "JSON" },
-    { id: "both", label: t("common_done") === "Both" ? "Both" : "Both" },
-  ];
-
-  // Gate — not signed in
+  // ── Sign-in gate ──────────────────────────────────────────────────
   if (!isSignedIn) {
     return (
       <Modal
@@ -98,14 +90,23 @@ export function EmailExportModal({ open, onClose, project }) {
       >
         <div className="flex flex-col gap-5">
           <div className="flex flex-col items-center gap-4 py-4 text-center">
-            <div className="w-14 h-14 rounded-[var(--r-xl)] bg-[var(--violet-bg)] flex items-center justify-center text-2xl">
-              ✉️
+            <div
+              className="w-14 h-14 rounded-[var(--r-xl)] flex items-center justify-center"
+              style={{ background: "var(--violet-bg)" }}
+            >
+              <FiCheckCircle size={26} style={{ color: "var(--violet)" }} />
             </div>
             <div>
-              <p className="font-display font-semibold text-lg text-[var(--text-primary)] mb-1">
+              <p
+                className="font-display font-semibold text-lg mb-1"
+                style={{ color: "var(--text-primary)" }}
+              >
                 {t("export_email_gate_title")}
               </p>
-              <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-xs">
+              <p
+                className="text-sm leading-relaxed max-w-xs"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 {t("export_email_gate_desc")}
               </p>
             </div>
@@ -113,7 +114,14 @@ export function EmailExportModal({ open, onClose, project }) {
               <SignUpButton mode="modal">
                 <button
                   onClick={handleClose}
-                  className="w-full h-11 rounded-[var(--r-md)] bg-[var(--violet)] text-white text-sm font-semibold hover:bg-[var(--violet-dim)] transition-colors active:scale-[0.98]"
+                  className="w-full h-11 rounded-[var(--r-md)] text-white text-sm font-semibold transition-colors"
+                  style={{ background: "var(--violet)" }}
+                  onMouseEnter={(e) =>
+                    (e.currentTarget.style.background = "var(--violet-dim)")
+                  }
+                  onMouseLeave={(e) =>
+                    (e.currentTarget.style.background = "var(--violet)")
+                  }
                 >
                   {t("export_email_gate_signup")}
                 </button>
@@ -121,13 +129,26 @@ export function EmailExportModal({ open, onClose, project }) {
               <SignInButton mode="modal">
                 <button
                   onClick={handleClose}
-                  className="w-full h-11 rounded-[var(--r-md)] border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-colors"
+                  className="w-full h-11 rounded-[var(--r-md)] border text-sm transition-colors"
+                  style={{
+                    borderColor: "var(--border)",
+                    color: "var(--text-secondary)",
+                    background: "transparent",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = "var(--bg-subtle)";
+                    e.currentTarget.style.color = "var(--text-primary)";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.color = "var(--text-secondary)";
+                  }}
                 >
                   {t("export_email_gate_signin")}
                 </button>
               </SignInButton>
             </div>
-            <p className="text-xs text-[var(--text-tertiary)]">
+            <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
               {t("export_email_gate_free")}
             </p>
           </div>
@@ -144,16 +165,23 @@ export function EmailExportModal({ open, onClose, project }) {
       size="sm"
     >
       <div className="flex flex-col gap-5">
+        {/* ── Success state ── */}
         {status === "success" ? (
           <div className="flex flex-col items-center gap-4 py-4 text-center">
-            <div className="w-12 h-12 rounded-full bg-[var(--emerald-bg)] flex items-center justify-center text-2xl">
-              ✓
+            <div
+              className="w-12 h-12 rounded-full flex items-center justify-center"
+              style={{ background: "var(--emerald-bg)" }}
+            >
+              <FiCheckCircle size={24} style={{ color: "var(--emerald)" }} />
             </div>
             <div>
-              <p className="font-semibold text-[var(--text-primary)] mb-1">
+              <p
+                className="font-semibold mb-1"
+                style={{ color: "var(--text-primary)" }}
+              >
                 {t("export_email_success")}
               </p>
-              <p className="text-sm text-[var(--text-secondary)]">
+              <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
                 {t("export_email_success_to")} <strong>{email}</strong>
               </p>
             </div>
@@ -163,13 +191,19 @@ export function EmailExportModal({ open, onClose, project }) {
           </div>
         ) : (
           <>
-            <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+            <p
+              className="text-sm leading-relaxed"
+              style={{ color: "var(--text-secondary)" }}
+            >
               {t("export_email_desc")}
             </p>
 
             {/* Format picker */}
             <div>
-              <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
+              <label
+                className="block text-sm font-medium mb-2"
+                style={{ color: "var(--text-primary)" }}
+              >
                 {t("export_email_format")}
               </label>
               <div className="flex gap-2">
@@ -180,13 +214,29 @@ export function EmailExportModal({ open, onClose, project }) {
                 ].map((f) => (
                   <button
                     key={f.id}
+                    type="button"
                     onClick={() => setFormat(f.id)}
-                    className={[
-                      "flex-1 py-2 text-xs font-medium rounded-[var(--r-md)] border transition-all",
-                      format === f.id
-                        ? "bg-[var(--violet)] text-white border-[var(--violet)]"
-                        : "border-[var(--border)] text-[var(--text-secondary)] hover:border-[var(--violet)] hover:text-[var(--text-primary)]",
-                    ].join(" ")}
+                    className="flex-1 py-2 text-xs font-medium rounded-[var(--r-md)] border transition-all"
+                    style={{
+                      background:
+                        format === f.id ? "var(--violet)" : "transparent",
+                      color:
+                        format === f.id ? "white" : "var(--text-secondary)",
+                      borderColor:
+                        format === f.id ? "var(--violet)" : "var(--border)",
+                    }}
+                    onMouseEnter={(e) => {
+                      if (format !== f.id) {
+                        e.currentTarget.style.borderColor = "var(--violet)";
+                        e.currentTarget.style.color = "var(--text-primary)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (format !== f.id) {
+                        e.currentTarget.style.borderColor = "var(--border)";
+                        e.currentTarget.style.color = "var(--text-secondary)";
+                      }
+                    }}
                   >
                     {f.label}
                   </button>
@@ -196,7 +246,10 @@ export function EmailExportModal({ open, onClose, project }) {
 
             {/* Email input */}
             <div>
-              <label className="block text-sm font-medium text-[var(--text-primary)] mb-1.5">
+              <label
+                className="block text-sm font-medium mb-1.5"
+                style={{ color: "var(--text-primary)" }}
+              >
                 {t("export_email_label")}
               </label>
               <input
@@ -213,26 +266,56 @@ export function EmailExportModal({ open, onClose, project }) {
                 onKeyDown={(e) =>
                   e.key === "Enter" && isValidEmail && handleSend()
                 }
-                className="w-full h-10 px-3 rounded-[var(--r-md)] border border-[var(--border)] bg-[var(--bg-base)] text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)] transition-all"
+                className="w-full h-10 px-3 rounded-[var(--r-md)] border text-sm transition-all focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:ring-offset-1"
+                style={{
+                  borderColor:
+                    "color-mix(in srgb, var(--text-tertiary) 40%, transparent)",
+                  background: "var(--bg-base)",
+                  color: "var(--text-primary)",
+                }}
               />
             </div>
 
+            {/* Error */}
             {status === "error" && (
-              <div className="rounded-[var(--r-md)] border border-[var(--coral)] bg-[var(--coral-bg)] px-3 py-2.5 text-sm text-[var(--coral)]">
+              <div
+                className="rounded-[var(--r-md)] border px-3 py-2.5 text-sm"
+                style={{
+                  borderColor:
+                    "color-mix(in srgb, var(--coral) 40%, transparent)",
+                  background: "var(--coral-bg)",
+                  color: "var(--coral)",
+                }}
+              >
                 {errorMsg || t("export_email_error")}
               </div>
             )}
 
             {/* Project preview */}
-            <div className="rounded-[var(--r-md)] bg-[var(--bg-subtle)] px-3 py-2.5 flex items-center gap-3">
-              <div className="w-8 h-8 rounded-[var(--r-sm)] bg-[var(--violet-bg)] flex items-center justify-center text-sm shrink-0">
-                📦
+            <div
+              className="rounded-[var(--r-md)] border px-3 py-2.5 flex items-center gap-3"
+              style={{
+                background: "var(--bg-subtle)",
+                borderColor: "var(--border)",
+              }}
+            >
+              <div
+                className="w-8 h-8 rounded-[var(--r-sm)] flex items-center justify-center text-sm shrink-0"
+                style={{ background: "var(--violet-bg)" }}
+              >
+                <FiCheckCircle size={14} style={{ color: "var(--violet)" }} />
               </div>
               <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-[var(--text-primary)] truncate">
+                <p
+                  className="text-sm font-medium truncate"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   {project?.projectTitle || "Untitled"}
                 </p>
-                <p className="text-xs text-[var(--text-tertiary)]">
+                <p
+                  className="text-xs"
+                  style={{ color: "var(--text-tertiary)" }}
+                >
                   {project?.tasks?.length || 0}{" "}
                   {t("export_email_project_tasks")} ·{" "}
                   {project?.phases?.length || 0}{" "}

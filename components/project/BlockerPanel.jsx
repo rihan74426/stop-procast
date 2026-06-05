@@ -5,7 +5,7 @@ import { useProjectStore } from "@/lib/store/projectStore";
 import { Button } from "@/components/ui/Button";
 import { timeAgo } from "@/lib/utils/date";
 import { useI18n } from "@/lib/i18n";
-import { PiConfetti } from "react-icons/pi";
+import { FiMinusCircle, FiCheckCircle, FiSmile } from "react-icons/fi";
 
 export function BlockerPanel({ project }) {
   const { t } = useI18n();
@@ -26,21 +26,27 @@ export function BlockerPanel({ project }) {
 
   return (
     <div>
+      {/* Header */}
       <div className="flex items-center justify-between mb-3">
-        <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider">
+        <p
+          className="text-xs font-semibold uppercase tracking-wider"
+          style={{ color: "var(--text-tertiary)" }}
+        >
           {t("blocker_title")}{" "}
           {active.length > 0 && (
-            <span className="text-[var(--coral)]">({active.length})</span>
+            <span style={{ color: "var(--coral)" }}>({active.length})</span>
           )}
         </p>
         <button
           onClick={() => setAdding((a) => !a)}
-          className="text-xs text-[var(--violet)] hover:underline"
+          className="text-xs font-medium hover:underline transition-colors"
+          style={{ color: "var(--violet)" }}
         >
           {t("blocker_add")}
         </button>
       </div>
 
+      {/* Add input */}
       {adding && (
         <div className="flex gap-2 mb-3">
           <input
@@ -52,7 +58,12 @@ export function BlockerPanel({ project }) {
               if (e.key === "Escape") setAdding(false);
             }}
             placeholder={t("blocker_placeholder")}
-            className="flex-1 h-9 px-3 text-sm rounded-[var(--r-md)] border border-[var(--coral)] bg-[var(--bg-base)] text-[var(--text-primary)] focus:outline-none"
+            className="flex-1 h-9 px-3 text-sm rounded-[var(--r-md)] border bg-[var(--bg-base)] focus:outline-none focus:ring-2"
+            style={{
+              borderColor: "var(--coral)",
+              color: "var(--text-primary)",
+              // ring via focus-visible
+            }}
           />
           <Button size="sm" variant="danger" onClick={handleAdd}>
             {t("blocker_add_btn")}
@@ -60,25 +71,39 @@ export function BlockerPanel({ project }) {
         </div>
       )}
 
+      {/* Active blockers */}
       {active.length > 0 && (
         <div className="flex flex-col gap-2 mb-3">
           {active.map((b) => (
             <div
               key={b.id}
-              className="flex items-start gap-3 rounded-[var(--r-md)] border border-[var(--coral)] bg-[var(--coral-bg)] px-4 py-3"
+              className="flex items-start gap-3 rounded-[var(--r-md)] border px-4 py-3"
+              style={{
+                borderColor:
+                  "color-mix(in srgb, var(--coral) 35%, transparent)",
+                background: "var(--coral-bg)",
+              }}
             >
-              <span className="text-[var(--coral)] text-base mt-0.5">⊘</span>
+              <FiMinusCircle
+                size={15}
+                className="shrink-0 mt-0.5"
+                style={{ color: "var(--coral)" }}
+              />
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-[var(--text-primary)]">
+                <p className="text-sm" style={{ color: "var(--text-primary)" }}>
                   {b.description}
                 </p>
-                <p className="text-xs text-[var(--text-tertiary)] mt-1">
+                <p
+                  className="text-xs mt-1"
+                  style={{ color: "var(--text-tertiary)" }}
+                >
                   {timeAgo(b.createdAt)}
                 </p>
               </div>
               <button
                 onClick={() => resolveBlocker(project.id, b.id)}
-                className="text-xs text-[var(--emerald)] hover:underline shrink-0"
+                className="text-xs font-medium hover:underline shrink-0 transition-colors"
+                style={{ color: "var(--emerald)" }}
               >
                 {t("blocker_resolve")}
               </button>
@@ -87,24 +112,37 @@ export function BlockerPanel({ project }) {
         </div>
       )}
 
+      {/* Empty state */}
       {active.length === 0 && !adding && (
-        <p className="text-sm text-[var(--text-tertiary)]">
-          {t("blocker_none")} <PiConfetti className="inline" />
-        </p>
+        <div
+          className="flex items-center gap-2 text-sm"
+          style={{ color: "var(--text-tertiary)" }}
+        >
+          <FiSmile size={14} />
+          <span>{t("blocker_none")}</span>
+        </div>
       )}
 
+      {/* Resolved list */}
       {resolved.length > 0 && (
         <details className="mt-2">
-          <summary className="text-xs text-[var(--text-tertiary)] cursor-pointer hover:text-[var(--text-secondary)]">
+          <summary
+            className="text-xs cursor-pointer hover:underline transition-colors"
+            style={{ color: "var(--text-tertiary)" }}
+          >
             {t("blocker_resolved_count", { n: resolved.length })}
           </summary>
           <div className="mt-2 flex flex-col gap-1">
             {resolved.map((b) => (
               <div
                 key={b.id}
-                className="flex items-center gap-2 px-3 py-1.5 text-sm text-[var(--text-tertiary)] line-through"
+                className="flex items-center gap-2 px-3 py-1.5 text-sm"
+                style={{
+                  color: "var(--text-tertiary)",
+                  textDecoration: "line-through",
+                }}
               >
-                <span>✓</span>
+                <FiCheckCircle size={12} style={{ flexShrink: 0 }} />
                 {b.description}
               </div>
             ))}

@@ -1,20 +1,50 @@
 "use client";
 
-import { useUser, SignInButton, SignUpButton } from "@clerk/nextjs";
-import { useI18n } from "@/lib/i18n";
-import { FiBookmark, FiGlobe, FiTrendingUp } from "react-icons/fi";
+/**
+ * SignInGate — shown to anonymous users on project page
+ * when they try to export or acquire a project.
+ *
+ * Drop this file at:  components/project/SignInGate.jsx
+ * Then import it in   app/project/[id]/ProjectPageClient.jsx
+ * replacing the inline SignInGate function.
+ */
 
-const FEATURES = [
-  { key: "auth_gate_feature_1", Icon: FiBookmark },
-  { key: "auth_gate_feature_2", Icon: FiGlobe },
-  { key: "auth_gate_feature_3", Icon: FiTrendingUp },
+import { useUser, SignInButton, SignUpButton } from "@clerk/nextjs";
+import {
+  FiPackage,
+  FiSend,
+  FiDownload,
+  FiMail,
+  FiSave,
+  FiCrosshair,
+  FiCheckSquare,
+  FiTrendingUp,
+} from "react-icons/fi";
+import { FaFire } from "react-icons/fa";
+
+const EXPORT_FEATURES = [
+  { Icon: FiDownload, text: "Export as PDF, Markdown, or JSON" },
+  { Icon: FiMail, text: "Send the blueprint to your email" },
+  { Icon: FiSave, text: "Your projects sync across all devices" },
 ];
 
-export function AuthGateModal({ open, onClose, onContinueAnyway }) {
-  const { isSignedIn } = useUser();
-  const { t } = useI18n();
+const ACQUIRE_FEATURES = [
+  { Icon: FiCrosshair, text: "Get your own editable copy of this plan" },
+  { Icon: FiCheckSquare, text: "Check off tasks and mark milestones" },
+  { Icon: FiTrendingUp, text: "Build streaks — finish what you start" },
+];
 
-  if (isSignedIn || !open) return null;
+export function SignInGate({
+  open,
+  onClose,
+  context = "export",
+  projectTitle,
+}) {
+  if (!open) return null;
+
+  const isExport = context === "export";
+  const TitleIcon = isExport ? FiPackage : FiSend;
+  const features = isExport ? EXPORT_FEATURES : ACQUIRE_FEATURES;
 
   return (
     <div
@@ -22,53 +52,56 @@ export function AuthGateModal({ open, onClose, onContinueAnyway }) {
       style={{ background: "rgba(12,12,15,0.78)", backdropFilter: "blur(8px)" }}
     >
       <div
-        className={[
-          "w-full sm:max-w-md",
-          "rounded-t-[var(--r-xl)] sm:rounded-[var(--r-xl)]",
-          "border border-[var(--border)] bg-[var(--bg-elevated)]",
-          "shadow-[var(--shadow-lg)] overflow-hidden",
-        ].join(" ")}
+        className="w-full sm:max-w-md rounded-t-[var(--r-xl)] sm:rounded-[var(--r-xl)] border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)] overflow-hidden"
         style={{
           animation: "gateIn 260ms cubic-bezier(0.175,0.885,0.32,1.275) both",
         }}
       >
         {/* Header */}
         <div
-          className="px-5 sm:px-6 py-5 sm:py-6"
+          className="px-6 py-5"
           style={{
             background:
               "linear-gradient(135deg, var(--violet) 0%, #534ab7 100%)",
           }}
         >
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-8 h-8 rounded-[var(--r-md)] bg-white/20 flex items-center justify-center shrink-0 overflow-hidden">
-              <img
-                src="/favicon.png"
-                alt="Momentum"
-                className="w-full h-full object-contain"
-                onError={(e) => {
-                  e.target.style.display = "none";
-                  e.target.parentElement.innerHTML = "M";
-                }}
-              />
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3">
+              <span
+                className="flex items-center justify-center w-9 h-9 rounded-[var(--r-md)] shrink-0 mt-0.5"
+                style={{ background: "rgba(255,255,255,0.15)" }}
+              >
+                <TitleIcon size={18} color="white" />
+              </span>
+              <div>
+                <p className="font-display font-bold text-white text-lg leading-snug">
+                  {isExport
+                    ? "Sign in to export"
+                    : "Sign in to acquire this plan"}
+                </p>
+                <p className="text-white/75 text-sm mt-1 leading-relaxed">
+                  {isExport
+                    ? `Download the full blueprint for "${projectTitle}".`
+                    : `Fork "${projectTitle}" to your dashboard and start your own execution.`}
+                </p>
+              </div>
             </div>
-            <div>
-              <p className="font-display font-bold text-white text-lg leading-tight">
-                {t("auth_gate_title")}
-              </p>
-            </div>
+            <button
+              onClick={onClose}
+              className="text-white/50 hover:text-white transition-colors text-xl leading-none mt-0.5 shrink-0"
+              aria-label="Close"
+            >
+              ×
+            </button>
           </div>
-          <p className="text-white/80 text-sm leading-relaxed mt-2">
-            {t("auth_gate_subtitle")}
-          </p>
         </div>
 
-        <div className="px-5 sm:px-6 py-5">
-          {/* Feature list */}
-          <ul className="flex flex-col gap-2.5 mb-5">
-            {FEATURES.map(({ key, Icon }) => (
+        {/* Body */}
+        <div className="px-6 py-5">
+          <ul className="flex flex-col gap-2 mb-5">
+            {features.map(({ Icon, text }) => (
               <li
-                key={key}
+                key={text}
                 className="flex items-center gap-3 text-sm"
                 style={{ color: "var(--text-primary)" }}
               >
@@ -78,12 +111,11 @@ export function AuthGateModal({ open, onClose, onContinueAnyway }) {
                 >
                   <Icon size={13} style={{ color: "var(--emerald)" }} />
                 </span>
-                {t(key)}
+                {text}
               </li>
             ))}
           </ul>
 
-          {/* CTAs */}
           <div className="flex flex-col gap-2.5">
             <SignUpButton mode="modal">
               <button
@@ -97,14 +129,14 @@ export function AuthGateModal({ open, onClose, onContinueAnyway }) {
                   (e.currentTarget.style.background = "var(--violet)")
                 }
               >
-                {t("auth_gate_cta_signup")}
+                Create free account — it takes 30 seconds
               </button>
             </SignUpButton>
 
             <SignInButton mode="modal">
               <button
                 onClick={onClose}
-                className="w-full h-11 rounded-[var(--r-md)] border text-sm transition-all"
+                className="w-full h-10 rounded-[var(--r-md)] border text-sm transition-all"
                 style={{
                   borderColor: "var(--border)",
                   color: "var(--text-secondary)",
@@ -119,13 +151,13 @@ export function AuthGateModal({ open, onClose, onContinueAnyway }) {
                   e.currentTarget.style.color = "var(--text-secondary)";
                 }}
               >
-                {t("auth_gate_cta_signin")}
+                Sign in to existing account
               </button>
             </SignInButton>
 
             <button
-              onClick={onContinueAnyway}
-              className="w-full py-2 text-xs transition-colors rounded-[var(--r-full)]"
+              onClick={onClose}
+              className="w-full py-1.5 text-xs transition-colors"
               style={{ color: "var(--text-tertiary)" }}
               onMouseEnter={(e) =>
                 (e.currentTarget.style.color = "var(--text-secondary)")
@@ -134,7 +166,7 @@ export function AuthGateModal({ open, onClose, onContinueAnyway }) {
                 (e.currentTarget.style.color = "var(--text-tertiary)")
               }
             >
-              {t("auth_gate_skip")}
+              Continue browsing
             </button>
           </div>
         </div>

@@ -4,15 +4,16 @@ import { forwardRef } from "react";
 
 const base = [
   "w-full rounded-[var(--r-md)] border bg-[var(--bg-base)]",
-  "text-[var(--text-primary)] text-sm placeholder:text-[var(--text-tertiary)]",
-  "transition-all duration-[var(--dur-base)]",
-  "focus:outline-none focus:ring-2 focus:ring-[var(--violet)] focus:border-[var(--violet)]",
+  "text-sm text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)]",
+  "transition-all duration-150",
+  "focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-offset-[var(--bg-surface)]",
   "disabled:opacity-40 disabled:cursor-not-allowed",
 ].join(" ");
 
 const stateClasses = {
-  default: "border-[var(--border)]",
-  error: "border-[var(--coral)] focus:ring-[var(--coral)]",
+  default:
+    "border-[color-mix(in_srgb,var(--text-tertiary)_40%,transparent)] focus:ring-[var(--violet)] focus:border-[var(--violet)]",
+  error: "border-[var(--coral)]   focus:ring-[var(--coral)]",
   success: "border-[var(--emerald)] focus:ring-[var(--emerald)]",
 };
 
@@ -61,16 +62,18 @@ function Field({ label, hint, error, children }) {
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label className="text-sm font-medium text-[var(--text-primary)]">
+        <label
+          className="text-sm font-medium"
+          style={{ color: "var(--text-primary)" }}
+        >
           {label}
         </label>
       )}
       {children}
       {(error || hint) && (
         <p
-          className={`text-xs ${
-            error ? "text-[var(--coral)]" : "text-[var(--text-tertiary)]"
-          }`}
+          className="text-xs"
+          style={{ color: error ? "var(--coral)" : "var(--text-tertiary)" }}
         >
           {error || hint}
         </p>

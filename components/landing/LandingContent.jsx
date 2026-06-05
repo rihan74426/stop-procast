@@ -21,7 +21,7 @@ import {
   FaArrowRight,
   FaPlay,
 } from "react-icons/fa";
-import { FiMessageSquare, FiCompass } from "react-icons/fi";
+import { FiMessageSquare, FiCompass, FiSun, FiMoon } from "react-icons/fi";
 
 // ─── LandingNav ────────────────────────────────────────────────────────
 
@@ -213,7 +213,7 @@ function LandingNav() {
               e.currentTarget.style.color = "var(--text-secondary)";
             }}
           >
-            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+            {theme === "dark" ? <FiSun size={15} /> : <FiMoon size={15} />}{" "}
           </button>
 
           {/* Auth */}
@@ -1029,33 +1029,5 @@ export default function LandingContent() {
         </Link>
       </footer>
     </div>
-  );
-}
-
-function SunIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-      <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M11.54 4.46l-1.41 1.41M4.95 11.54l-1.41 1.41"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function MoonIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-      <path
-        d="M13.5 9A6 6 0 0 1 7 2.5a6 6 0 1 0 6.5 6.5z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }

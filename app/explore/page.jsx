@@ -23,6 +23,8 @@ import {
   FiGrid,
   FiCompass,
   FiPlus,
+  FiSun,
+  FiMoon,
 } from "react-icons/fi";
 
 // ─── Scope color map ─────────────────────────────────────────────────
@@ -123,7 +125,7 @@ function ExploreNav() {
             aria-label="Toggle theme"
             className="h-8 w-8 flex items-center justify-center rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-subtle)] transition-all"
           >
-            {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+            {theme === "dark" ? <FiSun size={15} /> : <FiMoon size={15} />}{" "}
           </button>
           {isLoaded && !isSignedIn && (
             <SignInButton mode="modal">
@@ -1144,33 +1146,5 @@ export default function ExplorePage() {
     <DataProvider>
       <ExploreContent />
     </DataProvider>
-  );
-}
-
-// ─── Icon helpers ────────────────────────────────────────────────────
-function SunIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-      <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M11.54 4.46l-1.41 1.41M4.95 11.54l-1.41 1.41"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-function MoonIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
-      <path
-        d="M13.5 9A6 6 0 0 1 7 2.5a6 6 0 1 0 6.5 6.5z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }

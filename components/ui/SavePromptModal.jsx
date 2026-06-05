@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useUser, SignInButton, SignUpButton } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { useI18n } from "@/lib/i18n";
+import { FiSave } from "react-icons/fi";
 
 export function SavePromptModal() {
   const { isSignedIn, isLoaded } = useUser();
@@ -40,27 +41,48 @@ export function SavePromptModal() {
 
   return (
     <div className="fixed bottom-6 right-6 z-50 w-80 animate-[slideUp_300ms_var(--ease-spring)_both]">
-      <div className="rounded-[var(--r-xl)] border border-[var(--violet)] bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)] p-5">
+      <div
+        className="rounded-[var(--r-xl)] border bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)] p-5"
+        style={{
+          borderColor: "color-mix(in srgb, var(--violet) 50%, transparent)",
+        }}
+      >
         {/* Header */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-[var(--r-md)] bg-[var(--violet-bg)] flex items-center justify-center shrink-0">
-              <span className="text-base">💾</span>
+            <div
+              className="w-8 h-8 rounded-[var(--r-md)] flex items-center justify-center shrink-0"
+              style={{ background: "var(--violet-bg)" }}
+            >
+              <FiSave size={15} style={{ color: "var(--violet)" }} />
             </div>
-            <p className="font-display font-semibold text-sm text-[var(--text-primary)]">
+            <p
+              className="font-display font-semibold text-sm"
+              style={{ color: "var(--text-primary)" }}
+            >
               {t("save_prompt_title")}
             </p>
           </div>
           <button
             onClick={handleDismiss}
-            className="text-[var(--text-tertiary)] hover:text-[var(--text-primary)] transition-colors text-lg leading-none"
+            className="text-xl leading-none transition-colors"
+            style={{ color: "var(--text-tertiary)" }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.color = "var(--text-primary)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.color = "var(--text-tertiary)")
+            }
             aria-label="Dismiss"
           >
             ×
           </button>
         </div>
 
-        <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-4">
+        <p
+          className="text-sm leading-relaxed mb-4"
+          style={{ color: "var(--text-secondary)" }}
+        >
           {t("save_prompt_desc")}
         </p>
 
@@ -68,7 +90,14 @@ export function SavePromptModal() {
           <SignUpButton mode="modal">
             <button
               onClick={handleDismiss}
-              className="flex-1 h-9 rounded-[var(--r-md)] bg-[var(--violet)] text-white text-sm font-medium hover:bg-[var(--violet-dim)] transition-colors"
+              className="flex-1 h-9 rounded-[var(--r-md)] text-white text-sm font-medium transition-colors"
+              style={{ background: "var(--violet)" }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "var(--violet-dim)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "var(--violet)")
+              }
             >
               {t("save_prompt_signup")}
             </button>
@@ -76,7 +105,20 @@ export function SavePromptModal() {
           <SignInButton mode="modal">
             <button
               onClick={handleDismiss}
-              className="flex-1 h-9 rounded-[var(--r-md)] border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-colors"
+              className="flex-1 h-9 rounded-[var(--r-md)] border text-sm transition-colors"
+              style={{
+                borderColor: "var(--border)",
+                color: "var(--text-secondary)",
+                background: "transparent",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--bg-subtle)";
+                e.currentTarget.style.color = "var(--text-primary)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = "var(--text-secondary)";
+              }}
             >
               {t("save_prompt_signin")}
             </button>
@@ -85,7 +127,14 @@ export function SavePromptModal() {
 
         <button
           onClick={handleDismiss}
-          className="w-full mt-2 text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors py-1"
+          className="w-full mt-2 text-xs py-1 transition-colors"
+          style={{ color: "var(--text-tertiary)" }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.color = "var(--text-secondary)")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.color = "var(--text-tertiary)")
+          }
         >
           {t("save_prompt_continue")}
         </button>

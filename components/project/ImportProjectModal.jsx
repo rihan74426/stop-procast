@@ -6,23 +6,19 @@ import { useProjectStore } from "@/lib/store/projectStore";
 import { createProject } from "@/lib/schema";
 import { Modal } from "@/components/ui/Modal";
 import { Button } from "@/components/ui/Button";
-import { FiFileMinus, FiFilePlus } from "react-icons/fi";
 import { useI18n } from "@/lib/i18n";
+import { FiFilePlus, FiCheckCircle } from "react-icons/fi";
 
-/**
- * ImportProjectModal — accepts a Momentum JSON export and imports it as a new project.
- * Strips old IDs and timestamps so it behaves like a fresh project.
- */
 export function ImportProjectModal({ open, onClose }) {
   const router = useRouter();
   const addProject = useProjectStore((s) => s.addProject);
   const fileRef = useRef(null);
-  const [status, setStatus] = useState("idle"); // idle | parsing | error | success
+  const { t } = useI18n();
+
+  const [status, setStatus] = useState("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [preview, setPreview] = useState(null);
   const [parsed, setParsed] = useState(null);
-
-  const { t } = useI18n();
 
   const reset = () => {
     setStatus("idle");
@@ -40,35 +36,24 @@ export function ImportProjectModal({ open, onClose }) {
   const handleFile = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     if (!file.name.endsWith(".json")) {
       setStatus("error");
       setErrorMsg(t("import_error_only_json"));
       return;
     }
-
     const reader = new FileReader();
     reader.onload = (ev) => {
       try {
         const raw = JSON.parse(ev.target.result);
-
-        // Support both direct project objects and the backup format
-        // { version, exportedAt, projects: [...] } (exported from Settings)
-        // or a single project object
         let project = null;
         if (raw.projects && Array.isArray(raw.projects)) {
-          // Backup file — take first project or show picker (for now, first)
           project = raw.projects[0];
         } else if (raw.projectTitle !== undefined) {
           project = raw;
         } else {
           throw new Error(t("import_error_format"));
         }
-
-        if (!project?.projectTitle) {
-          throw new Error(t("import_error_no_title"));
-        }
-
+        if (!project?.projectTitle) throw new Error(t("import_error_no_title"));
         setParsed(project);
         setPreview({
           title: project.projectTitle,
@@ -90,9 +75,7 @@ export function ImportProjectModal({ open, onClose }) {
     if (!parsed) return;
     setStatus("importing");
     try {
-      // Re-hydrate as a fresh project — new ID, new timestamps, reset progress
       const fresh = createProject({
-        // Keep all AI-generated content
         projectTitle: parsed.projectTitle,
         oneLineGoal: parsed.oneLineGoal,
         problemStatement: parsed.problemStatement ?? "",
@@ -114,7 +97,6 @@ export function ImportProjectModal({ open, onClose }) {
         reviewQuestions: parsed.reviewQuestions ?? [],
         dailyNextAction: parsed.dailyNextAction ?? "",
       });
-
       const id = await addProject(fresh);
       setStatus("success");
       setTimeout(() => {
@@ -135,32 +117,51 @@ export function ImportProjectModal({ open, onClose }) {
       size="md"
     >
       <div className="flex flex-col gap-5">
+        {/* ── Success ── */}
         {status === "success" ? (
           <div className="flex flex-col items-center gap-3 py-6 text-center">
-            <div className="w-12 h-12 rounded-full bg-[var(--emerald-bg)] flex items-center justify-center text-2xl">
-              ✓
+            <div
+              className="w-12 h-12 rounded-full flex items-center justify-center"
+              style={{ background: "var(--emerald-bg)" }}
+            >
+              <FiCheckCircle size={24} style={{ color: "var(--emerald)" }} />
             </div>
-            <p className="font-semibold text-[var(--text-primary)]">
+            <p
+              className="font-semibold"
+              style={{ color: "var(--text-primary)" }}
+            >
               {t("import_success_title")}
             </p>
-            <p className="text-sm text-[var(--text-secondary)]">
+            <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
               {t("import_success_desc")}
             </p>
           </div>
         ) : (
           <>
-            <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+            <p
+              className="text-sm leading-relaxed"
+              style={{ color: "var(--text-secondary)" }}
+            >
               {t("import_desc")}
             </p>
 
-            {/* Drop zone / file picker */}
+            {/* Drop zone */}
             <label
-              className={[
-                "flex flex-col items-center justify-center gap-3 rounded-[var(--r-lg)] border-2 border-dashed px-6 py-8 cursor-pointer transition-all",
-                status === "ready"
-                  ? "border-[var(--emerald)] bg-[var(--emerald-bg)]"
-                  : "border-[var(--border)] hover:border-[var(--violet)] hover:bg-[var(--violet-bg)]",
-              ].join(" ")}
+              className="flex flex-col items-center justify-center gap-3 rounded-[var(--r-lg)] border-2 border-dashed px-6 py-8 cursor-pointer transition-all"
+              style={{
+                borderColor:
+                  status === "ready" ? "var(--emerald)" : "var(--border)",
+                background:
+                  status === "ready" ? "var(--emerald-bg)" : "transparent",
+              }}
+              onMouseEnter={(e) => {
+                if (status !== "ready")
+                  e.currentTarget.style.borderColor = "var(--violet)";
+              }}
+              onMouseLeave={(e) => {
+                if (status !== "ready")
+                  e.currentTarget.style.borderColor = "var(--border)";
+              }}
             >
               <input
                 ref={fileRef}
@@ -171,83 +172,130 @@ export function ImportProjectModal({ open, onClose }) {
               />
               {status === "ready" ? (
                 <>
-                  <span className="text-2xl">✓</span>
-                  <p className="text-sm font-medium text-[var(--emerald-dim)]">
+                  <FiCheckCircle
+                    size={28}
+                    style={{ color: "var(--emerald)" }}
+                  />
+                  <p
+                    className="text-sm font-medium"
+                    style={{ color: "var(--emerald-dim)" }}
+                  >
                     {preview.title}
                   </p>
-                  <p className="text-xs text-[var(--text-secondary)]">
+                  <p
+                    className="text-xs"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     {preview.phases} {t("import_phases")} · {preview.tasks}{" "}
                     {t("import_tasks")}
                     {preview.timeline ? ` · ${preview.timeline}` : ""}
                   </p>
-                  <p className="text-xs text-[var(--text-tertiary)] underline">
+                  <p
+                    className="text-xs underline"
+                    style={{ color: "var(--text-tertiary)" }}
+                  >
                     {t("import_dropzone_different")}
                   </p>
                 </>
               ) : (
                 <>
-                  <span className="text-3xl">
-                    <FiFilePlus />
-                  </span>
-                  <p className="text-sm text-[var(--text-secondary)] text-center">
+                  <FiFilePlus
+                    size={28}
+                    style={{ color: "var(--text-tertiary)" }}
+                  />
+                  <p
+                    className="text-sm text-center"
+                    style={{ color: "var(--text-secondary)" }}
+                  >
                     {t("import_dropzone_click")}
                   </p>
-                  <p className="text-xs text-[var(--text-tertiary)]">
+                  <p
+                    className="text-xs"
+                    style={{ color: "var(--text-tertiary)" }}
+                  >
                     {t("import_dropzone_hint")}
                   </p>
                 </>
               )}
             </label>
 
+            {/* Error */}
             {status === "error" && (
-              <div className="rounded-[var(--r-md)] border border-[var(--coral)] bg-[var(--coral-bg)] px-4 py-3 text-sm text-[var(--coral)]">
+              <div
+                className="rounded-[var(--r-md)] border px-4 py-3 text-sm"
+                style={{
+                  borderColor:
+                    "color-mix(in srgb, var(--coral) 40%, transparent)",
+                  background: "var(--coral-bg)",
+                  color: "var(--coral)",
+                }}
+              >
                 {errorMsg}
               </div>
             )}
 
+            {/* Preview card */}
             {status === "ready" && preview && (
-              <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-surface)] p-4 flex flex-col gap-2">
-                <p className="text-xs text-[var(--text-tertiary)] uppercase tracking-wider font-medium mb-1">
+              <div
+                className="rounded-[var(--r-lg)] border p-4 flex flex-col gap-2"
+                style={{
+                  background: "var(--bg-surface)",
+                  borderColor: "var(--border)",
+                }}
+              >
+                <p
+                  className="text-xs font-semibold uppercase tracking-wider mb-1"
+                  style={{ color: "var(--text-tertiary)" }}
+                >
                   {t("import_preview_label")}
                 </p>
-                <p className="font-display font-semibold text-base text-[var(--text-primary)]">
+                <p
+                  className="font-display font-semibold text-base"
+                  style={{ color: "var(--text-primary)" }}
+                >
                   {preview.title}
                 </p>
-                <p className="text-sm text-[var(--text-secondary)]">
+                <p
+                  className="text-sm"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   {preview.goal}
                 </p>
                 <div className="flex flex-wrap gap-2 mt-1">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)]">
-                    {preview.phases} {t("import_phases")}
-                  </span>
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)]">
-                    {preview.tasks} {t("import_tasks")}
-                  </span>
-                  {preview.timeline && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)]">
-                      {preview.timeline}
+                  {[
+                    `${preview.phases} ${t("import_phases")}`,
+                    `${preview.tasks} ${t("import_tasks")}`,
+                    ...(preview.timeline ? [preview.timeline] : []),
+                  ].map((tag) => (
+                    <span
+                      key={tag}
+                      className="text-xs px-2 py-0.5 rounded-full"
+                      style={{
+                        background: "var(--bg-muted)",
+                        color: "var(--text-secondary)",
+                      }}
+                    >
+                      {tag}
                     </span>
-                  )}
+                  ))}
                 </div>
               </div>
             )}
 
+            {/* Actions */}
             <div className="flex gap-2 justify-end">
               <Button variant="ghost" onClick={handleClose}>
                 {t("import_cancel")}
               </Button>
               <Button
+                variant="primary"
                 onClick={handleImport}
-                style={{ backgroundColor: "var(--violet)", color: "white" }}
-                className="bg-[var(--violet)] text-white hover:bg-[var(--violet-dark)]"
                 disabled={status !== "ready"}
                 loading={status === "importing"}
               >
-                {`${
-                  status === "importing"
-                    ? t("import_importing")
-                    : t("import_title")
-                }`}
+                {status === "importing"
+                  ? t("import_importing")
+                  : t("import_title")}
               </Button>
             </div>
           </>

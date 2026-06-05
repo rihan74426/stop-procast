@@ -18,7 +18,6 @@ export function ProjectCard({ project }) {
   const pressure = getPressure(project);
   const isCompleted = !!project.completionDate;
 
-  // Engagement totals — show if non-zero
   const stars = project.stars ?? 0;
   const views = project.views ?? 0;
   const helpedCount = project.helpedCount ?? 0;
@@ -29,22 +28,30 @@ export function ProjectCard({ project }) {
       <div
         className={[
           "rounded-[var(--r-lg)] border bg-[var(--bg-elevated)] p-4",
-          "transition-all duration-200 ease-[var(--ease-smooth)]",
-          "hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 hover:border-[var(--violet)]",
+          "transition-all duration-200 ease-out",
+          "hover:-translate-y-0.5",
+          "hover:shadow-[0_8px_24px_rgba(0,0,0,0.08),0_2px_8px_rgba(0,0,0,0.04)]",
+          "hover:border-[color-mix(in_srgb,var(--violet)_45%,transparent)]",
           "active:translate-y-0 active:shadow-none",
           isCompleted
-            ? "border-[var(--emerald)] opacity-80"
+            ? "border-[color-mix(in_srgb,var(--emerald)_45%,transparent)] opacity-80"
             : "border-[var(--border)]",
         ].join(" ")}
       >
         {/* Top row */}
         <div className="flex items-start justify-between gap-3 mb-3">
           <div className="flex-1 min-w-0">
-            <p className="font-display font-semibold text-base sm:text-lg text-[var(--text-primary)] leading-tight mb-1 truncate">
+            <p
+              className="font-display font-semibold text-base sm:text-lg leading-tight mb-1 truncate"
+              style={{ color: "var(--text-primary)" }}
+            >
               {project.projectTitle || "Untitled project"}
             </p>
             {project.oneLineGoal && (
-              <p className="text-xs sm:text-sm text-[var(--text-secondary)] line-clamp-2 leading-relaxed">
+              <p
+                className="text-xs sm:text-sm line-clamp-2 leading-relaxed"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 {project.oneLineGoal}
               </p>
             )}
@@ -62,7 +69,7 @@ export function ProjectCard({ project }) {
           </div>
         </div>
 
-        {/* Phase + pressure badges */}
+        {/* Badges */}
         <div className="flex flex-wrap gap-1.5 mb-3">
           {isCompleted ? (
             <Badge status="completed">{t("project_done")}</Badge>
@@ -83,18 +90,33 @@ export function ProjectCard({ project }) {
 
         {/* Next action */}
         {next && !isCompleted && (
-          <div className="rounded-[var(--r-md)] bg-[var(--bg-surface)] border border-[var(--border)] px-3 py-2 mb-3">
-            <p className="text-[10px] text-[var(--text-tertiary)] font-medium uppercase tracking-wide mb-0.5">
+          <div
+            className="rounded-[var(--r-md)] border px-3 py-2 mb-3"
+            style={{
+              background: "var(--bg-surface)",
+              borderColor: "var(--border)",
+            }}
+          >
+            <p
+              className="text-[10px] font-semibold uppercase tracking-wide mb-0.5"
+              style={{ color: "var(--text-tertiary)" }}
+            >
               {t("card_next_action")}
             </p>
-            <p className="text-xs sm:text-sm text-[var(--text-primary)] line-clamp-1">
+            <p
+              className="text-xs sm:text-sm line-clamp-1"
+              style={{ color: "var(--text-primary)" }}
+            >
               {next}
             </p>
           </div>
         )}
 
         {/* Footer */}
-        <div className="flex items-center justify-between gap-2 text-xs text-[var(--text-tertiary)]">
+        <div
+          className="flex items-center justify-between gap-2 text-xs"
+          style={{ color: "var(--text-tertiary)" }}
+        >
           <span className="shrink-0">
             {project.tasks.filter((t) => t.status === "done").length}/
             {project.tasks.length} {t("intake_tasks")}
@@ -103,12 +125,12 @@ export function ProjectCard({ project }) {
             {project.streakDays > 0 && (
               <span
                 className="flex items-center gap-0.5 shrink-0"
-                style={{ color: "var(--coral)" }}
+                style={{ color: "var(--amber)" }}
               >
-                <FaFire size={10} /> {project.streakDays}d
+                <FaFire size={10} />
+                {project.streakDays}d
               </span>
             )}
-            {/* Engagement micro-stats — only for public projects with data */}
             {hasEngagement && project.isPublic !== false && (
               <span className="flex items-center gap-2 shrink-0">
                 {stars > 0 && (

@@ -130,7 +130,6 @@
   --border-focus: var(--violet);
   --border-subtle: #1c1c22;
 
-  /* Brand colors — adjusted for dark backgrounds */
   --violet: #8f88e8;
   --violet-dim: #a8a3ee;
   --violet-bg: rgba(127, 119, 221, 0.15);
@@ -148,7 +147,6 @@
   --rose: #c04570;
   --rose-bg: rgba(153, 53, 86, 0.15);
 
-  /* Slate scale */
   --slate-4: #3a3a48;
   --slate-5: #5a5a6e;
   --slate-6: #9898a8;
@@ -163,44 +161,48 @@
 *::before,
 *::after {
   box-sizing: border-box;
-  /* Prevent text size inflation on mobile when rotating */
   -webkit-text-size-adjust: 100%;
 }
 
 html {
   height: 100%;
-  /* Smoother scrolling on all platforms */
   scroll-behavior: smooth;
-  /* Prevent horizontal overflow globally */
   overflow-x: hidden;
 }
 
-/* ─── Universal font stack ───────────────────────────────────────────── */
-button {
-  padding: calc(var(--spacing) * 1);
-  border-radius: var(--radius-2xl);
-  cursor: pointer;
-}
-
-body,
-input,
-textarea,
-button,
-select {
+/* ─── Body & typography base ─────────────────────────────────────────── */
+body {
   font-family: var(--font-body);
   background-color: var(--bg-surface);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   min-height: 100%;
+  overflow-x: hidden;
+  /* Theme transition — body only, not every element */
   transition: background-color var(--dur-slow) var(--ease-smooth),
     color var(--dur-slow) var(--ease-smooth);
 }
 
-body {
-  min-height: 100%;
-  /* Prevent horizontal overflow */
-  overflow-x: hidden;
+/* ─── Form element font inheritance ─────────────────────────────────── */
+/* NOTE: Do NOT set background-color, min-height, or transitions here.
+   Those must come from component/utility classes only.
+   Button variant backgrounds (bg-[var(--violet)] etc.) must not be
+   overridden by element-level CSS. */
+input,
+textarea,
+button,
+select {
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ─── Button base reset ─────────────────────────────────────────────── */
+/* Minimal reset only — layout and color come from Button.jsx or Tailwind */
+button {
+  cursor: pointer;
+  /* NO padding/border-radius/background here — Button.jsx handles those */
 }
 
 h1,
@@ -210,13 +212,11 @@ h4,
 h5,
 h6 {
   font-family: var(--font-display);
-  /* Better heading tracking — tighter on small sizes, keep letter-spacing less aggressive */
   letter-spacing: -0.015em;
   line-height: 1.15;
 }
 
 /* ─── Responsive typography scale ────────────────────────────────────── */
-/* Makes text naturally scale between mobile and desktop */
 @media (max-width: 640px) {
   h1 {
     font-size: clamp(1.5rem, 5vw, 2rem);
@@ -229,13 +229,10 @@ h6 {
   }
 }
 
-/* ─── Interactive elements — touch-friendly minimum sizes ────────────── */
+/* ─── Interactive elements ───────────────────────────────────────────── */
 button,
 [role="button"],
 a {
-  /* Minimum touch target for accessibility */
-  min-height: auto;
-  /* Remove default tap highlight on mobile */
   -webkit-tap-highlight-color: transparent;
 }
 
@@ -262,6 +259,8 @@ a {
 }
 
 /* ─── Focus ring ─────────────────────────────────────────────────────── */
+/* Individual components manage their own focus-visible ring colors.
+   This fallback covers anything not using the Button/Input components. */
 :focus-visible {
   outline: 2px solid var(--border-focus);
   outline-offset: 2px;
@@ -281,9 +280,8 @@ a {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* ─── Fix for mobile sidebar overlap on content ──────────────────────── */
+/* ─── Mobile sidebar overlap ─────────────────────────────────────────── */
 @media (max-width: 1024px) {
-  /* When mobile menu is open, prevent scrolling */
   body.sidebar-open {
     overflow: hidden;
   }
@@ -304,8 +302,7 @@ a {
   }
 }
 
-/* ─── Fix common Tailwind + CSS var conflicts ────────────────────────── */
-/* Ensure truncate works properly in flex containers */
+/* ─── Truncate in flex containers ────────────────────────────────────── */
 .truncate-flex {
   min-width: 0;
   overflow: hidden;
@@ -313,7 +310,7 @@ a {
   white-space: nowrap;
 }
 
-/* ─── Card hover states — consistent across the app ─────────────────── */
+/* ─── Card interactive hover ─────────────────────────────────────────── */
 .card-interactive {
   transition: transform var(--dur-base) var(--ease-smooth),
     box-shadow var(--dur-base) var(--ease-smooth),
@@ -339,28 +336,25 @@ input[type="date"]::-webkit-calendar-picker-indicator {
 
 /* ─── Mobile bottom navigation safe spacing ──────────────────────────── */
 @media (max-width: 1024px) {
-  /* Prevent content from being hidden behind mobile FAB button */
   main {
     padding-bottom: max(80px, env(safe-area-inset-bottom, 80px));
   }
-  /* Exception: pages with their own scroll containers */
   .no-fab-padding main {
     padding-bottom: 0;
   }
 }
 
-/* ─── Prose / content readability ────────────────────────────────────── */
+/* ─── Prose readability ──────────────────────────────────────────────── */
 .prose-content {
   max-width: 65ch;
   line-height: 1.7;
 }
 
-/* ─── Fix text overflow in small containers ──────────────────────────── */
 .text-balance {
   text-wrap: balance;
 }
 
-/* ─── Loading skeleton animation ────────────────────────────────────── */
+/* ─── Skeleton shimmer ───────────────────────────────────────────────── */
 @keyframes shimmer {
   0% {
     background-position: -200% 0;
@@ -381,8 +375,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   border-radius: var(--r-md);
 }
 
-/* ─── Improved focus for accessibility ───────────────────────────────── */
-/* High contrast focus for keyboard users */
+/* ─── High contrast focus ────────────────────────────────────────────── */
 @media (prefers-contrast: more) {
   :focus-visible {
     outline: 3px solid var(--text-primary);
@@ -390,6 +383,7 @@ input[type="date"]::-webkit-calendar-picker-indicator {
   }
 }
 
+/* ─── Violet button shorthand ────────────────────────────────────────── */
 .btn-violet {
   background: var(--violet);
   color: white;

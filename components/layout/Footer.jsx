@@ -2,12 +2,19 @@
 
 import Link from "next/link";
 import { useI18n } from "@/lib/i18n";
+import { FiArrowUpRight } from "react-icons/fi";
 
 export function Footer() {
   const { t } = useI18n();
 
   return (
-    <footer className="border-t border-[var(--border)] bg-[var(--bg-elevated)] mt-auto">
+    <footer
+      className="border-t mt-auto"
+      style={{
+        background: "var(--bg-elevated)",
+        borderColor: "var(--border)",
+      }}
+    >
       <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <div className="flex flex-col sm:flex-row items-center sm:items-start justify-between gap-6 sm:gap-8">
           {/* Brand */}
@@ -23,83 +30,110 @@ export function Footer() {
                   }}
                 />
               </div>
-              <span className="font-display font-semibold text-sm text-[var(--text-primary)]">
+              <span
+                className="font-display font-semibold text-sm"
+                style={{ color: "var(--text-primary)" }}
+              >
                 Momentum
               </span>
             </div>
-            <p className="text-xs text-[var(--text-tertiary)] max-w-[240px] leading-relaxed">
+            <p
+              className="text-xs max-w-[240px] leading-relaxed"
+              style={{ color: "var(--text-tertiary)" }}
+            >
               {t("footer_tagline")}
             </p>
           </div>
 
-          {/* Links */}
+          {/* Nav links */}
           <div className="flex flex-wrap justify-center sm:justify-end items-center gap-x-5 gap-y-2">
-            <Link
-              href="/"
-              className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
-            >
-              {t("nav_dashboard")}
-            </Link>
-            <Link
-              href="/new"
-              className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
-            >
-              {t("nav_new_project")}
-            </Link>
-            <Link
-              href="/settings"
-              className="text-xs text-[var(--text-tertiary)] hover:text-[var(--text-secondary)] transition-colors"
-            >
-              {t("nav_settings")}
-            </Link>
+            {[
+              { href: "/", label: t("nav_dashboard") },
+              { href: "/new", label: t("nav_new_project") },
+              { href: "/settings", label: t("nav_settings") },
+            ].map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                className="text-xs transition-colors"
+                style={{ color: "var(--text-tertiary)" }}
+                onMouseEnter={(e) =>
+                  (e.currentTarget.style.color = "var(--text-secondary)")
+                }
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.color = "var(--text-tertiary)")
+                }
+              >
+                {label}
+              </Link>
+            ))}
           </div>
         </div>
 
-        <div className="my-5 sm:my-6 border-t border-[var(--border-subtle)]" />
+        <div
+          className="my-5 sm:my-6 border-t"
+          style={{ borderColor: "var(--border-subtle)" }}
+        />
 
         <div className="flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-4">
-          <p className="text-xs text-[var(--text-tertiary)] order-2 sm:order-1">
+          <p
+            className="text-xs order-2 sm:order-1"
+            style={{ color: "var(--text-tertiary)" }}
+          >
             {t("footer_copyright", { year: String(new Date().getFullYear()) })}
           </p>
 
+          {/* Built by link */}
           <a
             href="https://nuruddin-webician.vercel.app/"
             target="_blank"
             rel="noopener noreferrer"
-            className="group order-1 sm:order-2 flex items-center gap-2.5 px-4 py-2 rounded-[var(--r-full)] border border-[var(--border)] bg-[var(--bg-surface)] hover:border-[var(--violet)] hover:bg-[var(--violet-bg)] transition-all duration-200"
+            className="group order-1 sm:order-2 flex items-center gap-2.5 px-4 py-2 rounded-[var(--r-full)] border transition-all duration-200"
+            style={{
+              borderColor: "var(--border)",
+              background: "var(--bg-surface)",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = "var(--violet)";
+              e.currentTarget.style.background = "var(--violet-bg)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = "var(--border)";
+              e.currentTarget.style.background = "var(--bg-surface)";
+            }}
           >
-            <div className="w-5 h-5 rounded-full bg-gradient-to-br from-[var(--violet)] to-[var(--emerald)] flex items-center justify-center shrink-0">
-              <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+            {/* Avatar circle */}
+            <div
+              className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
+              style={{
+                background:
+                  "linear-gradient(135deg, var(--violet), var(--emerald))",
+              }}
+            >
+              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
                 <path
-                  d="M2 5h6M5 2l3 3-3 3"
+                  d="M1 4h6M4 1l3 3-3 3"
                   stroke="white"
-                  strokeWidth="1.4"
+                  strokeWidth="1.2"
                   strokeLinecap="round"
                   strokeLinejoin="round"
                 />
               </svg>
             </div>
-            <span className="text-xs text-[var(--text-secondary)] group-hover:text-[var(--violet-dim)] transition-colors font-medium">
-              {t("footer_built_by")}{" "}
-              <span className="text-[var(--text-primary)] group-hover:text-[var(--violet-dim)]">
-                Nuruddin
-              </span>
-            </span>
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 10 10"
-              fill="none"
-              className="text-[var(--text-tertiary)] group-hover:text-[var(--violet)] transition-colors group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transform"
+
+            <span
+              className="text-xs font-medium transition-colors"
+              style={{ color: "var(--text-secondary)" }}
             >
-              <path
-                d="M2.5 7.5L7.5 2.5M7.5 2.5H4M7.5 2.5V6"
-                stroke="currentColor"
-                strokeWidth="1.3"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+              {t("footer_built_by")}{" "}
+              <span style={{ color: "var(--text-primary)" }}>Nuruddin</span>
+            </span>
+
+            <FiArrowUpRight
+              size={10}
+              className="transition-all duration-200"
+              style={{ color: "var(--text-tertiary)" }}
+            />
           </a>
         </div>
       </div>

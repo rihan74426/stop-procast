@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useId } from "react";
+import { FiX } from "react-icons/fi";
 
 export function Modal({ open, onClose, title, size = "md", children }) {
   const overlayRef = useRef(null);
@@ -45,44 +46,68 @@ export function Modal({ open, onClose, title, size = "md", children }) {
       ref={overlayRef}
       onClick={(e) => e.target === overlayRef.current && onClose?.()}
       className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-6"
-      style={{ background: "rgba(12,12,15,0.65)", backdropFilter: "blur(6px)" }}
+      style={{
+        background: "rgba(12,12,15,0.65)",
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+      }}
       aria-modal="true"
       role="dialog"
       aria-labelledby={title ? titleId : undefined}
     >
       <div
         className={[
-          "w-full rounded-t-[var(--r-xl)] sm:rounded-[var(--r-xl)]",
+          "w-full",
+          "rounded-t-[var(--r-xl)] sm:rounded-[var(--r-xl)]",
           "border border-[var(--border)]",
-          "bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)]",
-          "animate-[modalIn_200ms_var(--ease-spring)_both]",
+          "bg-[var(--bg-elevated)]",
+          "shadow-[0_24px_48px_rgba(0,0,0,0.18),0_8px_16px_rgba(0,0,0,0.10)]",
+          "animate-[modalIn_220ms_var(--ease-spring)_both]",
           "sm:mx-auto",
-          // Max height: leave room for safe area on mobile
           "max-h-[92dvh] sm:max-h-[85vh]",
           "flex flex-col",
-          sizeClasses[size] || sizeClasses.md,
+          sizeClasses[size] ?? sizeClasses.md,
         ].join(" ")}
       >
-        {/* Header — sticky */}
+        {/* ── Header ── */}
         {title && (
-          <div className="sticky top-0 z-10 bg-[var(--bg-elevated)] flex items-center justify-between px-5 sm:px-6 pt-4 pb-3 border-b border-[var(--border)] rounded-t-[var(--r-xl)] shrink-0">
+          <div
+            className="sticky top-0 z-10 flex items-center justify-between gap-3 px-5 sm:px-6 pt-4 pb-3.5 border-b shrink-0 rounded-t-[var(--r-xl)]"
+            style={{
+              background: "var(--bg-elevated)",
+              borderColor: "var(--border)",
+            }}
+          >
             <h2
               id={titleId}
-              className="text-base sm:text-lg font-display font-semibold text-[var(--text-primary)] truncate pr-4"
+              className="font-display font-semibold text-base sm:text-lg truncate pr-4"
+              style={{ color: "var(--text-primary)" }}
             >
               {title}
             </h2>
             <button
               onClick={onClose}
-              className="h-8 w-8 flex items-center justify-center rounded-[var(--r-md)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-colors shrink-0"
+              className="flex items-center justify-center w-8 h-8 rounded-[var(--r-md)] shrink-0 transition-colors"
+              style={{
+                color: "var(--text-tertiary)",
+                background: "transparent",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--bg-subtle)";
+                e.currentTarget.style.color = "var(--text-primary)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = "var(--text-tertiary)";
+              }}
               aria-label="Close"
             >
-              <CloseIcon />
+              <FiX size={16} strokeWidth={2} />
             </button>
           </div>
         )}
 
-        {/* Body — scrollable */}
+        {/* ── Body ── */}
         <div
           className="px-5 sm:px-6 py-5 overflow-y-auto flex-1"
           style={{
@@ -113,24 +138,5 @@ export function Modal({ open, onClose, title, size = "md", children }) {
         }
       `}</style>
     </div>
-  );
-}
-
-function CloseIcon() {
-  return (
-    <svg
-      width="16"
-      height="16"
-      viewBox="0 0 16 16"
-      fill="none"
-      aria-hidden="true"
-    >
-      <path
-        d="M12 4L4 12M4 4l8 8"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
   );
 }

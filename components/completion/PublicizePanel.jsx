@@ -4,27 +4,52 @@ import { useState } from "react";
 import { useUser } from "@clerk/nextjs";
 import { useI18n } from "@/lib/i18n";
 import { CATEGORIES } from "@/lib/ai/publicize";
+import {
+  FiGlobe,
+  FiAward,
+  FiAlertTriangle,
+  FiCheck,
+  FiX,
+  FiLoader,
+} from "react-icons/fi";
 
-/**
- * PublicizePanel — shown on the completion page.
- * Lets users opt-in to public sharing after a project is marked complete.
- */
 export function PublicizePanel({ project, onPublicized }) {
   const { t } = useI18n();
   const { isSignedIn } = useUser();
-  const [status, setStatus] = useState("idle"); // idle | loading | success | failed | skipped
+  const [status, setStatus] = useState("idle");
   const [result, setResult] = useState(null);
 
   if (!isSignedIn) return null;
+
+  // ── Already public ───────────────────────────────────────────────
   if (project.isPublic) {
     return (
-      <div className="rounded-[var(--r-lg)] border border-[var(--emerald)] bg-[var(--emerald-bg)] px-4 py-3 flex items-center gap-3">
-        <span className="text-emerald text-xl">🌍</span>
+      <div
+        className="rounded-[var(--r-lg)] border px-4 py-3 flex items-center gap-3"
+        style={{
+          borderColor: "color-mix(in srgb, var(--emerald) 35%, transparent)",
+          background: "var(--emerald-bg)",
+        }}
+      >
+        <span
+          className="flex items-center justify-center w-7 h-7 rounded-[var(--r-sm)] shrink-0"
+          style={{
+            background: "color-mix(in srgb, var(--emerald) 18%, transparent)",
+          }}
+        >
+          <FiGlobe size={14} style={{ color: "var(--emerald)" }} />
+        </span>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-[var(--emerald-dim)]">
+          <p
+            className="text-sm font-medium"
+            style={{ color: "var(--emerald-dim)" }}
+          >
             {t("publicize_already_public")}
           </p>
-          <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+          <p
+            className="text-xs mt-0.5"
+            style={{ color: "var(--text-secondary)" }}
+          >
             {t("publicize_category_label")}: <strong>{project.category}</strong>
           </p>
         </div>
@@ -54,16 +79,26 @@ export function PublicizePanel({ project, onPublicized }) {
 
   if (status === "skipped") return null;
 
+  // ── Success ──────────────────────────────────────────────────────
   if (status === "success" && result) {
     return (
-      <div className="rounded-[var(--r-lg)] border border-[var(--emerald)] bg-[var(--emerald-bg)] px-5 py-4 flex flex-col gap-2">
+      <div
+        className="rounded-[var(--r-lg)] border px-5 py-4 flex flex-col gap-2"
+        style={{
+          borderColor: "color-mix(in srgb, var(--emerald) 35%, transparent)",
+          background: "var(--emerald-bg)",
+        }}
+      >
         <div className="flex items-center gap-2">
-          <span className="text-xl">🎉</span>
-          <p className="font-semibold text-sm text-[var(--emerald-dim)]">
+          <FiAward size={18} style={{ color: "var(--emerald)" }} />
+          <p
+            className="font-semibold text-sm"
+            style={{ color: "var(--emerald-dim)" }}
+          >
             {t("publicize_success_title")}
           </p>
         </div>
-        <p className="text-xs text-[var(--text-secondary)]">
+        <p className="text-xs" style={{ color: "var(--text-secondary)" }}>
           {t("publicize_success_desc", {
             category: result.category,
             score: result.score,
@@ -73,7 +108,11 @@ export function PublicizePanel({ project, onPublicized }) {
           {(result.tags ?? []).map((tag) => (
             <span
               key={tag}
-              className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-muted)] text-[var(--text-secondary)]"
+              className="text-[10px] px-2 py-0.5 rounded-full"
+              style={{
+                background: "var(--bg-muted)",
+                color: "var(--text-secondary)",
+              }}
             >
               #{tag}
             </span>
@@ -83,19 +122,32 @@ export function PublicizePanel({ project, onPublicized }) {
     );
   }
 
+  // ── Quality check failed ─────────────────────────────────────────
   if (status === "failed" && result) {
     return (
-      <div className="rounded-[var(--r-lg)] border border-[var(--amber)] bg-[var(--amber-bg)] px-5 py-4 flex flex-col gap-2">
+      <div
+        className="rounded-[var(--r-lg)] border px-5 py-4 flex flex-col gap-2"
+        style={{
+          borderColor: "color-mix(in srgb, var(--amber) 35%, transparent)",
+          background: "var(--amber-bg)",
+        }}
+      >
         <div className="flex items-center gap-2">
-          <span className="text-xl">⚠️</span>
-          <p className="font-semibold text-sm text-[var(--amber)]">
+          <FiAlertTriangle size={16} style={{ color: "var(--amber)" }} />
+          <p
+            className="font-semibold text-sm"
+            style={{ color: "var(--amber)" }}
+          >
             {t("publicize_failed_title")}
           </p>
         </div>
-        <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+        <p
+          className="text-xs leading-relaxed"
+          style={{ color: "var(--text-secondary)" }}
+        >
           {result.reason || t("publicize_failed_desc")}
         </p>
-        <p className="text-xs text-[var(--text-tertiary)]">
+        <p className="text-xs" style={{ color: "var(--text-tertiary)" }}>
           {t("publicize_score_label")}: {result.score ?? "–"}/100 (
           {t("publicize_threshold_label")}: {result.threshold ?? 72})
         </p>
@@ -103,43 +155,66 @@ export function PublicizePanel({ project, onPublicized }) {
     );
   }
 
+  // ── Default CTA ──────────────────────────────────────────────────
+  const SHARED_ITEMS = [
+    { icon: FiCheck, text: t("publicize_shared_title"), ok: true },
+    { icon: FiCheck, text: t("publicize_shared_goal"), ok: true },
+    { icon: FiCheck, text: t("publicize_shared_phases"), ok: true },
+    { icon: FiCheck, text: t("publicize_shared_tags"), ok: true },
+    { icon: FiX, text: t("publicize_hidden_tasks"), ok: false },
+    { icon: FiX, text: t("publicize_hidden_identity"), ok: false },
+  ];
+
   return (
-    <div className="rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] px-5 py-4">
+    <div
+      className="rounded-[var(--r-lg)] border px-5 py-4"
+      style={{ borderColor: "var(--border)", background: "var(--bg-elevated)" }}
+    >
       <div className="flex items-start gap-3 mb-4">
-        <span className="text-2xl shrink-0">🌍</span>
+        <span
+          className="flex items-center justify-center w-9 h-9 rounded-[var(--r-md)] shrink-0"
+          style={{ background: "var(--violet-bg)" }}
+        >
+          <FiGlobe size={17} style={{ color: "var(--violet)" }} />
+        </span>
         <div>
-          <p className="font-semibold text-sm text-[var(--text-primary)] mb-1">
+          <p
+            className="font-semibold text-sm mb-1"
+            style={{ color: "var(--text-primary)" }}
+          >
             {t("publicize_cta_title")}
           </p>
-          <p className="text-xs text-[var(--text-secondary)] leading-relaxed">
+          <p
+            className="text-xs leading-relaxed"
+            style={{ color: "var(--text-secondary)" }}
+          >
             {t("publicize_cta_desc")}
           </p>
         </div>
       </div>
 
       {/* What gets shared */}
-      <div className="rounded-[var(--r-md)] bg-[var(--bg-subtle)] border border-[var(--border)] p-3 mb-4">
-        <p className="text-xs font-medium text-[var(--text-secondary)] mb-2 uppercase tracking-wider">
+      <div
+        className="rounded-[var(--r-md)] border p-3 mb-4"
+        style={{ background: "var(--bg-subtle)", borderColor: "var(--border)" }}
+      >
+        <p
+          className="text-xs font-semibold uppercase tracking-wider mb-2"
+          style={{ color: "var(--text-secondary)" }}
+        >
           {t("publicize_shared_label")}
         </p>
         <div className="grid grid-cols-2 gap-1.5">
-          {[
-            { icon: "✓", text: t("publicize_shared_title") },
-            { icon: "✓", text: t("publicize_shared_goal") },
-            { icon: "✓", text: t("publicize_shared_phases") },
-            { icon: "✓", text: t("publicize_shared_tags") },
-            { icon: "✗", text: t("publicize_hidden_tasks") },
-            { icon: "✗", text: t("publicize_hidden_identity") },
-          ].map(({ icon, text }) => (
+          {SHARED_ITEMS.map(({ icon: Icon, text, ok }) => (
             <div
               key={text}
-              className={`flex items-center gap-1.5 text-[10px] ${
-                icon === "✓"
-                  ? "text-[var(--emerald-dim)]"
-                  : "text-[var(--text-tertiary)]"
-              }`}
+              className="flex items-center gap-1.5 text-[10px]"
+              style={{
+                color: ok ? "var(--emerald-dim)" : "var(--text-tertiary)",
+              }}
             >
-              <span className="font-bold">{icon}</span> {text}
+              <Icon size={11} />
+              {text}
             </div>
           ))}
         </div>
@@ -148,23 +223,38 @@ export function PublicizePanel({ project, onPublicized }) {
       <div className="flex gap-2">
         <button
           onClick={() => setStatus("skipped")}
-          className="flex-1 h-9 rounded-[var(--r-md)] border border-[var(--border)] text-xs text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] transition-colors"
+          className="flex-1 h-9 rounded-[var(--r-md)] border text-xs transition-colors"
+          style={{
+            borderColor: "var(--border)",
+            color: "var(--text-secondary)",
+            background: "transparent",
+          }}
+          onMouseEnter={(e) =>
+            (e.currentTarget.style.background = "var(--bg-subtle)")
+          }
+          onMouseLeave={(e) =>
+            (e.currentTarget.style.background = "transparent")
+          }
         >
           {t("publicize_skip")}
         </button>
         <button
           onClick={handlePublicize}
           disabled={status === "loading"}
-          className={[
-            "flex-1 h-9 rounded-[var(--r-md)] text-xs font-semibold transition-all",
-            status === "loading"
-              ? "bg-[var(--bg-muted)] text-[var(--text-tertiary)] cursor-not-allowed"
-              : "bg-[var(--violet)] text-white hover:bg-[var(--violet-dim)]",
-          ].join(" ")}
+          className="flex-1 h-9 rounded-[var(--r-md)] text-xs font-semibold text-white transition-all disabled:opacity-50"
+          style={{ background: "var(--violet)" }}
+          onMouseEnter={(e) =>
+            status !== "loading" &&
+            (e.currentTarget.style.background = "var(--violet-dim)")
+          }
+          onMouseLeave={(e) =>
+            status !== "loading" &&
+            (e.currentTarget.style.background = "var(--violet)")
+          }
         >
           {status === "loading" ? (
             <span className="flex items-center justify-center gap-2">
-              <span className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              <FiLoader size={12} className="animate-spin" />
               {t("publicize_checking")}
             </span>
           ) : (

@@ -159,3 +159,5 @@ Non-owner public view shows "Use as template" CTA → links to `/new?fork=${id}`
 the clicks on projects in the explore will open the project page, where users can export them after they sign in instantly. or they can accuire them as their project. and start a journey for themselves.
 
 the explore page will not have a sidebar. it needs to be open and more elitely designed that attracts visitors and produces curisity. Improve and make it a masterpiece.
+
+the settings are not applied very well. they don't have api or data stored or any changes there would matter. connect it to everywhere. understand the project scope and filter and add more things to there as per need and they should be effective immediately.

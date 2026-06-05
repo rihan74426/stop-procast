@@ -4,6 +4,13 @@ import { useState } from "react";
 import { getPressure, PRESSURE_LABELS } from "@/lib/pressure";
 import { generateReengage } from "@/lib/ai/clientGenerate";
 import { useI18n } from "@/lib/i18n";
+import { FiAlertOctagon, FiAlertTriangle, FiClock } from "react-icons/fi";
+
+const LEVEL_ICON = {
+  critical: FiAlertOctagon,
+  high: FiAlertTriangle,
+  medium: FiClock,
+};
 
 export function ProjectPressure({ project }) {
   const { locale, t } = useI18n();
@@ -31,6 +38,8 @@ export function ProjectPressure({ project }) {
     },
   }[pressure.level];
 
+  const Icon = LEVEL_ICON[pressure.level] ?? FiAlertTriangle;
+
   const handleGetSuggestion = async () => {
     if (loading || suggestion) return;
     setLoading(true);
@@ -50,27 +59,42 @@ export function ProjectPressure({ project }) {
       style={{ borderColor: colors.border, background: colors.bg }}
     >
       <div className="flex items-start gap-3">
-        <span className="text-lg">
-          {pressure.level === "critical"
-            ? "🚨"
-            : pressure.level === "high"
-            ? "⚠️"
-            : "⏰"}
+        {/* Icon badge */}
+        <span
+          className="flex items-center justify-center w-7 h-7 rounded-[var(--r-sm)] shrink-0 mt-0.5"
+          style={{
+            background: `color-mix(in srgb, ${colors.text} 15%, transparent)`,
+          }}
+        >
+          <Icon size={15} style={{ color: colors.text }} />
         </span>
-        <div className="flex-1">
-          <p className="text-sm font-medium" style={{ color: colors.text }}>
+
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold" style={{ color: colors.text }}>
             {PRESSURE_LABELS[pressure.level]}
           </p>
+
           <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1">
             {pressure.reasons.map((r, i) => (
-              <p key={i} className="text-xs text-[var(--text-secondary)]">
+              <p
+                key={i}
+                className="text-xs"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 {reasonLabel(r, t)}
               </p>
             ))}
           </div>
+
           {suggestion ? (
-            <p className="mt-2 text-sm text-[var(--text-primary)] italic border-t border-[var(--border)] pt-2">
-              💡 {suggestion}
+            <p
+              className="mt-2 text-sm italic border-t pt-2"
+              style={{
+                borderColor: "var(--border)",
+                color: "var(--text-primary)",
+              }}
+            >
+              {suggestion}
             </p>
           ) : (
             <button

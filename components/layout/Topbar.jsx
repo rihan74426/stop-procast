@@ -12,7 +12,13 @@ import { LANGUAGES } from "@/lib/i18n/translations";
 import { useRouter } from "next/navigation";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { clearMomentumStorage } from "@/lib/clearStorage";
-import { FiCompass, FiHome } from "react-icons/fi";
+import {
+  FiCompass,
+  FiHome,
+  FiSun,
+  FiMoon,
+  FiChevronDown,
+} from "react-icons/fi";
 
 export function TopBar() {
   const { theme, toggle } = useTheme();
@@ -20,6 +26,7 @@ export function TopBar() {
   const { signOut } = useClerk();
   const { t, locale, changeLocale } = useI18n();
   const router = useRouter();
+
   const [langOpen, setLangOpen] = useState(false);
   const [showSignOutConfirm, setShowSignOutConfirm] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -49,17 +56,26 @@ export function TopBar() {
   return (
     <>
       <header className="h-14 border-b border-[var(--border)] bg-[var(--bg-elevated)] flex items-center px-3 sm:px-4 gap-1.5 sm:gap-2 sticky top-0 z-30 min-w-0">
-        {/* Home button — always visible */}
+        {/* Home button */}
         <Link
           href="/"
           aria-label="Home"
-          className="h-9 w-9 flex items-center justify-center rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all shrink-0"
           title={t("nav_home")}
+          className="h-9 w-9 flex items-center justify-center rounded-[var(--r-md)] border border-[var(--border)] transition-colors shrink-0"
+          style={{ color: "var(--text-secondary)" }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "var(--bg-subtle)";
+            e.currentTarget.style.color = "var(--text-primary)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.color = "var(--text-secondary)";
+          }}
         >
           <FiHome size={15} />
         </Link>
 
-        {/* Logo / brand — links to dashboard if signed in, else home */}
+        {/* Brand logo */}
         <Link
           href={isSignedIn ? "/dashboard" : "/"}
           className="flex items-center gap-1.5 sm:gap-2 mr-1 sm:mr-2 shrink-0"
@@ -77,7 +93,10 @@ export function TopBar() {
               priority
             />
           </div>
-          <span className="font-display font-semibold text-sm tracking-tight text-[var(--text-primary)] hidden xs:block sm:block">
+          <span
+            className="font-display font-semibold text-sm tracking-tight hidden xs:block sm:block"
+            style={{ color: "var(--text-primary)" }}
+          >
             Momentum
           </span>
         </Link>
@@ -87,10 +106,19 @@ export function TopBar() {
         {/* Explore link */}
         <Link
           href="/explore"
-          className="h-9 px-2 sm:px-2.5 flex items-center gap-2 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all mr-1 shrink-0"
+          className="h-9 px-2 sm:px-2.5 flex items-center gap-2 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] transition-all mr-1 shrink-0"
+          style={{ color: "var(--text-secondary)" }}
           aria-label={t("nav_explore")}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "var(--bg-subtle)";
+            e.currentTarget.style.color = "var(--text-primary)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.color = "var(--text-secondary)";
+          }}
         >
-          <FiCompass className="text-base" />
+          <FiCompass size={14} />
           <span className="hidden md:inline">{t("nav_explore")}</span>
         </Link>
 
@@ -98,32 +126,38 @@ export function TopBar() {
         <div ref={langRef} className="relative">
           <button
             onClick={() => setLangOpen((o) => !o)}
-            className="h-9 px-2 sm:px-2.5 flex items-center gap-1 sm:gap-1.5 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all"
+            className="h-9 px-2 sm:px-2.5 flex items-center gap-1 sm:gap-1.5 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] transition-all"
+            style={{ color: "var(--text-secondary)" }}
             aria-label={t("lang_select")}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--bg-subtle)";
+              e.currentTarget.style.color = "var(--text-primary)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = "var(--text-secondary)";
+            }}
           >
             <span className="text-base leading-none">{currentLang.flag}</span>
             <span className="hidden md:inline">{currentLang.label}</span>
-            <svg
-              width="10"
-              height="10"
-              viewBox="0 0 10 10"
-              fill="none"
-              className={`transition-transform duration-150 hidden sm:block ${
-                langOpen ? "rotate-180" : ""
-              }`}
-            >
-              <path
-                d="M2 3.5l3 3 3-3"
-                stroke="currentColor"
-                strokeWidth="1.4"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            </svg>
+            <FiChevronDown
+              size={12}
+              className="hidden sm:block transition-transform duration-150"
+              style={{
+                transform: langOpen ? "rotate(180deg)" : "rotate(0deg)",
+              }}
+            />
           </button>
 
           {langOpen && (
-            <div className="absolute right-5 top-full mt-1.5 w-44 rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)] overflow-hidden z-50">
+            <div
+              className="absolute right-0 top-full mt-1.5 w-44 rounded-[var(--r-lg)] border overflow-hidden z-50"
+              style={{
+                borderColor: "var(--border)",
+                background: "var(--bg-elevated)",
+                boxShadow: "var(--shadow-lg)",
+              }}
+            >
               {LANGUAGES.map((lang) => (
                 <button
                   key={lang.code}
@@ -131,17 +165,38 @@ export function TopBar() {
                     changeLocale(lang.code);
                     setLangOpen(false);
                   }}
-                  className={[
-                    "w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left transition-colors",
-                    locale === lang.code
-                      ? "bg-[var(--violet-bg)] text-[var(--violet-dim)] font-medium"
-                      : "text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]",
-                  ].join(" ")}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left transition-colors"
+                  style={{
+                    background:
+                      locale === lang.code ? "var(--violet-bg)" : "transparent",
+                    color:
+                      locale === lang.code
+                        ? "var(--violet-dim)"
+                        : "var(--text-secondary)",
+                    fontWeight: locale === lang.code ? 500 : 400,
+                  }}
+                  onMouseEnter={(e) => {
+                    if (locale !== lang.code) {
+                      e.currentTarget.style.background = "var(--bg-subtle)";
+                      e.currentTarget.style.color = "var(--text-primary)";
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (locale !== lang.code) {
+                      e.currentTarget.style.background = "transparent";
+                      e.currentTarget.style.color = "var(--text-secondary)";
+                    }
+                  }}
                 >
                   <span className="text-base">{lang.flag}</span>
                   <span>{lang.label}</span>
                   {locale === lang.code && (
-                    <span className="ml-auto text-[var(--violet)]">✓</span>
+                    <span
+                      className="ml-auto"
+                      style={{ color: "var(--violet)" }}
+                    >
+                      ✓
+                    </span>
                   )}
                 </button>
               ))}
@@ -153,9 +208,18 @@ export function TopBar() {
         <button
           onClick={toggle}
           aria-label="Toggle theme"
-          className="h-9 w-9 flex items-center justify-center rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all shrink-0"
+          className="h-9 w-9 flex items-center justify-center rounded-[var(--r-md)] border border-[var(--border)] transition-all shrink-0"
+          style={{ color: "var(--text-secondary)" }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.background = "var(--bg-subtle)";
+            e.currentTarget.style.color = "var(--text-primary)";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.background = "transparent";
+            e.currentTarget.style.color = "var(--text-secondary)";
+          }}
         >
-          {theme === "dark" ? <SunIcon /> : <MoonIcon />}
+          {theme === "dark" ? <FiSun size={15} /> : <FiMoon size={15} />}
         </button>
 
         {/* Auth */}
@@ -163,8 +227,17 @@ export function TopBar() {
           (isSignedIn ? (
             <button
               onClick={() => setShowSignOutConfirm(true)}
-              className="h-9 px-2 sm:px-2.5 flex items-center gap-1.5 sm:gap-2 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all shrink-0"
+              className="h-9 px-2 sm:px-2.5 flex items-center gap-1.5 sm:gap-2 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] transition-all shrink-0"
+              style={{ color: "var(--text-secondary)" }}
               title={t("signout_confirm_title")}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--bg-subtle)";
+                e.currentTarget.style.color = "var(--text-primary)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = "var(--text-secondary)";
+              }}
             >
               {user?.imageUrl ? (
                 <img
@@ -173,7 +246,13 @@ export function TopBar() {
                   className="w-5 h-5 rounded-full object-cover shrink-0"
                 />
               ) : (
-                <div className="w-5 h-5 rounded-full bg-[var(--violet-bg)] flex items-center justify-center text-[10px] font-bold text-[var(--violet-dim)] shrink-0">
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0"
+                  style={{
+                    background: "var(--violet-bg)",
+                    color: "var(--violet-dim)",
+                  }}
+                >
                   {(
                     user?.firstName?.[0] ||
                     user?.emailAddresses?.[0]?.emailAddress?.[0] ||
@@ -187,7 +266,18 @@ export function TopBar() {
             </button>
           ) : (
             <SignInButton mode="modal">
-              <button className="h-9 px-2 sm:px-3 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] transition-all whitespace-nowrap shrink-0">
+              <button
+                className="h-9 px-2 sm:px-3 text-xs font-medium rounded-[var(--r-md)] border border-[var(--border)] transition-all whitespace-nowrap shrink-0"
+                style={{ color: "var(--text-secondary)" }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "var(--bg-subtle)";
+                  e.currentTarget.style.color = "var(--text-primary)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "transparent";
+                  e.currentTarget.style.color = "var(--text-secondary)";
+                }}
+              >
                 <span className="hidden sm:inline">{t("nav_sign_in")}</span>
                 <span className="sm:hidden">Sign in</span>
               </button>
@@ -195,7 +285,7 @@ export function TopBar() {
           ))}
       </header>
 
-      {/* Sign-out confirmation modal */}
+      {/* Sign-out confirmation */}
       <Modal
         open={showSignOutConfirm}
         onClose={() => setShowSignOutConfirm(false)}
@@ -203,7 +293,10 @@ export function TopBar() {
         size="sm"
       >
         <div className="flex flex-col gap-5">
-          <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+          <p
+            className="text-sm leading-relaxed"
+            style={{ color: "var(--text-secondary)" }}
+          >
             {t("signout_confirm_desc")}
           </p>
           <div className="flex gap-2 justify-end">
@@ -225,33 +318,5 @@ export function TopBar() {
         </div>
       </Modal>
     </>
-  );
-}
-
-function SunIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.5" />
-      <path
-        d="M8 1v2M8 13v2M1 8h2M13 8h2M3.05 3.05l1.41 1.41M11.54 11.54l1.41 1.41M11.54 4.46l-1.41 1.41M4.95 11.54l-1.41 1.41"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-      />
-    </svg>
-  );
-}
-
-function MoonIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <path
-        d="M13.5 9A6 6 0 0 1 7 2.5a6 6 0 1 0 6.5 6.5z"
-        stroke="currentColor"
-        strokeWidth="1.5"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
   );
 }

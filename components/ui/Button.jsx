@@ -2,52 +2,67 @@
 
 import { forwardRef } from "react";
 
-/**
- * Button — variant colours use CSS design tokens so they automatically
- * adapt between light and dark mode without going all-black / all-white.
- *
- * primary  → violet fill (brand action)
- * ghost    → transparent + border, text-secondary (secondary action)
- * danger   → coral tint fill, coral text → coral fill + white on hover
- * emerald  → green fill (positive / completion)
- * subtle   → muted surface, secondary text (tertiary action)
- */
+// ─── Base ─────────────────────────────────────────────────────────────
+const base = [
+  "inline-flex items-center justify-center font-medium rounded-[var(--r-md)] border",
+  "transition-all duration-150 ease-out",
+  "active:scale-[0.97]",
+  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-surface)]",
+  "disabled:opacity-40 disabled:pointer-events-none",
+  "select-none cursor-pointer whitespace-nowrap",
+].join(" ");
 
+// ─── Variants ─────────────────────────────────────────────────────────
 const variants = {
-  primary: [
-    "bg-[var(--violet)] text-white",
-    "hover:bg-[var(--violet-dim)]",
-    "border-transparent",
-  ],
-  ghost: [
-    "bg-transparent text-[var(--text-secondary)]",
-    "hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)]",
-    "border-[var(--border)]",
-  ],
-  danger: [
-    "bg-[var(--coral-bg)] text-[var(--coral)]",
-    "hover:bg-[var(--coral)] hover:text-white",
-    "border-[var(--coral)]",
-  ],
-  emerald: [
-    "bg-[var(--emerald)] text-white",
-    "hover:bg-[var(--emerald-dim)]",
-    "border-transparent",
-  ],
-  subtle: [
-    "bg-[var(--bg-subtle)] text-[var(--text-secondary)]",
-    "hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)]",
-    "border-transparent",
-  ],
+  // Solid fill — brand violet with subtle depth
+  primary:
+    "bg-[var(--violet)] text-white border-transparent " +
+    "shadow-[0_1px_2px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.10)] " +
+    "hover:bg-[var(--violet-dim)] hover:shadow-[0_3px_10px_color-mix(in_srgb,var(--violet)_30%,transparent),inset_0_1px_0_rgba(255,255,255,0.10)] " +
+    "active:shadow-none " +
+    "focus-visible:ring-[var(--violet)]",
+
+  // Outlined — clear border, no fill
+  ghost:
+    "bg-transparent text-[var(--text-secondary)] " +
+    "border-[color-mix(in_srgb,var(--text-tertiary)_55%,transparent)] " +
+    "hover:bg-[var(--bg-subtle)] hover:text-[var(--text-primary)] hover:border-[color-mix(in_srgb,var(--text-secondary)_60%,transparent)] " +
+    "focus-visible:ring-[var(--border-focus)]",
+
+  // Destructive — coral tint, fills on hover
+  danger:
+    "bg-[var(--coral-bg)] text-[var(--coral)] " +
+    "border-[color-mix(in_srgb,var(--coral)_60%,transparent)] " +
+    "hover:bg-[var(--coral)] hover:text-white hover:border-transparent " +
+    "hover:shadow-[0_3px_10px_color-mix(in_srgb,var(--coral)_25%,transparent)] " +
+    "active:shadow-none " +
+    "focus-visible:ring-[var(--coral)]",
+
+  // Positive — green fill
+  emerald:
+    "bg-[var(--emerald)] text-white border-transparent " +
+    "shadow-[0_1px_2px_rgba(0,0,0,0.18),inset_0_1px_0_rgba(255,255,255,0.10)] " +
+    "hover:bg-[var(--emerald-dim)] hover:shadow-[0_3px_10px_color-mix(in_srgb,var(--emerald)_30%,transparent),inset_0_1px_0_rgba(255,255,255,0.10)] " +
+    "active:shadow-none " +
+    "focus-visible:ring-[var(--emerald)]",
+
+  // Muted surface — tertiary action
+  subtle:
+    "bg-[var(--bg-subtle)] text-[var(--text-secondary)] " +
+    "border-[var(--border)] " +
+    "hover:bg-[var(--bg-muted)] hover:text-[var(--text-primary)] " +
+    "focus-visible:ring-[var(--border-focus)]",
 };
 
+// ─── Sizes ────────────────────────────────────────────────────────────
 const sizes = {
-  sm: "h-9  px-3          text-sm  gap-1.5",
-  md: "h-10 px-4          text-sm  gap-2",
-  lg: "h-11 sm:h-12 px-5 sm:px-6 text-sm sm:text-base gap-2 sm:gap-2.5",
-  icon: "h-9  w-9 p-0       text-sm  justify-center",
+  sm: "h-8  px-3     text-xs  gap-1.5 tracking-[0.01em]",
+  md: "h-9  px-4     text-sm  gap-2",
+  lg: "h-11 px-5 sm:px-6 text-sm sm:text-[0.9375rem] gap-2",
+  icon: "h-9  w-9  p-0 text-sm  justify-center",
 };
 
+// ─── Component ────────────────────────────────────────────────────────
 export const Button = forwardRef(function Button(
   {
     variant = "primary",
@@ -60,30 +75,14 @@ export const Button = forwardRef(function Button(
   },
   ref
 ) {
-  const vArr = variants[variant] ?? variants.primary;
-  const s = sizes[size] ?? sizes.md;
-
   return (
     <button
       ref={ref}
       disabled={disabled || loading}
       className={[
-        // layout + shape
-        "inline-flex items-center justify-center font-medium rounded-[var(--r-md)] border",
-        // motion
-        "transition-all duration-[var(--dur-base)] ease-[var(--ease-smooth)]",
-        "active:scale-[0.97]",
-        // focus
-        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--border-focus)] focus-visible:ring-offset-1",
-        // disabled
-        "disabled:opacity-40 disabled:pointer-events-none",
-        // base
-        "select-none cursor-pointer min-h-[36px]",
-        // variant tokens
-        ...vArr,
-        // size
-        s,
-        // caller overrides (last, highest specificity)
+        base,
+        variants[variant] ?? variants.primary,
+        sizes[size] ?? sizes.md,
         className,
       ].join(" ")}
       {...props}
@@ -100,6 +99,7 @@ export const Button = forwardRef(function Button(
   );
 });
 
+// ─── Spinner ──────────────────────────────────────────────────────────
 function Spinner() {
   return (
     <svg
@@ -116,7 +116,7 @@ function Spinner() {
         r="5.5"
         stroke="currentColor"
         strokeWidth="1.5"
-        strokeOpacity="0.3"
+        strokeOpacity="0.25"
       />
       <path
         d="M7 1.5A5.5 5.5 0 0 1 12.5 7"

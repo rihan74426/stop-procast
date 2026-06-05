@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/Button";
 import { AuthGateModal } from "@/components/auth/AuthGateModal";
 import { useI18n } from "@/lib/i18n";
 import { createToastSequence } from "@/lib/toastSequence";
+import { FaLightbulb } from "react-icons/fa";
 import {
   FiCpu,
   FiMap,
@@ -15,27 +16,30 @@ import {
   FiAlertTriangle,
   FiTool,
   FiStar,
+  FiCheck,
+  FiCircle,
+  FiLoader,
+  FiActivity,
 } from "react-icons/fi";
-import { FaLightbulb } from "react-icons/fa";
 
+// ─── Stage definitions ────────────────────────────────────────────────
 const STREAM_STAGES = [
-  { at: 0, icon: FiCpu, key: "blueprint_toast_analysing" },
-  { at: 300, icon: FiMap, key: "blueprint_toast_mapping" },
-  { at: 800, icon: FiTarget, key: "blueprint_toast_defining" },
-  { at: 1400, icon: FiClipboard, key: "blueprint_toast_writing" },
-  { at: 2000, icon: FiAlertTriangle, key: "blueprint_toast_blockers" },
-  { at: 2600, icon: FiTool, key: "blueprint_toast_tools" },
-  { at: 3200, icon: FiStar, key: "blueprint_toast_finalising" },
+  { at: 0, Icon: FiCpu, key: "blueprint_toast_analysing" },
+  { at: 300, Icon: FiMap, key: "blueprint_toast_mapping" },
+  { at: 800, Icon: FiTarget, key: "blueprint_toast_defining" },
+  { at: 1400, Icon: FiClipboard, key: "blueprint_toast_writing" },
+  { at: 2000, Icon: FiAlertTriangle, key: "blueprint_toast_blockers" },
+  { at: 2600, Icon: FiTool, key: "blueprint_toast_tools" },
+  { at: 3200, Icon: FiStar, key: "blueprint_toast_finalising" },
 ];
 
+// ─── Scope config ─────────────────────────────────────────────────────
 const SCOPE_META = {
   lean: { badge: "emerald", color: "var(--emerald)" },
   standard: { badge: "violet", color: "var(--violet)" },
   ambitious: { badge: "amber", color: "var(--amber)" },
 };
 
-// Scope display data — labels and hints hardcoded as fallbacks,
-// overridden by translation keys when present.
 const SCOPE_DISPLAY = {
   lean: {
     labelKey: "scope_lean_label",
@@ -57,14 +61,12 @@ const SCOPE_DISPLAY = {
   },
 };
 
-// Safe t() wrapper: returns fallback if the key resolves to itself (i.e. key not found)
 function tSafe(t, key, fallback) {
   const result = t(key);
   return result && result !== key ? result : fallback;
 }
 
 // ─── Streaming progress UI ────────────────────────────────────────────
-
 const StreamingProgress = memo(function StreamingProgress({
   charCount,
   scopeLevel,
@@ -76,7 +78,6 @@ const StreamingProgress = memo(function StreamingProgress({
 
   const scopeLabel = tSafe(t, display.labelKey, display.labelFallback);
   const scopeHint = tSafe(t, display.hintKey, display.hintFallback);
-
   const deepDesc = tSafe(
     t,
     "scope_deep_desc",
@@ -93,11 +94,10 @@ const StreamingProgress = memo(function StreamingProgress({
     "Usually takes 15–40 seconds"
   );
 
-  // Compute which stage we are in based on char count
   const stage =
     [...STREAM_STAGES].reverse().find((s) => charCount >= s.at) ??
     STREAM_STAGES[0];
-  const Icon = stage.icon;
+  const Icon = stage.Icon;
   const pct =
     charCount === Infinity
       ? 100
@@ -107,66 +107,118 @@ const StreamingProgress = memo(function StreamingProgress({
     <div className="flex flex-col gap-5">
       <div>
         <div className="flex items-center gap-3 mb-1 flex-wrap">
-          <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)]">
+          <h1
+            className="text-2xl sm:text-3xl font-display font-semibold"
+            style={{ color: "var(--text-primary)" }}
+          >
             {t("intake_review_building")}
           </h1>
           <Badge variant={scopeInfo.badge}>{scopeLabel}</Badge>
           {isDeep && (
-            <Badge variant="amber">🔬 {t("intake_review_deep")}</Badge>
+            <Badge variant="amber">
+              <FiActivity size={10} />
+              {t("intake_review_deep")}
+            </Badge>
           )}
         </div>
-        <p className="text-sm text-[var(--text-secondary)]">
+        <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
           {isDeep ? deepDesc : scopeHint}
         </p>
       </div>
 
       {charCount === 0 && (
-        <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-          <div className="w-3 h-3 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin" />
+        <div
+          className="flex items-center gap-2 text-sm"
+          style={{ color: "var(--text-secondary)" }}
+        >
+          <div
+            className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin shrink-0"
+            style={{
+              borderColor: "var(--violet)",
+              borderTopColor: "transparent",
+            }}
+          />
           <span>{t("intake_review_contacting")}</span>
         </div>
       )}
 
-      <div className="flex items-center gap-3 rounded-[var(--r-lg)] border border-[var(--violet)] bg-[var(--violet-bg)] px-4 py-3">
-        <span className="text-xl">
-          <Icon />
+      {/* Active stage card */}
+      <div
+        className="flex items-center gap-3 rounded-[var(--r-lg)] border px-4 py-3"
+        style={{
+          borderColor: "var(--violet)",
+          background: "var(--violet-bg)",
+        }}
+      >
+        <span style={{ color: "var(--violet)" }}>
+          <Icon size={20} />
         </span>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium text-[var(--violet-dim)]">
+          <p
+            className="text-sm font-medium"
+            style={{ color: "var(--violet-dim)" }}
+          >
             {pct === 100
-              ? t("common_done") + "!"
+              ? tSafe(t, "common_done", "Done") + "!"
               : tSafe(t, stage.key, stage.key)}
           </p>
-          <div className="mt-1.5 h-1.5 rounded-full bg-[var(--bg-muted)] overflow-hidden">
+          <div
+            className="mt-1.5 h-1.5 rounded-full overflow-hidden"
+            style={{ background: "var(--bg-muted)" }}
+          >
             <div
               className="h-full rounded-full transition-all duration-700"
               style={{ width: `${pct}%`, background: "var(--violet)" }}
             />
           </div>
         </div>
-        <span className="text-xs text-[var(--text-tertiary)] tabular-nums shrink-0">
+        <span
+          className="text-xs tabular-nums shrink-0"
+          style={{ color: "var(--text-tertiary)" }}
+        >
           {pct}%
         </span>
       </div>
 
+      {/* Stage grid */}
       <div className="grid grid-cols-2 gap-2">
         {STREAM_STAGES.map((s) => {
           const done = charCount >= s.at;
           const active = stage.at === s.at;
+          const StageIcon = s.Icon;
+
           return (
             <div
               key={s.at}
-              className={[
-                "flex items-center gap-2 px-3 py-2 rounded-[var(--r-md)] text-xs transition-all duration-300",
-                done
+              className="flex items-center gap-2 px-3 py-2 rounded-[var(--r-md)] text-xs transition-all duration-300"
+              style={{
+                background: done
                   ? active
-                    ? "bg-[var(--violet-bg)] text-[var(--violet-dim)] border border-[var(--violet)]"
-                    : "text-[var(--emerald)] opacity-75"
-                  : "text-[var(--text-tertiary)] opacity-40",
-              ].join(" ")}
+                    ? "var(--violet-bg)"
+                    : "transparent"
+                  : "transparent",
+                border:
+                  done && active
+                    ? "1px solid var(--violet)"
+                    : "1px solid transparent",
+                color: done
+                  ? active
+                    ? "var(--violet-dim)"
+                    : "var(--emerald)"
+                  : "var(--text-tertiary)",
+                opacity: done ? 1 : 0.4,
+              }}
             >
-              <span className="shrink-0 text-sm">
-                {done ? (active ? "⟳" : "✓") : "○"}
+              <span className="shrink-0">
+                {done ? (
+                  active ? (
+                    <FiLoader size={11} className="animate-spin" />
+                  ) : (
+                    <FiCheck size={11} strokeWidth={2.5} />
+                  )
+                ) : (
+                  <FiCircle size={11} />
+                )}
               </span>
               <span className="truncate">{tSafe(t, s.key, s.key)}</span>
             </div>
@@ -174,7 +226,10 @@ const StreamingProgress = memo(function StreamingProgress({
         })}
       </div>
 
-      <p className="text-xs text-center text-[var(--text-tertiary)]">
+      <p
+        className="text-xs text-center"
+        style={{ color: "var(--text-tertiary)" }}
+      >
         {isDeep ? deepTime : normalTime}
       </p>
     </div>
@@ -182,7 +237,6 @@ const StreamingProgress = memo(function StreamingProgress({
 });
 
 // ─── Main component ───────────────────────────────────────────────────
-
 export function StepReview({
   blueprint,
   genStatus,
@@ -200,7 +254,6 @@ export function StepReview({
   const [showAuthGate, setShowAuthGate] = useState(false);
   const toastSequenceRef = useRef(null);
 
-  // Manage toast sequence during generation
   useEffect(() => {
     if (genStatus === "streaming" && !toastSequenceRef.current) {
       toastSequenceRef.current = createToastSequence("blueprint", locale);
@@ -214,20 +267,14 @@ export function StepReview({
       );
       toastSequenceRef.current = null;
     }
-
     return () => {
-      if (toastSequenceRef.current) {
-        toastSequenceRef.current.unmount();
-      }
+      toastSequenceRef.current?.unmount();
     };
   }, [genStatus, genError, locale, t]);
 
   const handleCommitClick = useCallback(() => {
-    if (!isSignedIn) {
-      setShowAuthGate(true);
-    } else {
-      onCommit(blueprint);
-    }
+    if (!isSignedIn) setShowAuthGate(true);
+    else onCommit(blueprint);
   }, [isSignedIn, onCommit, blueprint]);
 
   const handleContinueAnyway = useCallback(() => {
@@ -235,12 +282,9 @@ export function StepReview({
     onCommit(blueprint);
   }, [onCommit, blueprint]);
 
-  // Scope display
   const display = SCOPE_DISPLAY[scopeLevel] ?? SCOPE_DISPLAY.standard;
   const scopeInfo = SCOPE_META[scopeLevel] ?? SCOPE_META.standard;
   const scopeLabel = tSafe(t, display.labelKey, display.labelFallback);
-
-  // Greeting bar
   const name = user?.firstName || user?.username || null;
   const greeting = isSignedIn
     ? name
@@ -250,22 +294,37 @@ export function StepReview({
 
   function GreetingBanner() {
     return (
-      <div className="rounded-[var(--r-md)] px-4 py-3 bg-[var(--bg-elevated)] border border-[var(--border)] mb-4">
-        <p className="text-sm text-[var(--text-primary)] font-medium">
+      <div
+        className="rounded-[var(--r-md)] border px-4 py-3 mb-4"
+        style={{
+          background: "var(--bg-elevated)",
+          borderColor: "var(--border)",
+        }}
+      >
+        <p
+          className="text-sm font-medium"
+          style={{ color: "var(--text-primary)" }}
+        >
           {greeting}
         </p>
       </div>
     );
   }
 
-  // ── Loading while checking limit ──────────────────────────────────
+  // ── Loading ────────────────────────────────────────────────────────
   if (limitLoading && genStatus === "idle") {
     return (
       <>
         <GreetingBanner />
         <div className="flex flex-col gap-4 items-center py-12">
-          <div className="w-8 h-8 rounded-full border-2 border-[var(--violet)] border-t-transparent animate-spin" />
-          <p className="text-sm text-[var(--text-secondary)]">
+          <div
+            className="w-8 h-8 rounded-full border-2 border-t-transparent animate-spin"
+            style={{
+              borderColor: "var(--violet)",
+              borderTopColor: "transparent",
+            }}
+          />
+          <p className="text-sm" style={{ color: "var(--text-secondary)" }}>
             {t("common_loading")}
           </p>
         </div>
@@ -273,20 +332,40 @@ export function StepReview({
     );
   }
 
-  // ── Limit gate ────────────────────────────────────────────────────
+  // ── Limit gate ─────────────────────────────────────────────────────
   if (genStatus === "limited" || (!limitLoading && !limitAllowed)) {
     return (
       <>
         <GreetingBanner />
         <div className="flex flex-col gap-6">
-          <div className="rounded-[var(--r-xl)] border-2 border-[var(--violet)] bg-[var(--violet-bg)] p-6 text-center">
-            <div className="text-5xl mb-4">🎯</div>
-            <h2 className="font-display font-semibold text-2xl text-[var(--text-primary)] mb-2">
+          <div
+            className="rounded-[var(--r-xl)] border-2 p-6 text-center"
+            style={{
+              borderColor: "var(--violet)",
+              background: "var(--violet-bg)",
+            }}
+          >
+            <div
+              className="inline-flex items-center justify-center w-14 h-14 rounded-[var(--r-xl)] mb-4"
+              style={{
+                background:
+                  "color-mix(in srgb, var(--violet) 18%, transparent)",
+              }}
+            >
+              <FiTarget size={26} style={{ color: "var(--violet)" }} />
+            </div>
+            <h2
+              className="font-display font-semibold text-2xl mb-2"
+              style={{ color: "var(--text-primary)" }}
+            >
               {isSignedIn
                 ? t("intake_review_limit_title_authed")
                 : t("intake_review_limit_title_anon")}
             </h2>
-            <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-sm mx-auto mb-5">
+            <p
+              className="text-sm leading-relaxed max-w-sm mx-auto mb-5"
+              style={{ color: "var(--text-secondary)" }}
+            >
               {isSignedIn
                 ? t("intake_review_limit_desc_authed")
                 : t("intake_review_limit_desc_anon")}
@@ -321,13 +400,20 @@ export function StepReview({
     );
   }
 
-  // ── Error ─────────────────────────────────────────────────────────
+  // ── Error ──────────────────────────────────────────────────────────
   if (genStatus === "error") {
     return (
       <>
         <GreetingBanner />
         <div className="flex flex-col gap-6">
-          <div className="rounded-[var(--r-lg)] border border-[var(--coral)] bg-[var(--coral-bg)] p-5 text-[var(--coral)]">
+          <div
+            className="rounded-[var(--r-lg)] border p-5"
+            style={{
+              borderColor: "color-mix(in srgb, var(--coral) 40%, transparent)",
+              background: "var(--coral-bg)",
+              color: "var(--coral)",
+            }}
+          >
             <p className="font-medium mb-1">{t("intake_review_error_title")}</p>
             <p className="text-sm opacity-80">{genError}</p>
           </div>
@@ -342,7 +428,7 @@ export function StepReview({
     );
   }
 
-  // ── Streaming / idle (waiting) ────────────────────────────────────
+  // ── Streaming / idle ───────────────────────────────────────────────
   if (genStatus === "streaming" || genStatus === "idle") {
     return (
       <>
@@ -356,13 +442,13 @@ export function StepReview({
     );
   }
 
-  // ── Done — show blueprint ─────────────────────────────────────────
+  // ── No blueprint ───────────────────────────────────────────────────
   if (!blueprint) {
     return (
       <>
         <GreetingBanner />
         <div className="flex flex-col gap-4 items-center py-12">
-          <p className="text-[var(--text-secondary)]">
+          <p style={{ color: "var(--text-secondary)" }}>
             {t("intake_review_no_blueprint")}
           </p>
           <Button variant="ghost" onClick={onBack}>
@@ -373,25 +459,42 @@ export function StepReview({
     );
   }
 
+  // ── Done — show blueprint ──────────────────────────────────────────
   return (
     <>
       <GreetingBanner />
       <div className="flex flex-col gap-6 sm:gap-8">
+        {/* Header */}
         <div>
           <div className="flex items-center gap-2 mb-2 flex-wrap">
-            <span className="w-2 h-2 rounded-full bg-[var(--emerald)] shrink-0" />
-            <span className="text-sm text-[var(--emerald)] font-medium">
+            <span
+              className="w-2 h-2 rounded-full shrink-0"
+              style={{ background: "var(--emerald)" }}
+            />
+            <span
+              className="text-sm font-medium"
+              style={{ color: "var(--emerald)" }}
+            >
               {t("intake_review_ready")}
             </span>
             <Badge variant={scopeInfo.badge}>{scopeLabel}</Badge>
             {scopeLevel === "ambitious" && (
-              <Badge variant="amber">🔬 {t("intake_review_deep")}</Badge>
+              <Badge variant="amber">
+                <FiActivity size={10} />
+                {t("intake_review_deep")}
+              </Badge>
             )}
           </div>
-          <h1 className="text-2xl sm:text-3xl font-display font-semibold text-[var(--text-primary)] mb-1">
+          <h1
+            className="text-2xl sm:text-3xl font-display font-semibold mb-1"
+            style={{ color: "var(--text-primary)" }}
+          >
             {blueprint.projectTitle}
           </h1>
-          <p className="text-sm sm:text-base text-[var(--text-secondary)]">
+          <p
+            className="text-sm sm:text-base"
+            style={{ color: "var(--text-secondary)" }}
+          >
             {blueprint.oneLineGoal}
           </p>
         </div>
@@ -407,19 +510,19 @@ export function StepReview({
           <span style={{ color: scopeInfo.color }} className="font-semibold">
             {scopeLabel} {t("intake_review_meta_scope")}
           </span>
-          <span className="text-[var(--text-secondary)]">
+          <span style={{ color: "var(--text-secondary)" }}>
             {blueprint.phases.length} {t("intake_review_meta_phases")}
           </span>
-          <span className="text-[var(--text-secondary)]">
+          <span style={{ color: "var(--text-secondary)" }}>
             {blueprint.tasks.length} {t("intake_review_meta_tasks")}
           </span>
           {blueprint.timeline && (
-            <span className="text-[var(--text-secondary)]">
+            <span style={{ color: "var(--text-secondary)" }}>
               {blueprint.timeline}
             </span>
           )}
           {blueprint.estimatedEffort && (
-            <span className="text-[var(--text-secondary)]">
+            <span style={{ color: "var(--text-secondary)" }}>
               {blueprint.estimatedEffort}
             </span>
           )}
@@ -427,24 +530,40 @@ export function StepReview({
 
         {/* Phases */}
         <div>
-          <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
+          <p
+            className="text-xs font-semibold uppercase tracking-wider mb-3"
+            style={{ color: "var(--text-tertiary)" }}
+          >
             {t("intake_review_phases")}
           </p>
           <div className="flex flex-col gap-2 sm:gap-3">
             {blueprint.phases.map((phase, i) => (
               <div
                 key={phase.id}
-                className="rounded-[var(--r-lg)] border border-[var(--border)] p-3 sm:p-4"
+                className="rounded-[var(--r-lg)] border p-3 sm:p-4"
+                style={{ borderColor: "var(--border)" }}
               >
                 <div className="flex items-center gap-2 sm:gap-3 mb-1.5">
-                  <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-full bg-[var(--violet-bg)] flex items-center justify-center text-xs font-medium text-[var(--violet-dim)] shrink-0">
+                  <div
+                    className="w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-xs font-medium shrink-0"
+                    style={{
+                      background: "var(--violet-bg)",
+                      color: "var(--violet-dim)",
+                    }}
+                  >
                     {i + 1}
                   </div>
-                  <p className="font-medium text-sm sm:text-base text-[var(--text-primary)]">
+                  <p
+                    className="font-medium text-sm sm:text-base"
+                    style={{ color: "var(--text-primary)" }}
+                  >
                     {phase.name}
                   </p>
                 </div>
-                <p className="text-xs sm:text-sm text-[var(--text-secondary)] ml-7 sm:ml-9">
+                <p
+                  className="text-xs sm:text-sm ml-7 sm:ml-9"
+                  style={{ color: "var(--text-secondary)" }}
+                >
                   {phase.objective}
                 </p>
                 {phase.milestones.length > 0 && (
@@ -464,18 +583,25 @@ export function StepReview({
         {/* Success criteria */}
         {blueprint.successCriteria?.length > 0 && (
           <div>
-            <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
+            <p
+              className="text-xs font-semibold uppercase tracking-wider mb-3"
+              style={{ color: "var(--text-tertiary)" }}
+            >
               {t("intake_review_success")}
             </p>
             <ul className="flex flex-col gap-1.5">
               {blueprint.successCriteria.map((c, i) => (
                 <li
                   key={i}
-                  className="flex items-start gap-2 text-xs sm:text-sm text-[var(--text-secondary)]"
+                  className="flex items-start gap-2 text-xs sm:text-sm"
+                  style={{ color: "var(--text-secondary)" }}
                 >
-                  <span className="text-[var(--emerald)] mt-0.5 shrink-0">
-                    ✓
-                  </span>
+                  <FiCheck
+                    size={13}
+                    strokeWidth={2.5}
+                    className="shrink-0 mt-0.5"
+                    style={{ color: "var(--emerald)" }}
+                  />
                   {c}
                 </li>
               ))}
@@ -483,19 +609,27 @@ export function StepReview({
           </div>
         )}
 
-        {/* Blockers */}
+        {/* Challenges / blockers */}
         {blueprint.blockers?.length > 0 && (
           <div>
-            <p className="text-xs text-[var(--text-tertiary)] font-medium uppercase tracking-wider mb-3">
+            <p
+              className="text-xs font-semibold uppercase tracking-wider mb-3"
+              style={{ color: "var(--text-tertiary)" }}
+            >
               {t("intake_review_challenges")}
             </p>
             <ul className="flex flex-col gap-1.5">
               {blueprint.blockers.map((b, i) => (
                 <li
                   key={i}
-                  className="flex items-start gap-2 text-xs sm:text-sm text-[var(--text-secondary)]"
+                  className="flex items-start gap-2 text-xs sm:text-sm"
+                  style={{ color: "var(--text-secondary)" }}
                 >
-                  <span className="text-[var(--amber)] mt-0.5 shrink-0">⚠</span>
+                  <FiAlertTriangle
+                    size={12}
+                    className="shrink-0 mt-0.5"
+                    style={{ color: "var(--amber)" }}
+                  />
                   {typeof b === "string" ? b : b.description}
                 </li>
               ))}
@@ -505,19 +639,34 @@ export function StepReview({
 
         {/* Sign-in nudge */}
         {!isSignedIn && (
-          <div className="rounded-[var(--r-md)] bg-[var(--violet-bg)] border border-[var(--violet)] px-4 py-3 flex items-start gap-3">
-            <span className="text-lg shrink-0">
-              <FaLightbulb />
-            </span>
+          <div
+            className="rounded-[var(--r-md)] border px-4 py-3 flex items-start gap-3"
+            style={{
+              background: "var(--violet-bg)",
+              borderColor: "color-mix(in srgb, var(--violet) 40%, transparent)",
+            }}
+          >
+            <FaLightbulb
+              size={15}
+              className="shrink-0 mt-0.5"
+              style={{ color: "var(--violet)" }}
+            />
             <div>
-              <p className="text-xs font-medium text-[var(--violet-dim)]">
+              <p
+                className="text-xs font-medium"
+                style={{ color: "var(--violet-dim)" }}
+              >
                 {t("intake_review_signin_nudge")}
               </p>
-              <p className="text-xs text-[var(--text-secondary)] mt-0.5">
+              <p
+                className="text-xs mt-0.5"
+                style={{ color: "var(--text-secondary)" }}
+              >
                 {t("intake_review_signin_desc")}{" "}
                 <button
                   onClick={() => setShowAuthGate(true)}
-                  className="text-[var(--violet)] hover:underline font-medium"
+                  className="font-medium hover:underline"
+                  style={{ color: "var(--violet)" }}
                 >
                   {t("intake_review_signin_link")}
                 </button>

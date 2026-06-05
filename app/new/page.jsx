@@ -22,6 +22,7 @@ import { loadUserProfile, buildProfileContext } from "@/lib/userProfile";
 import { useI18n } from "@/lib/i18n";
 import { BiSolidPencil } from "react-icons/bi";
 import { TosModal } from "@/components/ui/TosModal";
+import { FiCheck } from "react-icons/fi";
 
 const STEP_LABELS_KEYS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
 
@@ -578,7 +579,11 @@ function NewProjectContent() {
                         ].join(" ")}
                         aria-hidden="true"
                       >
-                        {isDonePast ? "✓" : i + 1}
+                        {isDonePast ? (
+                          <FiCheck size={10} strokeWidth={2.5} />
+                        ) : (
+                          i + 1
+                        )}{" "}
                       </div>
                       <span
                         className={`text-xs font-medium hidden sm:block transition-colors ${

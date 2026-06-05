@@ -11,9 +11,16 @@ export function Card({ className = "", hover = false, onClick, children }) {
       onKeyDown={onClick ? (e) => e.key === "Enter" && onClick(e) : undefined}
       className={[
         "rounded-[var(--r-lg)] border border-[var(--border)] bg-[var(--bg-elevated)]",
-        "transition-all duration-[var(--dur-base)] ease-[var(--ease-smooth)]",
+        "transition-all duration-200 ease-out",
         interactive
-          ? "cursor-pointer hover:shadow-[var(--shadow-md)] hover:-translate-y-0.5 hover:border-[var(--violet)] active:translate-y-0 active:shadow-[var(--shadow-sm)]"
+          ? [
+              "cursor-pointer",
+              "hover:-translate-y-0.5",
+              "hover:border-[color-mix(in_srgb,var(--violet)_45%,transparent)]",
+              "hover:shadow-[0_8px_24px_rgba(0,0,0,0.08),0_2px_8px_rgba(0,0,0,0.04)]",
+              "active:translate-y-0 active:shadow-[0_1px_4px_rgba(0,0,0,0.06)]",
+              "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--violet)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--bg-surface)]",
+            ].join(" ")
           : "",
         className,
       ].join(" ")}
