@@ -156,8 +156,33 @@ Non-owner public view shows "Use as template" CTA → links to `/new?fork=${id}`
 - Do NOT show the ToS modal more than once per session for the same user
 - Do NOT add `isPublic`, `publicQuality`, etc. to `TaskSchema` — they belong on root `ProjectSchema` only
 
-the clicks on projects in the explore will open the project page, where users can export them after they sign in instantly. or they can accuire them as their project. and start a journey for themselves.
+ProjectPageClient.jsx:759 GET http://localhost:3000/api/projects/082df8f5-d894-4309-a1c5-9e453102fd01 404 (Not Found)
+GET /api/projects/082df8f5-d894-4309-a1c5-9e453102fd01 404 in 4.3s (next.js: 4.2s, proxy.ts: 22ms, application-code: 124ms)
 
-the explore page will not have a sidebar. it needs to be open and more elitely designed that attracts visitors and produces curisity. Improve and make it a masterpiece.
+project aquiring failed, is not coming in dashboard properly and the project counting is not connected properly. make sure everything is connected and the data is centralized very well.
 
-the settings are not applied very well. they don't have api or data stored or any changes there would matter. connect it to everywhere. understand the project scope and filter and add more things to there as per need and they should be effective immediately.
+Send feedback from any app
+Add this to any of your apps to report user feedback to this dashboard:
+
+// In any of your apps:
+fetch("https://nuruddin-webician.vercel.app/api/feedback", {
+method: "POST",
+headers: {
+"Content-Type": "application/json",
+"x-feedback-secret": process.env.FEEDBACK_API_SECRET,
+},
+body: JSON.stringify({
+appId: "Momentum", // matches App name in dashboard
+type: "bug", // general | bug | feature | praise
+message: userMessage,
+userEmail: user.email, // optional
+userName: user.name, // optional
+rating: 4, // optional, 1-5
+metadata: { page: "/checkout", browser: "Chrome" },
+}),
+});
+
+add this in the feedback api.
+
+change of plan:
+Make the user to login when they try to build their own app. reserve the dashboard for authenticated users only. the unauthenticated users will need to authenticate when try to generate something. then it'll all work fine.

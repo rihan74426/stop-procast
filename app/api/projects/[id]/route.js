@@ -130,7 +130,10 @@ export async function GET(request, { params }) {
     }
 
     // Public access — return if isPublic: true (default for all projects)
-    const project = await Project.findOne({ id, isPublic: true }).lean();
+    const project = await Project.findOne({
+      id,
+      isPublic: { $ne: false },
+    }).lean();
     if (!project) {
       return Response.json({ error: "Not found or private" }, { status: 404 });
     }
