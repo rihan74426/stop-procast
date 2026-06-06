@@ -51,7 +51,6 @@ import {
 import { MdDelete } from "react-icons/md";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
-import { FiGitBranch } from "react-icons/fi";
 import { SignInGate } from "@/components/project/SignInGate";
 
 // ─── Access levels ────────────────────────────────────────────────────
