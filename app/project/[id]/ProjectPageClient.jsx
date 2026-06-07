@@ -2,9 +2,7 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { useUser, SignInButton, SignUpButton } from "@clerk/nextjs";
-import { useProjectStore } from "@/lib/store/projectStore";
 import { SavePromptModal } from "@/components/ui/SavePromptModal";
 import { TopBar } from "@/components/layout/Topbar";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -17,7 +15,6 @@ import { StreakBanner } from "@/components/project/StreakBanner";
 import { ProjectPressure } from "@/components/project/ProjectPressure";
 import { EmailExportModal } from "@/components/project/EmailExportModal";
 import { ProgressRing } from "@/components/ui/Progress";
-import { Button } from "@/components/ui/Button";
 import { Badge } from "@/components/ui/Badge";
 import { overallProgress } from "@/lib/utils/progress";
 import { formatDate, projectAgeLabel } from "@/lib/utils/date";
@@ -27,7 +24,6 @@ import {
 } from "@/lib/utils/exportMarkdown";
 import { useEngageView, trackExport } from "@/lib/utils/engage";
 import { useI18n } from "@/lib/i18n";
-import { toast } from "@/lib/toast";
 import {
   FaFilePdf,
   FaJs,
@@ -65,20 +61,30 @@ import { SignInGate } from "@/components/project/SignInGate";
 
 // ─── Acquire panel (shown to signed-in non-owners) ────────────────────
 // Checks the 4-project limit before forking.
-function AcquirePanel({ project }) {
+("use client");
+
+// Drop-in replacement for the AcquirePanel function inside ProjectPageClient.jsx
+// Paste this to replace the existing AcquirePanel component at the top of that file.
+
+import Link from "next/link";
+import { useProjectStore } from "@/lib/store/projectStore";
+import { Button } from "@/components/ui/Button";
+import { toast } from "@/lib/toast";
+import { FiGitBranch, FiCheckCircle, FiAlertCircle } from "react-icons/fi";
+
+const AUTH_LIMIT = 4;
+
+export function AcquirePanel({ project }) {
   const router = useRouter();
   const addProject = useProjectStore((s) => s.addProject);
   const projects = useProjectStore((s) => s.projects);
 
-  const [status, setStatus] = useState("idle"); // idle | checking | acquiring | limited | done | error
-  const [limitInfo, setLimitInfo] = useState(null); // { count, limit }
-  const AUTH_LIMIT = 4;
+  const [status, setStatus] = useState("idle");
+  const [limitInfo, setLimitInfo] = useState(null);
 
-  // Quick local count so we can show the state without a round-trip first
   const activeLocalCount = projects.filter((p) => !p.completionDate).length;
   const alreadyAtLimit = activeLocalCount >= AUTH_LIMIT;
 
-  // Has the user already acquired this exact project?
   const alreadyOwned = projects.some(
     (p) => p.id === project.id || p.forkedFrom === project.id
   );
@@ -96,7 +102,6 @@ function AcquirePanel({ project }) {
 
     setStatus("checking");
 
-    // Server-side limit check
     try {
       const res = await fetch("/api/projects/check-limit");
       const data = await res.json();
@@ -106,12 +111,12 @@ function AcquirePanel({ project }) {
         return;
       }
     } catch {
-      // If check fails, try anyway — server will enforce
+      /* try anyway */
     }
 
     setStatus("acquiring");
     try {
-      const id = await addProject({
+      const newId = await addProject({
         projectTitle: project.projectTitle,
         oneLineGoal: project.oneLineGoal,
         problemStatement: project.problemStatement ?? "",
@@ -124,7 +129,6 @@ function AcquirePanel({ project }) {
         },
         scopeLevel: project.scopeLevel ?? "standard",
         phases: project.phases ?? [],
-        // Reset all task statuses — the user starts fresh
         tasks: (project.tasks ?? []).map((t) => ({
           ...t,
           status: "todo",
@@ -138,13 +142,17 @@ function AcquirePanel({ project }) {
         reviewQuestions: project.reviewQuestions ?? [],
         forkedFrom: project.id,
       });
+
       setStatus("done");
-      toast.success("Project added! Redirecting to your copy…", {
-        duration: 2500,
-      });
-      setTimeout(() => router.push(`/project/${id}`), 800);
+      toast.success("Project added to your dashboard!", { duration: 2500 });
+
+      // Trigger global re-sync so dashboard count updates
+      if (typeof window !== "undefined" && window.__momentumRefresh) {
+        window.__momentumRefresh();
+      }
+
+      setTimeout(() => router.push(`/project/${newId}`), 600);
     } catch (err) {
-      // Handle server-side limit rejection
       if (err?.code === "LIMIT_REACHED" || err?.message?.includes("limit")) {
         setLimitInfo({ count: AUTH_LIMIT, limit: AUTH_LIMIT });
         setStatus("limited");
@@ -155,7 +163,6 @@ function AcquirePanel({ project }) {
     }
   };
 
-  // ── Already owned ─────────────────────────────────────────────────
   if (alreadyOwned) {
     return (
       <div
@@ -199,7 +206,6 @@ function AcquirePanel({ project }) {
     );
   }
 
-  // ── At limit ──────────────────────────────────────────────────────
   if (status === "limited" || alreadyAtLimit) {
     const count = limitInfo?.count ?? activeLocalCount;
     const limit = limitInfo?.limit ?? AUTH_LIMIT;
@@ -224,36 +230,19 @@ function AcquirePanel({ project }) {
               className="text-xs mt-1 leading-relaxed"
               style={{ color: "var(--text-secondary)" }}
             >
-              You have {count} active project{count !== 1 ? "s" : ""}. Complete
-              or delete one to make room for this plan.
+              Complete or delete a project to make room.
             </p>
           </div>
         </div>
-        <div className="flex flex-col gap-2">
-          <Link href="/dashboard">
-            <Button size="sm" className="w-full justify-center" variant="ghost">
-              Go to dashboard → manage projects
-            </Button>
-          </Link>
-          <button
-            onClick={() => setStatus("idle")}
-            className="text-xs text-center transition-colors"
-            style={{ color: "var(--text-tertiary)" }}
-            onMouseEnter={(e) =>
-              (e.currentTarget.style.color = "var(--text-secondary)")
-            }
-            onMouseLeave={(e) =>
-              (e.currentTarget.style.color = "var(--text-tertiary)")
-            }
-          >
-            Dismiss
-          </button>
-        </div>
+        <Link href="/dashboard">
+          <Button size="sm" className="w-full justify-center" variant="ghost">
+            Go to dashboard → manage projects
+          </Button>
+        </Link>
       </div>
     );
   }
 
-  // ── Done (brief success before redirect) ──────────────────────────
   if (status === "done") {
     return (
       <div
@@ -284,7 +273,6 @@ function AcquirePanel({ project }) {
     );
   }
 
-  // ── Default CTA ───────────────────────────────────────────────────
   const isLoading = status === "checking" || status === "acquiring";
   const loadingLabel =
     status === "checking" ? "Checking limit…" : "Forking plan…";
@@ -316,13 +304,12 @@ function AcquirePanel({ project }) {
             className="text-xs leading-relaxed"
             style={{ color: "var(--text-secondary)" }}
           >
-            Fork this blueprint to your dashboard. All tasks reset to "todo" —
-            you start your own journey.
+            Fork this blueprint. All tasks reset to "todo" — you start fresh.
           </p>
         </div>
       </div>
 
-      {/* Slot info */}
+      {/* Slot indicator */}
       <div
         className="flex items-center gap-2 px-3 py-2 rounded-[var(--r-md)] text-xs"
         style={{
@@ -358,15 +345,14 @@ function AcquirePanel({ project }) {
           loadingLabel
         ) : (
           <>
-            <FiGitBranch size={14} />
-            Add to my {activeLocalCount}/{AUTH_LIMIT} projects
+            <FiGitBranch size={14} /> Add to my projects ({activeLocalCount}/
+            {AUTH_LIMIT})
           </>
         )}
       </Button>
     </div>
   );
 }
-
 // ─── Export panel ─────────────────────────────────────────────────────
 // canExport: isOwner || isSignedIn
 // If !canExport, clicking any export button triggers the sign-in gate.

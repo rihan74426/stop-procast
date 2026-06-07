@@ -6,19 +6,39 @@ const ANON_LIMIT = 1;
 const AUTH_LIMIT = 4;
 
 // GET /api/projects
+// Returns projects for authenticated user OR anonymous session
 export async function GET(request) {
   try {
-    const { userId } = await auth();
-    if (!userId) return Response.json({ projects: [] });
-
     const db = await tryConnectDB();
     if (!db) return Response.json({ projects: [], warning: "DB unavailable" });
 
-    const projects = await Project.find({ userId })
-      .sort({ createdAt: -1 })
-      .lean();
-    const clean = projects.map(({ _id, __v, ...p }) => p);
-    return Response.json({ projects: clean });
+    let userId = null;
+    try {
+      const session = await auth();
+      userId = session?.userId ?? null;
+    } catch {
+      /* no session */
+    }
+
+    if (userId) {
+      const projects = await Project.find({ userId })
+        .sort({ createdAt: -1 })
+        .lean();
+      const clean = projects.map(({ _id, __v, ...p }) => p);
+      return Response.json({ projects: clean });
+    }
+
+    // Anonymous: return session projects
+    const sessionId = request.headers.get("X-Session-Id");
+    if (sessionId) {
+      const projects = await Project.find({ sessionId, userId: null })
+        .sort({ createdAt: -1 })
+        .lean();
+      const clean = projects.map(({ _id, __v, ...p }) => p);
+      return Response.json({ projects: clean });
+    }
+
+    return Response.json({ projects: [] });
   } catch (err) {
     console.error("GET /api/projects:", err.message);
     return Response.json({ projects: [] });
@@ -35,24 +55,25 @@ export async function POST(request) {
       return Response.json({ error: "Invalid JSON" }, { status: 400 });
     }
 
-    if (!body?.id) {
+    if (!body?.id)
       return Response.json({ error: "Missing project id" }, { status: 400 });
+
+    let userId = null;
+    try {
+      const session = await auth();
+      userId = session?.userId ?? null;
+    } catch {
+      /* no session */
     }
 
-    const { userId } = await auth();
     const sessionId =
       body.sessionId || request.headers.get("X-Session-Id") || null;
-
     const { _id, __v, ...safeBody } = body;
 
     const db = await tryConnectDB();
-    if (!db) {
-      // DB down — acknowledge, client has local copy
-      return Response.json({ project: safeBody }, { status: 201 });
-    }
+    if (!db) return Response.json({ project: safeBody }, { status: 201 });
 
     if (userId) {
-      // Check authenticated user limit
       const existingDoc = await Project.findOne({ id: safeBody.id }).lean();
       if (!existingDoc) {
         const count = await Project.countDocuments({ userId });
@@ -82,7 +103,7 @@ export async function POST(request) {
       return Response.json({ project: clean }, { status: 201 });
     }
 
-    // Anonymous user — check limit
+    // Anonymous user
     const existing = await Project.findOne({ id: safeBody.id }).lean();
     if (existing) {
       const { _id: _d, __v: _v, ...clean } = existing;

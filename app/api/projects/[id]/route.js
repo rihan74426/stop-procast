@@ -2,7 +2,6 @@ import { auth } from "@clerk/nextjs/server";
 import { tryConnectDB } from "@/lib/db/mongoose";
 import Project from "@/lib/models/Project";
 
-// Fields stripped from public (non-owner) responses
 const PRIVATE_FIELDS = new Set([
   "userId",
   "sessionId",
@@ -19,19 +18,16 @@ function stripPrivate(obj) {
   return out;
 }
 
-// PATCH /api/projects/[id]
 export async function PATCH(request, { params }) {
   try {
     const { userId } = await auth();
     const { id } = await params;
-
     let body;
     try {
       body = await request.json();
     } catch {
       return Response.json({ error: "Invalid JSON" }, { status: 400 });
     }
-
     const {
       userId: _u,
       id: _i,
@@ -41,26 +37,19 @@ export async function PATCH(request, { params }) {
       isAnonymous: _a,
       ...safePatch
     } = body;
-
-    if (Object.keys(safePatch).length === 0) {
-      return Response.json({ ok: true });
-    }
-
+    if (Object.keys(safePatch).length === 0) return Response.json({ ok: true });
     const db = await tryConnectDB();
     if (!db) return Response.json({ ok: true, warning: "DB unavailable" });
-
     if (userId) {
       await Project.findOneAndUpdate({ id, userId }, { $set: safePatch });
     } else {
       const sessionId = request.headers.get("X-Session-Id");
-      if (sessionId) {
+      if (sessionId)
         await Project.findOneAndUpdate(
           { id, sessionId, isAnonymous: true },
           { $set: safePatch }
         );
-      }
     }
-
     return Response.json({ ok: true });
   } catch (err) {
     console.error("PATCH /api/projects/[id]:", err.message);
@@ -68,24 +57,19 @@ export async function PATCH(request, { params }) {
   }
 }
 
-// DELETE /api/projects/[id]
 export async function DELETE(request, { params }) {
   try {
     const { userId } = await auth();
     const { id } = await params;
-
     const db = await tryConnectDB();
     if (!db) return Response.json({ ok: true });
-
     if (userId) {
       await Project.deleteOne({ id, userId });
     } else {
       const sessionId = request.headers.get("X-Session-Id");
-      if (sessionId) {
+      if (sessionId)
         await Project.deleteOne({ id, sessionId, isAnonymous: true });
-      }
     }
-
     return Response.json({ ok: true });
   } catch (err) {
     console.error("DELETE /api/projects/[id]:", err.message);
@@ -96,55 +80,58 @@ export async function DELETE(request, { params }) {
 /**
  * GET /api/projects/[id]
  *
- * Priority order:
- * 1. Authenticated owner   → full project data
- * 2. Anonymous + isPublic  → anonymized project data (no userId/sessionId)
- * 3. Not found / private   → 404
- *
- * This means any project with isPublic: true (the default) is accessible
- * to anyone with the ID — no login required.
+ * Priority:
+ * 1. Authenticated owner            → full data, isOwner: true
+ * 2. Session-matched anon project   → full data, isOwner: true  ← NEW
+ * 3. Public (isPublic !== false)    → stripped, isPublicView: true
+ * 4. Not found / private            → 404
  */
 export async function GET(request, { params }) {
   try {
     const { id } = await params;
-
     const db = await tryConnectDB();
-    if (!db) {
-      return Response.json({ error: "DB unavailable" }, { status: 503 });
-    }
+    if (!db) return Response.json({ error: "DB unavailable" }, { status: 503 });
 
-    // Try authenticated owner first
-    let isOwner = false;
+    // Resolve auth without throwing
+    let userId = null;
     try {
-      const { userId } = await auth();
-      if (userId) {
-        const project = await Project.findOne({ id, userId }).lean();
-        if (project) {
-          const { _id, __v, ...clean } = project;
-          return Response.json({ project: clean, isOwner: true });
-        }
-        isOwner = false;
-      }
+      const session = await auth();
+      userId = session?.userId ?? null;
     } catch {
-      // auth() can throw if no Clerk session — that's fine, fall through to public
+      /* no session */
     }
 
-    // Public access — return if isPublic: true (default for all projects)
+    // 1. Authenticated owner
+    if (userId) {
+      const project = await Project.findOne({ id, userId }).lean();
+      if (project) {
+        const { _id, __v, ...clean } = project;
+        return Response.json({ project: clean, isOwner: true });
+      }
+    }
+
+    // 2. Session-based anonymous owner (before or after claim)
+    const sessionId = request.headers.get("X-Session-Id");
+    if (sessionId) {
+      const project = await Project.findOne({ id, sessionId }).lean();
+      if (project) {
+        const { _id, __v, ...clean } = project;
+        return Response.json({ project: clean, isOwner: true });
+      }
+    }
+
+    // 3. Public access
     const project = await Project.findOne({
       id,
       isPublic: { $ne: false },
     }).lean();
-    if (!project) {
+    if (!project)
       return Response.json({ error: "Not found or private" }, { status: 404 });
-    }
-
-    const clean = stripPrivate(project);
 
     return Response.json(
-      { project: clean, isOwner: false, isPublicView: true },
+      { project: stripPrivate(project), isOwner: false, isPublicView: true },
       {
         headers: {
-          // Cache public project views briefly
           "Cache-Control": "public, s-maxage=30, stale-while-revalidate=120",
         },
       }

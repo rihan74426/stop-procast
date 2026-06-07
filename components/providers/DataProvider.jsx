@@ -13,9 +13,7 @@ import { resetHydratedSession } from "@/lib/store/projectStore";
  * Responsibilities:
  * 1. On sign-in:  claim anonymous projects → hydrate from server
  * 2. On sign-out: clear localStorage and reset store
- *
- * Performance: Uses a short timeout before hydration to avoid blocking
- * the initial render on slower connections / new devices.
+ * 3. Exposes forceRefresh on window for post-acquire re-sync
  */
 export function DataProvider({ children }) {
   const { isSignedIn, isLoaded, user } = useUser();
@@ -24,9 +22,22 @@ export function DataProvider({ children }) {
   const prevUserIdRef = useRef(null);
   const syncedUserIdRef = useRef(null);
 
+  // Load local projects immediately on mount
   useEffect(() => {
     useProjectStore.getState().loadLocal();
   }, []);
+
+  // Expose a global force-refresh so AcquirePanel can trigger re-sync
+  useEffect(() => {
+    window.__momentumRefresh = () => {
+      syncedUserIdRef.current = null;
+      resetHydratedSession();
+      hydrateFromServer();
+    };
+    return () => {
+      delete window.__momentumRefresh;
+    };
+  }, [hydrateFromServer]);
 
   useEffect(() => {
     if (!isLoaded) return;
@@ -34,7 +45,7 @@ export function DataProvider({ children }) {
     const currentUserId = user?.id ?? null;
     const previousUserId = prevUserIdRef.current;
 
-    // ── Sign-out detected ────────────────────────────────────────
+    // Sign-out detected
     if (previousUserId !== null && currentUserId === null) {
       clearMomentumStorage();
       syncedUserIdRef.current = null;
@@ -44,13 +55,12 @@ export function DataProvider({ children }) {
 
     prevUserIdRef.current = currentUserId;
 
-    // ── Sign-in / hydration ──────────────────────────────────────
+    // Sign-in / hydration
     if (!isSignedIn || !currentUserId) return;
     if (syncedUserIdRef.current === currentUserId) return;
 
     syncedUserIdRef.current = currentUserId;
 
-    // Small delay to not block initial render on cold devices
     const timer = setTimeout(async () => {
       try {
         const { count } = await claimAnonymousProjects();

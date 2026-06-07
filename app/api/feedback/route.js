@@ -1,18 +1,46 @@
 // app/api/feedback/route.js
 // Feedback & bug reports — stored in MongoDB (or falls back to in-memory)
-// Public read, write-once per session (no auth required to view/submit)
-// Admin actions require Clerk auth + publicMetadata.role === "admin"
-// New submissions fire a Formspree email to admins automatically.
+// Also forwards to external dashboard at nuruddin-webician.vercel.app
 
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { tryConnectDB } from "@/lib/db/mongoose";
 import { generateId, getFeedbackModel, memStore } from "@/lib/models/Feedback";
 
 const FORMSPREE_ENDPOINT = "https://formspree.io/f/mpqbqjkd";
+const EXTERNAL_FEEDBACK_URL =
+  "https://nuruddin-webician.vercel.app/api/feedback";
+
+// ─── Forward to external dashboard (fire-and-forget) ──────────────────
+async function forwardToExternalDashboard(item) {
+  try {
+    const secret = process.env.FEEDBACK_API_SECRET;
+    if (!secret) return; // skip if not configured
+
+    await fetch(EXTERNAL_FEEDBACK_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-feedback-secret": secret,
+      },
+      body: JSON.stringify({
+        appId: "Momentum",
+        type: item.type === "suggestion" ? "feature" : item.type,
+        message: item.body ? `${item.title}\n\n${item.body}` : item.title,
+        metadata: {
+          originalType: item.type,
+          sessionId: item.sessionId,
+          submittedAt: item.createdAt,
+        },
+      }),
+      signal: AbortSignal.timeout(6000),
+    });
+  } catch (err) {
+    // Fire-and-forget — never block the response
+    console.warn("[feedback] external forward failed:", err.message);
+  }
+}
 
 // ─── Notify admins via Formspree ──────────────────────────────────────
-// Fire-and-forget — never blocks the response or throws to the client.
-
 async function notifyAdmins(item) {
   try {
     const typeLabel =
@@ -51,13 +79,11 @@ async function notifyAdmins(item) {
       console.warn("[feedback] Formspree notify failed:", res.status, text);
     }
   } catch (err) {
-    // Never propagate — email notification is best-effort
     console.warn("[feedback] Formspree notify error:", err.message);
   }
 }
 
 // ─── Helper: verify admin ─────────────────────────────────────────────
-
 async function isAdminUser() {
   try {
     const { userId } = await auth();
@@ -158,8 +184,9 @@ export async function POST(request) {
       savedItem = clean;
     }
 
-    // Notify admins via Formspree — fire-and-forget, never blocks response
+    // Fire-and-forget notifications
     notifyAdmins(savedItem);
+    forwardToExternalDashboard(savedItem);
 
     return Response.json({ item: savedItem, fallback: !db }, { status: 201 });
   } catch (err) {
@@ -179,20 +206,15 @@ export async function PATCH(request) {
     }
 
     const { id, action, sessionId, status, adminNote } = body;
+    if (!id) return Response.json({ error: "Missing id" }, { status: 400 });
 
-    if (!id) {
-      return Response.json({ error: "Missing id" }, { status: 400 });
-    }
-
-    // Admin actions require server-side verification
     if (
       (status !== undefined || adminNote !== undefined) &&
       action !== "upvote"
     ) {
       const admin = await isAdminUser();
-      if (!admin) {
+      if (!admin)
         return Response.json({ error: "Unauthorized" }, { status: 403 });
-      }
     }
 
     const db = await tryConnectDB();
@@ -214,7 +236,6 @@ export async function PATCH(request) {
 
     const Feedback = getFeedbackModel();
 
-    // Upvote — idempotent per session
     if (action === "upvote" && sessionId) {
       const doc = await Feedback.findOneAndUpdate(
         { id, upvotedBy: { $ne: sessionId } },
@@ -226,7 +247,6 @@ export async function PATCH(request) {
       return Response.json({ item: clean });
     }
 
-    // Admin status/note update
     if (status !== undefined || adminNote !== undefined) {
       const validStatuses = [
         "open",
