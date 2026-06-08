@@ -48,6 +48,10 @@ import { MdDelete } from "react-icons/md";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { ConfirmModal } from "@/components/ui/ConfirmModal";
 import { SignInGate } from "@/components/project/SignInGate";
+import Link from "next/link";
+import { useProjectStore } from "@/lib/store/projectStore";
+import { Button } from "@/components/ui/Button";
+import { toast } from "@/lib/toast";
 
 // ─── Access levels ────────────────────────────────────────────────────
 // OWNER       → project is in their account (storeProject !== null)
@@ -61,16 +65,9 @@ import { SignInGate } from "@/components/project/SignInGate";
 
 // ─── Acquire panel (shown to signed-in non-owners) ────────────────────
 // Checks the 4-project limit before forking.
-("use client");
 
 // Drop-in replacement for the AcquirePanel function inside ProjectPageClient.jsx
 // Paste this to replace the existing AcquirePanel component at the top of that file.
-
-import Link from "next/link";
-import { useProjectStore } from "@/lib/store/projectStore";
-import { Button } from "@/components/ui/Button";
-import { toast } from "@/lib/toast";
-import { FiGitBranch, FiCheckCircle, FiAlertCircle } from "react-icons/fi";
 
 const AUTH_LIMIT = 4;
 
