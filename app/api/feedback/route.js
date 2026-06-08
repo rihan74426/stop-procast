@@ -10,6 +10,29 @@ const FORMSPREE_ENDPOINT = "https://formspree.io/f/mpqbqjkd";
 const EXTERNAL_FEEDBACK_URL =
   "https://nuruddin-webician.vercel.app/api/feedback";
 
+// Helper to create an AbortSignal with a timeout that works across runtimes
+function createTimeoutSignal(ms) {
+  // Prefer native AbortSignal.timeout if available
+  if (
+    typeof AbortSignal !== "undefined" &&
+    typeof AbortSignal.timeout === "function"
+  ) {
+    try {
+      return AbortSignal.timeout(ms);
+    } catch {
+      // fall through to fallback below
+    }
+  }
+  // Fallback for environments without AbortSignal.timeout
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), ms);
+  // Clear timeout if caller uses the signal before it fires (best-effort)
+  const signal = controller.signal;
+  // attach a small finalizer to clear the timer when aborted/finished
+  signal.addEventListener("abort", () => clearTimeout(id), { once: true });
+  return signal;
+}
+
 // ─── Forward to external dashboard (fire-and-forget) ──────────────────
 async function forwardToExternalDashboard(item) {
   try {
@@ -32,11 +55,15 @@ async function forwardToExternalDashboard(item) {
           submittedAt: item.createdAt,
         },
       }),
-      signal: AbortSignal.timeout(6000),
+      signal: createTimeoutSignal(6000),
     });
   } catch (err) {
-    // Fire-and-forget — never block the response
-    console.warn("[feedback] external forward failed:", err.message);
+    // Fire-and-forget — never block the response; include stack for diagnostics
+    console.warn(
+      "[feedback] external forward failed:",
+      err?.message ?? err,
+      err?.stack ?? ""
+    );
   }
 }
 
@@ -71,15 +98,26 @@ async function notifyAdmins(item) {
         Accept: "application/json",
       },
       body: params.toString(),
-      signal: AbortSignal.timeout(8000),
+      signal: createTimeoutSignal(8000),
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => "");
+      // attempt to read response body (text or json) for better diagnostics
+      let text = "";
+      try {
+        text = await res.text();
+      } catch {
+        text = "<failed to read body>";
+      }
       console.warn("[feedback] Formspree notify failed:", res.status, text);
     }
   } catch (err) {
-    console.warn("[feedback] Formspree notify error:", err.message);
+    // include stack for better error diagnosis
+    console.warn(
+      "[feedback] Formspree notify error:",
+      err?.message ?? err,
+      err?.stack ?? ""
+    );
   }
 }
 

@@ -186,3 +186,5 @@ add this in the feedback api.
 
 change of plan:
 Make the user to login when they try to build their own app. reserve the dashboard for authenticated users only. the unauthenticated users will need to authenticate when try to generate something. then it'll all work fine.
+
+2026-06-08 16:26:20.799 [warning] [feedback] Formspree notify error: fetch failed
