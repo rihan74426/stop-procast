@@ -33,43 +33,42 @@ function createTimeoutSignal(ms) {
 // Fire-and-forget. Portfolio's /api/feedback handles its own Formspree notify.
 async function forwardToExternalDashboard(item) {
   try {
-    const secret = process.env.FEEDBACK_API_SECRET;
+    const secret = process.env.FEEDBACK_API_SECRET; //[cite: 3]
     if (!secret) {
       console.warn(
-        "[feedback] FEEDBACK_API_SECRET not set — skipping external forward"
+        "[feedback] FEEDBACK_API_SECRET not set — skipping external forward" //[cite: 3]
       );
       return;
     }
 
     const res = await fetch(EXTERNAL_FEEDBACK_URL, {
-      method: "POST",
+      //[cite: 3]
+      method: "POST", //[cite: 3]
       headers: {
-        "Content-Type": "application/json",
-        "x-feedback-secret": secret,
+        "Content-Type": "application/json", //[cite: 3]
+        "x-feedback-secret": secret, //[cite: 3]
       },
       body: JSON.stringify({
-        appId: "Momentum",
-        // portfolio stores "feature" not "suggestion"
-        type: item.type === "suggestion" ? "feature" : item.type,
-        message: item.body ? `${item.title}\n\n${item.body}` : item.title,
+        //[cite: 3]
+        appId: "Momentum", //[cite: 3]
+        type: item.type === "suggestion" ? "feature" : item.type, //[cite: 3]
+        message: item.body ? `${item.title}\n\n${item.body}` : item.title, //[cite: 3]
         metadata: {
-          originalType: item.type,
-          feedbackId: item.id,
-          sessionId: item.sessionId ?? null,
-          submittedAt: item.createdAt,
+          originalType: item.type, //[cite: 3]
+          feedbackId: item.id, //[cite: 3]
+          sessionId: item.sessionId ?? null, //[cite: 3]
+          submittedAt: item.createdAt, //[cite: 3]
         },
       }),
-      // 12 s — enough for a Vercel cold start on the portfolio side
-      signal: createTimeoutSignal(12000),
+      signal: createTimeoutSignal(12000), //[cite: 3]
     });
 
     if (!res.ok) {
-      const text = await res.text().catch(() => "<unreadable>");
-      console.warn(`[feedback] external forward returned ${res.status}:`, text);
+      const text = await res.text().catch(() => "<unreadable>"); //[cite: 3]
+      console.warn(`[feedback] external forward returned ${res.status}:`, text); //[cite: 3]
     }
   } catch (err) {
-    // fire-and-forget — never block the 201 response
-    console.warn("[feedback] external forward failed:", err?.message ?? err);
+    console.warn("[feedback] external forward failed:", err?.message ?? err); //[cite: 3]
   }
 }
 
@@ -130,58 +129,68 @@ export async function POST(request) {
   try {
     let body;
     try {
-      body = await request.json();
+      body = await request.json(); //
     } catch {
-      return Response.json({ error: "Invalid JSON" }, { status: 400 });
+      return Response.json({ error: "Invalid JSON" }, { status: 400 }); //[cite: 3]
     }
 
-    const { type, title, body: text, sessionId } = body;
+    const { type, title, body: text, sessionId } = body; //[cite: 3]
 
     if (!title?.trim() || title.trim().length < 5) {
+      //[cite: 3]
       return Response.json(
-        { error: "Title must be at least 5 characters." },
-        { status: 400 }
+        { error: "Title must be at least 5 characters." }, //[cite: 3]
+        { status: 400 } //[cite: 3]
       );
     }
 
-    const validTypes = ["bug", "suggestion", "praise", "question"];
-    const safeType = validTypes.includes(type) ? type : "suggestion";
+    const validTypes = ["bug", "suggestion", "praise", "question"]; //[cite: 3]
+    const safeType = validTypes.includes(type) ? type : "suggestion"; //[cite: 3]
 
     const item = {
-      id: generateId(),
-      type: safeType,
-      title: title.trim().slice(0, 120),
-      body: (text ?? "").trim().slice(0, 2000),
-      sessionId: sessionId ?? null,
-      userId: null,
-      upvotes: 0,
-      upvotedBy: [],
-      status: "open",
-      adminNote: "",
-      createdAt: new Date().toISOString(),
-      resolvedAt: null,
+      id: generateId(), //[cite: 3]
+      type: safeType, //[cite: 3]
+      title: title.trim().slice(0, 120), //[cite: 3]
+      body: (text ?? "").trim().slice(0, 2000), //[cite: 3]
+      sessionId: sessionId ?? null, //[cite: 3]
+      userId: null, //[cite: 3]
+      upvotes: 0, //[cite: 3]
+      upvotedBy: [], //[cite: 3]
+      status: "open", //[cite: 3]
+      adminNote: "", //[cite: 3]
+      createdAt: new Date().toISOString(), //[cite: 3]
+      resolvedAt: null, //[cite: 3]
     };
 
-    const db = await tryConnectDB();
-    let savedItem = item;
+    const db = await tryConnectDB(); //[cite: 3]
+    let savedItem = item; //[cite: 3]
 
     if (!db) {
-      memStore.unshift(item);
+      memStore.unshift(item); //[cite: 3]
     } else {
-      const Feedback = getFeedbackModel();
-      const doc = await Feedback.create(item);
-      const { _id, __v, ...clean } = doc.toObject();
-      savedItem = clean;
+      const Feedback = getFeedbackModel(); //[cite: 3]
+      const doc = await Feedback.create(item); //[cite: 3]
+      const { _id, __v, ...clean } = doc.toObject(); //[cite: 3]
+      savedItem = clean; //[cite: 3]
     }
 
-    // Forward to portfolio — this is the ONLY notification path.
-    // Portfolio's /api/feedback stores it in its own DB + fires Formspree email.
-    forwardToExternalDashboard(savedItem);
+    // ✅ FIXED: Using Next.js/Vercel waitUntil mechanism
+    // This safely keeps the lambda environment alive until the dispatch finishes,
+    // without forcing the user to wait for it.
+    if (
+      typeof process !== "undefined" &&
+      typeof process.waitUntil === "function"
+    ) {
+      process.waitUntil(forwardToExternalDashboard(savedItem));
+    } else {
+      // Fallback if local runtime doesn't expose it globally
+      forwardToExternalDashboard(savedItem); //[cite: 3]
+    }
 
-    return Response.json({ item: savedItem, fallback: !db }, { status: 201 });
+    return Response.json({ item: savedItem, fallback: !db }, { status: 201 }); //[cite: 3]
   } catch (err) {
-    console.error("[feedback POST]", err.message);
-    return Response.json({ error: "Failed to submit" }, { status: 500 });
+    console.error("[feedback POST]", err.message); //[cite: 3]
+    return Response.json({ error: "Failed to submit" }, { status: 500 }); //[cite: 3]
   }
 }
 
