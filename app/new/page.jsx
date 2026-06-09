@@ -9,7 +9,6 @@ import { StepScope } from "@/components/intake/StepScope";
 import { StepReview } from "@/components/intake/StepReview";
 import { StepCommit } from "@/components/intake/StepCommit";
 import { useProjectStore } from "@/lib/store/projectStore";
-import { useProjectLimit } from "@/lib/ai/useProjectLimit";
 import { DataProvider } from "@/components/providers/DataProvider";
 import { SavePromptModal } from "@/components/ui/SavePromptModal";
 import { TopBar } from "@/components/layout/Topbar";
@@ -23,6 +22,161 @@ import { useI18n } from "@/lib/i18n";
 import { BiSolidPencil } from "react-icons/bi";
 import { TosModal } from "@/components/ui/TosModal";
 import { FiCheck } from "react-icons/fi";
+
+// ─── Auth gate overlay (shown before step 1 for unauthenticated users) ──
+function CaptureAuthGate({ idea, onClose, onContinueAnyway }) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4"
+      style={{
+        background: "rgba(12,12,15,0.82)",
+        backdropFilter: "blur(10px)",
+      }}
+    >
+      <div
+        className="w-full sm:max-w-md rounded-t-[var(--r-xl)] sm:rounded-[var(--r-xl)] border border-[var(--border)] bg-[var(--bg-elevated)] shadow-[var(--shadow-lg)] overflow-hidden"
+        style={{
+          animation: "gateIn 260ms cubic-bezier(0.175,0.885,0.32,1.275) both",
+        }}
+      >
+        {/* Header */}
+        <div
+          className="px-6 py-5 border-b border-[var(--border)]"
+          style={{
+            background:
+              "linear-gradient(135deg, var(--violet) 0%, #534ab7 100%)",
+          }}
+        >
+          <div className="flex items-start gap-3">
+            <div
+              className="w-10 h-10 rounded-[var(--r-md)] flex items-center justify-center shrink-0 text-xl"
+              style={{ background: "rgba(255,255,255,0.15)" }}
+            >
+              🚀
+            </div>
+            <div>
+              <p className="font-display font-bold text-white text-lg leading-snug">
+                Sign in to build your plan
+              </p>
+              <p className="text-white/75 text-sm mt-1 leading-relaxed">
+                Your idea is ready. Sign in so we can generate your AI-powered
+                blueprint.
+              </p>
+            </div>
+          </div>
+
+          {/* Idea preview pill */}
+          {idea && idea.trim().length > 0 && (
+            <div
+              className="mt-4 px-3 py-2 rounded-[var(--r-md)] text-xs text-white/90 line-clamp-2 leading-relaxed"
+              style={{ background: "rgba(255,255,255,0.12)" }}
+            >
+              💡 "{idea.trim().slice(0, 120)}
+              {idea.trim().length > 120 ? "…" : ""}"
+            </div>
+          )}
+        </div>
+
+        {/* Benefits */}
+        <div className="px-6 py-5">
+          <ul className="flex flex-col gap-2.5 mb-5">
+            {[
+              { icon: "🎯", text: "AI generates your full project blueprint" },
+              { icon: "✅", text: "Track tasks, milestones & streaks" },
+              { icon: "☁️", text: "Projects sync across all your devices" },
+              { icon: "🆓", text: "100% free — no credit card needed" },
+            ].map(({ icon, text }) => (
+              <li
+                key={text}
+                className="flex items-center gap-3 text-sm"
+                style={{ color: "var(--text-primary)" }}
+              >
+                <span
+                  className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 text-sm"
+                  style={{ background: "var(--emerald-bg)" }}
+                >
+                  {icon}
+                </span>
+                {text}
+              </li>
+            ))}
+          </ul>
+
+          {/* CTAs */}
+          <div className="flex flex-col gap-2.5">
+            <button
+              onClick={() => {
+                // Trigger Clerk sign-up modal via programmatic click on a hidden SignUpButton
+                const btn = document.getElementById("__new_signup_trigger");
+                if (btn) btn.click();
+              }}
+              className="w-full h-11 rounded-[var(--r-md)] font-semibold text-sm text-white transition-all active:scale-[0.97]"
+              style={{ background: "var(--violet)" }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.background = "var(--violet-dim)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.background = "var(--violet)")
+              }
+            >
+              Create free account — 30 seconds
+            </button>
+
+            <button
+              onClick={() => {
+                const btn = document.getElementById("__new_signin_trigger");
+                if (btn) btn.click();
+              }}
+              className="w-full h-11 rounded-[var(--r-md)] border text-sm transition-all"
+              style={{
+                borderColor: "var(--border)",
+                color: "var(--text-secondary)",
+                background: "transparent",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = "var(--bg-subtle)";
+                e.currentTarget.style.color = "var(--text-primary)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = "transparent";
+                e.currentTarget.style.color = "var(--text-secondary)";
+              }}
+            >
+              Sign in to existing account
+            </button>
+
+            <button
+              onClick={onClose}
+              className="w-full py-2 text-xs transition-colors"
+              style={{ color: "var(--text-tertiary)" }}
+              onMouseEnter={(e) =>
+                (e.currentTarget.style.color = "var(--text-secondary)")
+              }
+              onMouseLeave={(e) =>
+                (e.currentTarget.style.color = "var(--text-tertiary)")
+              }
+            >
+              ← Go back and edit my idea
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes gateIn {
+          from { opacity: 0; transform: translateY(24px) scale(0.97); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @media (max-width: 640px) {
+          @keyframes gateIn {
+            from { opacity: 0; transform: translateY(100%); }
+            to   { opacity: 1; transform: translateY(0); }
+          }
+        }
+      `}</style>
+    </div>
+  );
+}
 
 const STEP_LABELS_KEYS = ["Capture", "Clarify", "Scope", "Review", "Commit"];
 
@@ -87,14 +241,11 @@ function RegenPermissionBanner({ onKeep, onRegenerate, t }) {
   );
 }
 
-// Add stable serializer / input key builder to avoid false "stale" detections
 function stableSerializeClarifyAnswers(answers) {
-  // produce a deterministic array of answers based on numeric indices
   if (!answers || typeof answers !== "object") return "[]";
   const keys = Object.keys(answers)
     .filter((k) => k != null)
     .sort((a, b) => {
-      // sort numerically when possible e.g. "0","1"... else lexicographic
       const na = Number.isFinite(Number(a)) ? Number(a) : a;
       const nb = Number.isFinite(Number(b)) ? Number(b) : b;
       if (typeof na === "number" && typeof nb === "number") return na - nb;
@@ -103,7 +254,6 @@ function stableSerializeClarifyAnswers(answers) {
   const arr = keys.map((k) => {
     const v = answers[k];
     if (v == null) return "";
-    // normalize whitespace so insignificant changes don't flip the key
     return String(v).replace(/\s+/g, " ").trim();
   });
   return JSON.stringify(arr);
@@ -120,7 +270,6 @@ function buildInputKey({
     .replace(/\s+/g, " ")
     .trim();
   const clar = stableSerializeClarifyAnswers(clarifyAnswers);
-  // include locale and allowed flag to ensure exact matching when relevant
   return `${ideaNorm}||${scopeLevel}||${clar}||${locale}||${
     limitAllowed ? "1" : "0"
   }`;
@@ -136,12 +285,14 @@ export default function NewProjectPage() {
 
 function NewProjectContent() {
   const router = useRouter();
-  const { isSignedIn } = useUser();
+  const { isSignedIn, isLoaded } = useUser();
   const { locale, t } = useI18n();
   const addProject = useProjectStore((s) => s.addProject);
-  const { loading: limitLoading, allowed: limitAllowed } = useProjectLimit();
 
-  const [showEarlyAuthGate, setShowEarlyAuthGate] = useState(false);
+  // Auth gate state — shown when user tries to proceed from capture without being signed in
+  const [showCaptureAuthGate, setShowCaptureAuthGate] = useState(false);
+  const [pendingAdvance, setPendingAdvance] = useState(false);
+
   const [step, setStep] = useState(0);
   const [maxReached, setMaxReached] = useState(0);
   const [idea, setIdea] = useState("");
@@ -164,24 +315,11 @@ function NewProjectContent() {
   const isMountedRef = useRef(true);
   const MAX_RETRIES = 2;
 
-  const genInputsRef = useRef({
-    idea,
-    clarifyAnswers,
-    scopeLevel,
-    limitAllowed,
-    locale,
-  });
+  const genInputsRef = useRef({ idea, clarifyAnswers, scopeLevel, locale });
   useEffect(() => {
-    genInputsRef.current = {
-      idea,
-      clarifyAnswers,
-      scopeLevel,
-      limitAllowed,
-      locale,
-    };
-  }, [idea, clarifyAnswers, scopeLevel, limitAllowed, locale]);
+    genInputsRef.current = { idea, clarifyAnswers, scopeLevel, locale };
+  }, [idea, clarifyAnswers, scopeLevel, locale]);
 
-  // Keep t() fresh
   const tRef = useRef(t);
   useEffect(() => {
     tRef.current = t;
@@ -203,10 +341,14 @@ function NewProjectContent() {
       localStorage.setItem("puter.auth.token", authToken);
   }, []);
 
+  // If user just signed in while gate was showing, auto-advance
   useEffect(() => {
-    if (!limitLoading && !limitAllowed && !isSignedIn)
-      setShowEarlyAuthGate(true);
-  }, [limitLoading, limitAllowed, isSignedIn]);
+    if (isLoaded && isSignedIn && pendingAdvance) {
+      setPendingAdvance(false);
+      setShowCaptureAuthGate(false);
+      advance(1);
+    }
+  }, [isLoaded, isSignedIn, pendingAdvance]); // eslint-disable-line
 
   const goTo = useCallback(
     (target) => {
@@ -221,6 +363,17 @@ function NewProjectContent() {
     setMaxReached((prev) => Math.max(prev, target));
   }, []);
 
+  // Called when user presses "Continue" from StepCapture
+  // Gate fires here if not signed in
+  const handleCaptureNext = useCallback(() => {
+    if (!isSignedIn) {
+      setPendingAdvance(true);
+      setShowCaptureAuthGate(true);
+      return;
+    }
+    advance(1);
+  }, [isSignedIn, advance]);
+
   const handleIdeaChange = useCallback((v) => setIdea(v), []);
   const handleClarifyChange = useCallback(
     (i, v) => setClarifyAnswers((prev) => ({ ...prev, [i]: v })),
@@ -228,13 +381,12 @@ function NewProjectContent() {
   );
   const handleScopeChange = useCallback((v) => setScopeLevel(v), []);
 
-  // replace inputKey with buildInputKey to make stale detection deterministic
   const inputKey = buildInputKey({
     idea,
     scopeLevel,
     clarifyAnswers,
     locale,
-    limitAllowed,
+    limitAllowed: isSignedIn,
   });
 
   const blueprintIsStale =
@@ -263,13 +415,14 @@ function NewProjectContent() {
       idea: currentIdea,
       clarifyAnswers: currentAnswers,
       scopeLevel: currentScope,
-      limitAllowed: currentAllowed,
       locale: currentLocale,
     } = genInputsRef.current;
     const currentT = tRef.current;
 
-    if (!currentAllowed) {
-      setGenStatus("limited");
+    // Should not reach here if not signed in, but guard anyway
+    if (!isSignedIn) {
+      setPendingAdvance(true);
+      setShowCaptureAuthGate(true);
       return;
     }
 
@@ -280,13 +433,12 @@ function NewProjectContent() {
     setGenError(null);
     rawRef.current = "";
 
-    // capture the exact input key for this generation run
     const generationInputKey = buildInputKey({
       idea: currentIdea,
       scopeLevel: currentScope,
       clarifyAnswers: currentAnswers,
       locale: currentLocale,
-      limitAllowed: currentAllowed,
+      limitAllowed: true,
     });
 
     stopWaitRef.current = startWaitSequence(currentT);
@@ -361,10 +513,7 @@ function NewProjectContent() {
       toast.success(currentT("toast_blueprint_ready"), { duration: 3000 });
 
       setBlueprint(parsed);
-
-      // set the blueprintKey to the stable generation input key captured earlier
       setBlueprintKey(generationInputKey);
-
       setGenStatus("done");
       setStep(4);
       setMaxReached((prev) => Math.max(prev, 4));
@@ -407,7 +556,7 @@ function NewProjectContent() {
       setGenStatus("error");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stopGeneration]);
+  }, [stopGeneration, isSignedIn]);
 
   const handleStartGeneration = useCallback(() => {
     retryCountRef.current = 0;
@@ -433,19 +582,16 @@ function NewProjectContent() {
   }, [runGeneration]);
 
   const handleKeepPlan = useCallback(() => {
-    // When user explicitly chooses to keep the current plan, mark the blueprint
-    // as matching the current inputs (use stable key) — this prevents spurious
-    // stale banners caused by object key order or whitespace.
     const currentKey = buildInputKey({
       idea,
       scopeLevel,
       clarifyAnswers,
       locale,
-      limitAllowed,
+      limitAllowed: isSignedIn,
     });
     setBlueprintKey(currentKey);
     toast.success(t("toast_keep_plan"), { duration: 2000 });
-  }, [idea, scopeLevel, clarifyAnswers, locale, limitAllowed, t]);
+  }, [idea, scopeLevel, clarifyAnswers, locale, isSignedIn, t]);
 
   const handleCommit = useCallback(
     async ({ deadline }) => {
@@ -486,58 +632,27 @@ function NewProjectContent() {
     [blueprint, scopeLevel, addProject, router, t]
   );
 
-  if (!limitLoading && !limitAllowed && !isSignedIn) {
-    return (
-      <div className="flex h-screen overflow-hidden">
-        <Sidebar />
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-          <TopBar />
-          <main className="flex-1 overflow-y-auto bg-[var(--bg-elevated)]">
-            <div className="flex items-center justify-center px-4 py-12">
-              <div className="w-full max-w-md text-center flex flex-col gap-6">
-                <div className="text-5xl">🎯</div>
-                <div>
-                  <h1 className="font-display font-bold text-2xl text-[var(--text-primary)] mb-2">
-                    {t("intake_review_limit_title_anon")}
-                  </h1>
-                  <p className="text-[var(--text-secondary)] leading-relaxed">
-                    {t("intake_review_limit_desc_anon")}
-                  </p>
-                </div>
-                <div className="flex flex-col gap-2 mx-auto w-full max-w-xs">
-                  <button
-                    onClick={() => setShowEarlyAuthGate(true)}
-                    className="w-full h-12 rounded-[var(--r-md)] bg-[var(--violet)] text-white font-semibold hover:bg-[var(--violet-dim)] transition-colors"
-                  >
-                    {t("intake_review_limit_signup")}
-                  </button>
-                  <button
-                    onClick={() => router.push("/")}
-                    className="w-full h-10 rounded-[var(--r-md)] border border-[var(--border)] text-sm text-[var(--text-secondary)] hover:bg-[var(--bg-subtle)]"
-                  >
-                    {t("common_back")}
-                  </button>
-                </div>
-              </div>
-            </div>
-          </main>
-          <AuthGateModal
-            open={showEarlyAuthGate}
-            onClose={() => setShowEarlyAuthGate(false)}
-            onContinueAnyway={() => setShowEarlyAuthGate(false)}
-          />
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex h-screen overflow-hidden">
+      {/* Hidden Clerk trigger buttons — programmatically clicked by gate overlay */}
+      <div className="hidden" aria-hidden="true">
+        <SignUpButtonHidden
+          onSuccess={() => {
+            setPendingAdvance(true);
+          }}
+        />
+        <SignInButtonHidden
+          onSuccess={() => {
+            setPendingAdvance(true);
+          }}
+        />
+      </div>
+
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
         <TopBar />
 
-        {/* Step breadcrumb — compact on mobile */}
+        {/* Step breadcrumb */}
         <div className="border-b border-[var(--border)] bg-[var(--bg-elevated)] px-3 sm:px-6 py-2.5 sm:py-4 sticky top-0 z-10 backdrop-blur-sm shadow-sm">
           <div className="max-w-2xl mx-auto">
             <div className="flex items-center gap-1 sm:gap-2">
@@ -547,19 +662,15 @@ function NewProjectContent() {
                 const isDonePast = isVisited && i < step;
                 const isClickable = isVisited && !isActive;
                 return (
-                  <div key={i} className="flex items-center gap-1 sm:gap-2 ">
+                  <div key={i} className="flex items-center gap-1 sm:gap-2">
                     <button
                       onClick={() => isClickable && goTo(i)}
                       disabled={!isClickable}
                       aria-current={isActive ? "step" : undefined}
                       aria-disabled={!isClickable}
-                      style={{
-                        borderRadius: "1.5rem",
-                        padding: "5px",
-                      }}
+                      style={{ borderRadius: "1.5rem", padding: "5px" }}
                       className={[
                         "flex items-center gap-1 sm:gap-1.5 transition-all p-2",
-                        // remove any default browser background and ensure consistent focus behavior
                         "appearance-none -webkit-appearance-none bg-transparent focus:outline-none focus:ring-2 focus:ring-[var(--violet)] rounded",
                         isClickable
                           ? "cursor-pointer hover:opacity-90"
@@ -583,7 +694,7 @@ function NewProjectContent() {
                           <FiCheck size={10} strokeWidth={2.5} />
                         ) : (
                           i + 1
-                        )}{" "}
+                        )}
                       </div>
                       <span
                         className={`text-xs font-medium hidden sm:block transition-colors ${
@@ -626,7 +737,7 @@ function NewProjectContent() {
                 <StepCapture
                   value={idea}
                   onChange={handleIdeaChange}
-                  onNext={() => advance(1)}
+                  onNext={handleCaptureNext}
                 />
               )}
               {step === 1 && (
@@ -678,8 +789,8 @@ function NewProjectContent() {
                       setBlueprint(bp);
                       advance(4);
                     }}
-                    limitAllowed={limitAllowed}
-                    limitLoading={limitLoading}
+                    limitAllowed={true}
+                    limitLoading={false}
                   />
                 </>
               )}
@@ -706,6 +817,7 @@ function NewProjectContent() {
             </div>
           </div>
         </main>
+
         <TosModal
           open={showTos}
           onAccept={() => {
@@ -716,6 +828,47 @@ function NewProjectContent() {
         />
         <SavePromptModal />
       </div>
+
+      {/* Auth gate overlay — shown when unauthenticated user tries to proceed from capture */}
+      {showCaptureAuthGate && !isSignedIn && (
+        <CaptureAuthGate
+          idea={idea}
+          onClose={() => {
+            setShowCaptureAuthGate(false);
+            setPendingAdvance(false);
+          }}
+          onContinueAnyway={() => {
+            // Not offered — user must sign in
+            setShowCaptureAuthGate(false);
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+// ─── Hidden Clerk trigger wrappers ────────────────────────────────────
+// These render Clerk's modal buttons invisibly so we can trigger them
+// programmatically from the custom overlay.
+
+import { SignUpButton, SignInButton } from "@clerk/nextjs";
+
+function SignUpButtonHidden({ onSuccess }) {
+  return (
+    <SignUpButton mode="modal" afterSignUpUrl="/new">
+      <button id="__new_signup_trigger" tabIndex={-1} aria-hidden="true">
+        signup
+      </button>
+    </SignUpButton>
+  );
+}
+
+function SignInButtonHidden({ onSuccess }) {
+  return (
+    <SignInButton mode="modal" afterSignInUrl="/new">
+      <button id="__new_signin_trigger" tabIndex={-1} aria-hidden="true">
+        signin
+      </button>
+    </SignInButton>
   );
 }

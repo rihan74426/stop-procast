@@ -1,18 +1,16 @@
 // app/api/feedback/route.js
 // Feedback & bug reports — stored in MongoDB (or falls back to in-memory)
-// Also forwards to external dashboard at nuruddin-webician.vercel.app
+// Email notifications handled by portfolio dashboard (forwardToExternalDashboard)
 
 import { auth, clerkClient } from "@clerk/nextjs/server";
 import { tryConnectDB } from "@/lib/db/mongoose";
 import { generateId, getFeedbackModel, memStore } from "@/lib/models/Feedback";
 
-const FORMSPREE_ENDPOINT = "https://formspree.io/f/mpqbqjkd";
 const EXTERNAL_FEEDBACK_URL =
   "https://nuruddin-webician.vercel.app/api/feedback";
 
 // Helper to create an AbortSignal with a timeout that works across runtimes
 function createTimeoutSignal(ms) {
-  // Prefer native AbortSignal.timeout if available
   if (
     typeof AbortSignal !== "undefined" &&
     typeof AbortSignal.timeout === "function"
@@ -20,26 +18,30 @@ function createTimeoutSignal(ms) {
     try {
       return AbortSignal.timeout(ms);
     } catch {
-      // fall through to fallback below
+      // fall through
     }
   }
-  // Fallback for environments without AbortSignal.timeout
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), ms);
-  // Clear timeout if caller uses the signal before it fires (best-effort)
-  const signal = controller.signal;
-  // attach a small finalizer to clear the timer when aborted/finished
-  signal.addEventListener("abort", () => clearTimeout(id), { once: true });
-  return signal;
+  controller.signal.addEventListener("abort", () => clearTimeout(id), {
+    once: true,
+  });
+  return controller.signal;
 }
 
-// ─── Forward to external dashboard (fire-and-forget) ──────────────────
+// ─── Forward to portfolio dashboard + trigger email via portfolio Formspree ──
+// Fire-and-forget. Portfolio's /api/feedback handles its own Formspree notify.
 async function forwardToExternalDashboard(item) {
   try {
     const secret = process.env.FEEDBACK_API_SECRET;
-    if (!secret) return; // skip if not configured
+    if (!secret) {
+      console.warn(
+        "[feedback] FEEDBACK_API_SECRET not set — skipping external forward"
+      );
+      return;
+    }
 
-    await fetch(EXTERNAL_FEEDBACK_URL, {
+    const res = await fetch(EXTERNAL_FEEDBACK_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -47,77 +49,27 @@ async function forwardToExternalDashboard(item) {
       },
       body: JSON.stringify({
         appId: "Momentum",
+        // portfolio stores "feature" not "suggestion"
         type: item.type === "suggestion" ? "feature" : item.type,
         message: item.body ? `${item.title}\n\n${item.body}` : item.title,
         metadata: {
           originalType: item.type,
-          sessionId: item.sessionId,
+          feedbackId: item.id,
+          sessionId: item.sessionId ?? null,
           submittedAt: item.createdAt,
         },
       }),
-      signal: createTimeoutSignal(6000),
-    });
-  } catch (err) {
-    // Fire-and-forget — never block the response; include stack for diagnostics
-    console.warn(
-      "[feedback] external forward failed:",
-      err?.message ?? err,
-      err?.stack ?? ""
-    );
-  }
-}
-
-// ─── Notify admins via Formspree ──────────────────────────────────────
-async function notifyAdmins(item) {
-  try {
-    const typeLabel =
-      {
-        bug: "🐛 Bug Report",
-        suggestion: "💡 Idea / Suggestion",
-        praise: "⭐ Praise",
-        question: "❓ Question",
-      }[item.type] ?? item.type;
-
-    const params = new URLSearchParams();
-    params.set("type", typeLabel);
-    params.set("title", item.title);
-    params.set("details", item.body || "(no details provided)");
-    params.set("submitted_at", item.createdAt);
-    params.set(
-      "feedback_url",
-      `${
-        process.env.NEXT_PUBLIC_APP_URL ?? "https://momentum-app.com"
-      }/feedback`
-    );
-    params.set("_subject", `[Momentum Feedback] ${typeLabel}: ${item.title}`);
-
-    const res = await fetch(FORMSPREE_ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-        Accept: "application/json",
-      },
-      body: params.toString(),
-      signal: createTimeoutSignal(8000),
+      // 12 s — enough for a Vercel cold start on the portfolio side
+      signal: createTimeoutSignal(12000),
     });
 
     if (!res.ok) {
-      // attempt to read response body (text or json) for better diagnostics
-      let text = "";
-      try {
-        text = await res.text();
-      } catch {
-        text = "<failed to read body>";
-      }
-      console.warn("[feedback] Formspree notify failed:", res.status, text);
+      const text = await res.text().catch(() => "<unreadable>");
+      console.warn(`[feedback] external forward returned ${res.status}:`, text);
     }
   } catch (err) {
-    // include stack for better error diagnosis
-    console.warn(
-      "[feedback] Formspree notify error:",
-      err?.message ?? err,
-      err?.stack ?? ""
-    );
+    // fire-and-forget — never block the 201 response
+    console.warn("[feedback] external forward failed:", err?.message ?? err);
   }
 }
 
@@ -222,8 +174,8 @@ export async function POST(request) {
       savedItem = clean;
     }
 
-    // Fire-and-forget notifications
-    notifyAdmins(savedItem);
+    // Forward to portfolio — this is the ONLY notification path.
+    // Portfolio's /api/feedback stores it in its own DB + fires Formspree email.
     forwardToExternalDashboard(savedItem);
 
     return Response.json({ item: savedItem, fallback: !db }, { status: 201 });

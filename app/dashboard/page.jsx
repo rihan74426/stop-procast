@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useUser } from "@clerk/nextjs";
+import { useRouter } from "next/navigation";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { ProjectCard } from "@/components/dashboard/ProjectCard";
 import { EmptyState } from "@/components/dashboard/EmptyState";
@@ -100,16 +101,49 @@ function DashboardGreeting({ user, projectCount }) {
   );
 }
 
+/* ─── Auth gate loading screen ───────────────────────────────────────── */
+function DashboardAuthGate() {
+  const router = useRouter();
+
+  useEffect(() => {
+    // Small delay so user sees redirect is happening
+    const t = setTimeout(() => router.replace("/"), 100);
+    return () => clearTimeout(t);
+  }, [router]);
+
+  return (
+    <div className="flex h-screen items-center justify-center">
+      <div
+        className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
+        style={{ borderColor: "var(--violet)", borderTopColor: "transparent" }}
+      />
+    </div>
+  );
+}
+
 /* ─── Main dashboard ─────────────────────────────────────────────────── */
 function DashboardContent() {
   const { t } = useI18n();
   const { user, isLoaded, isSignedIn } = useUser();
+  const router = useRouter();
   const projects = useProjectStore((s) => s.projects);
 
   const active = projects.filter((p) => !p.completionDate);
   const completed = projects.filter((p) => p.completionDate);
 
   const [showImport, setShowImport] = useState(false);
+
+  // Redirect unauthenticated users to landing page
+  useEffect(() => {
+    if (isLoaded && !isSignedIn) {
+      router.replace("/");
+    }
+  }, [isLoaded, isSignedIn, router]);
+
+  // Show spinner while Clerk loads or while redirecting
+  if (!isLoaded || !isSignedIn) {
+    return <DashboardAuthGate />;
+  }
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -121,9 +155,7 @@ function DashboardContent() {
             {/* Header row */}
             <div className="flex items-start justify-between mb-5 sm:mb-6 gap-3">
               <div className="flex-1 min-w-0">
-                {isLoaded && (
-                  <DashboardGreeting user={user} projectCount={active.length} />
-                )}
+                <DashboardGreeting user={user} projectCount={active.length} />
                 <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
                   {active.length === 0
                     ? t("dashboard_no_active")
