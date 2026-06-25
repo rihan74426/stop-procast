@@ -12,6 +12,7 @@ export default clerkMiddleware(async (auth, req) => {
 
   // These paths are unconditionally public — never intercepted
   if (
+    pathname.startsWith("/dashboard") ||
     pathname.startsWith("/feedback") ||
     pathname.startsWith("/api/feedback")
   ) {

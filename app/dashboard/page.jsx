@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { useUser } from "@clerk/nextjs";
-import { useRouter } from "next/navigation";
+import { useUser, SignInButton, SignUpButton } from "@clerk/nextjs";
 import { useProjectStore } from "@/lib/store/projectStore";
 import { ProjectCard } from "@/components/dashboard/ProjectCard";
 import { EmptyState } from "@/components/dashboard/EmptyState";
@@ -25,7 +24,7 @@ import {
   FaBullseye,
   FaChartLine,
 } from "react-icons/fa";
-import { FiSmile } from "react-icons/fi";
+import { FiSmile, FiBookmark, FiTrendingUp, FiGlobe } from "react-icons/fi";
 
 /* ─── Greeting helpers ───────────────────────────────────────────────── */
 function getTimeGreeting(t) {
@@ -101,22 +100,108 @@ function DashboardGreeting({ user, projectCount }) {
   );
 }
 
-/* ─── Auth gate loading screen ───────────────────────────────────────── */
-function DashboardAuthGate() {
-  const router = useRouter();
-
-  useEffect(() => {
-    // Small delay so user sees redirect is happening
-    const t = setTimeout(() => router.replace("/"), 100);
-    return () => clearTimeout(t);
-  }, [router]);
-
+/* ─── Sign-in prompt for unauthenticated users ───────────────────────── */
+function SignInPrompt() {
+  const { t } = useI18n();
   return (
-    <div className="flex h-screen items-center justify-center">
+    <div className="flex flex-col items-center justify-center py-16 sm:py-24 px-6 text-center">
+      {/* Icon */}
       <div
-        className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
-        style={{ borderColor: "var(--violet)", borderTopColor: "transparent" }}
-      />
+        className="w-20 h-20 rounded-[var(--r-xl)] flex items-center justify-center mb-8"
+        style={{
+          background: "var(--violet-bg)",
+          border:
+            "1.5px solid color-mix(in srgb, var(--violet) 30%, transparent)",
+        }}
+      >
+        <FaRocket size={28} style={{ color: "var(--violet)" }} />
+      </div>
+
+      <h2
+        className="font-display font-semibold text-2xl mb-3"
+        style={{ color: "var(--text-primary)" }}
+      >
+        Your projects live here
+      </h2>
+      <p
+        className="max-w-sm leading-relaxed mb-8 text-sm sm:text-base"
+        style={{ color: "var(--text-secondary)" }}
+      >
+        Sign in to see your projects, track progress, and pick up where you left
+        off.
+      </p>
+
+      {/* Feature list */}
+      <ul className="flex flex-col gap-2.5 mb-8 text-left max-w-xs w-full">
+        {[
+          { icon: FiBookmark, text: "Projects sync across all devices" },
+          { icon: FiTrendingUp, text: "Track streaks and milestones" },
+          { icon: FiGlobe, text: "Share completed plans with the community" },
+        ].map(({ icon: Icon, text }) => (
+          <li
+            key={text}
+            className="flex items-center gap-3 text-sm"
+            style={{ color: "var(--text-primary)" }}
+          >
+            <span
+              className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
+              style={{ background: "var(--emerald-bg)" }}
+            >
+              <Icon size={13} style={{ color: "var(--emerald)" }} />
+            </span>
+            {text}
+          </li>
+        ))}
+      </ul>
+
+      <div className="flex flex-col sm:flex-row gap-3 w-full max-w-xs">
+        <SignUpButton mode="modal">
+          <button
+            className="flex-1 h-11 rounded-[var(--r-md)] text-sm font-semibold text-white transition-all active:scale-[0.97]"
+            style={{ background: "var(--violet)" }}
+            onMouseEnter={(e) =>
+              (e.currentTarget.style.background = "var(--violet-dim)")
+            }
+            onMouseLeave={(e) =>
+              (e.currentTarget.style.background = "var(--violet)")
+            }
+          >
+            Create free account
+          </button>
+        </SignUpButton>
+        <SignInButton mode="modal">
+          <button
+            className="flex-1 h-11 rounded-[var(--r-md)] border text-sm transition-all"
+            style={{
+              borderColor: "var(--border)",
+              color: "var(--text-secondary)",
+              background: "transparent",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = "var(--bg-subtle)";
+              e.currentTarget.style.color = "var(--text-primary)";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = "transparent";
+              e.currentTarget.style.color = "var(--text-secondary)";
+            }}
+          >
+            Sign in
+          </button>
+        </SignInButton>
+      </div>
+
+      <p className="mt-5 text-xs" style={{ color: "var(--text-tertiary)" }}>
+        Or{" "}
+        <Link
+          href="/new"
+          className="hover:underline"
+          style={{ color: "var(--violet)" }}
+        >
+          start a new project
+        </Link>{" "}
+        without an account
+      </p>
     </div>
   );
 }
@@ -125,25 +210,12 @@ function DashboardAuthGate() {
 function DashboardContent() {
   const { t } = useI18n();
   const { user, isLoaded, isSignedIn } = useUser();
-  const router = useRouter();
   const projects = useProjectStore((s) => s.projects);
 
   const active = projects.filter((p) => !p.completionDate);
   const completed = projects.filter((p) => p.completionDate);
 
   const [showImport, setShowImport] = useState(false);
-
-  // Redirect unauthenticated users to landing page
-  useEffect(() => {
-    if (isLoaded && !isSignedIn) {
-      router.replace("/");
-    }
-  }, [isLoaded, isSignedIn, router]);
-
-  // Show spinner while Clerk loads or while redirecting
-  if (!isLoaded || !isSignedIn) {
-    return <DashboardAuthGate />;
-  }
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -156,102 +228,121 @@ function DashboardContent() {
             <div className="flex items-start justify-between mb-5 sm:mb-6 gap-3">
               <div className="flex-1 min-w-0">
                 <DashboardGreeting user={user} projectCount={active.length} />
-                <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
-                  {active.length === 0
-                    ? t("dashboard_no_active")
-                    : active.length === 1
-                    ? t("dashboard_active_count", { count: 1 })
-                    : t("dashboard_active_count_plural", {
-                        count: active.length,
-                      })}
-                </p>
+                {isSignedIn && (
+                  <p className="text-xs sm:text-sm text-[var(--text-secondary)]">
+                    {active.length === 0
+                      ? t("dashboard_no_active")
+                      : active.length === 1
+                      ? t("dashboard_active_count", { count: 1 })
+                      : t("dashboard_active_count_plural", {
+                          count: active.length,
+                        })}
+                  </p>
+                )}
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowImport(true)}
-                  className="gap-1.5"
-                  title="Import a project from JSON"
-                >
-                  <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
-                    <path
-                      d="M7 1v8M4 6l3 3 3-3M2 11h10"
-                      stroke="currentColor"
-                      strokeWidth="1.6"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                  </svg>
-                  <span className="hidden sm:inline">Import</span>
-                </Button>
-
-                <Link href="/new">
-                  <Button size="sm" className="gap-1.5 sm:gap-2">
-                    <svg width="12" height="12" viewBox="0 0 14 14" fill="none">
+              {isSignedIn && (
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowImport(true)}
+                    className="gap-1.5"
+                    title="Import a project from JSON"
+                  >
+                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none">
                       <path
-                        d="M7 1v12M1 7h12"
+                        d="M7 1v8M4 6l3 3 3-3M2 11h10"
                         stroke="currentColor"
-                        strokeWidth="1.8"
+                        strokeWidth="1.6"
                         strokeLinecap="round"
+                        strokeLinejoin="round"
                       />
                     </svg>
-                    <span className="hidden sm:inline">
-                      {t("dashboard_new_project")}
-                    </span>
-                    <span className="sm:hidden">New</span>
+                    <span className="hidden sm:inline">Import</span>
                   </Button>
-                </Link>
-              </div>
+
+                  <Link href="/new">
+                    <Button size="sm" className="gap-1.5 sm:gap-2">
+                      <svg
+                        width="12"
+                        height="12"
+                        viewBox="0 0 14 14"
+                        fill="none"
+                      >
+                        <path
+                          d="M7 1v12M1 7h12"
+                          stroke="currentColor"
+                          strokeWidth="1.8"
+                          strokeLinecap="round"
+                        />
+                      </svg>
+                      <span className="hidden sm:inline">
+                        {t("dashboard_new_project")}
+                      </span>
+                      <span className="sm:hidden">New</span>
+                    </Button>
+                  </Link>
+                </div>
+              )}
             </div>
 
-            {/* Builder stats — only shown to signed-in users with public projects */}
-            {isSignedIn && projects.length > 0 && (
-              <BuilderStats projects={projects} />
-            )}
+            {/* Unauthenticated: show sign-in prompt */}
+            {!isSignedIn && isLoaded && <SignInPrompt />}
 
-            {/* Empty state */}
-            {projects.length === 0 && <EmptyState />}
+            {/* Authenticated content */}
+            {isSignedIn && (
+              <>
+                {/* Builder stats */}
+                {projects.length > 0 && <BuilderStats projects={projects} />}
 
-            {/* Active projects */}
-            {active.length > 0 && (
-              <section className="mb-8 sm:mb-10">
-                <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3 sm:mb-4">
-                  {t("dashboard_active")}
-                </p>
-                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {active.map((p) => (
-                    <ProjectCard key={p.id} project={p} />
-                  ))}
-                </div>
-              </section>
-            )}
+                {/* Empty state */}
+                {projects.length === 0 && <EmptyState />}
 
-            {/* Completed projects */}
-            {completed.length > 0 && (
-              <section className="pb-20 lg:pb-4">
-                <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3 sm:mb-4">
-                  {t("dashboard_shipped")}
-                </p>
-                <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                  {completed.map((p) => (
-                    <ProjectCard key={p.id} project={p} />
-                  ))}
-                </div>
-              </section>
+                {/* Active projects */}
+                {active.length > 0 && (
+                  <section className="mb-8 sm:mb-10">
+                    <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3 sm:mb-4">
+                      {t("dashboard_active")}
+                    </p>
+                    <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      {active.map((p) => (
+                        <ProjectCard key={p.id} project={p} />
+                      ))}
+                    </div>
+                  </section>
+                )}
+
+                {/* Completed projects */}
+                {completed.length > 0 && (
+                  <section className="pb-20 lg:pb-4">
+                    <p className="text-xs text-[var(--text-tertiary)] font-semibold uppercase tracking-widest mb-3 sm:mb-4">
+                      {t("dashboard_shipped")}
+                    </p>
+                    <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                      {completed.map((p) => (
+                        <ProjectCard key={p.id} project={p} />
+                      ))}
+                    </div>
+                  </section>
+                )}
+              </>
             )}
           </div>
 
-          {projects.length > 0 && <Footer />}
+          {isSignedIn && projects.length > 0 && <Footer />}
         </main>
       </div>
 
-      <ImportProjectModal
-        open={showImport}
-        onClose={() => setShowImport(false)}
-      />
-      <SavePromptModal />
+      {isSignedIn && (
+        <>
+          <ImportProjectModal
+            open={showImport}
+            onClose={() => setShowImport(false)}
+          />
+          <SavePromptModal />
+        </>
+      )}
     </div>
   );
 }
